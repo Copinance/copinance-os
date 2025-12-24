@@ -66,7 +66,7 @@ pytest -m integration
 
 ### Commit Messages
 
-Use clear, descriptive commit messages:
+Use clear, descriptive commit messages. A commit message template is available in [`.gitmessage`](.gitmessage) to help you follow these conventions:
 
 ```
 feat: add sentiment analysis workflow
@@ -133,6 +133,8 @@ When adding features, follow these steps:
 
 ## Pull Request Process
 
+**Important**: Try to create atomic PRs: each pull request should focus on a single change or feature implementation. Avoid bulk implementations to ensure a better code review experience. Use the [pull request template](.github/pull_request_template.md) to structure your PR description.
+
 1. **Update Tests**: Ensure all tests pass and add new ones
 2. **Update Documentation**: Update README, docstrings, and comments
 3. **Code Quality**: Run black, ruff, and mypy
@@ -142,10 +144,10 @@ When adding features, follow these steps:
 
 ### PR Checklist
 
-- [ ] Tests pass (`pytest`)
 - [ ] Code is formatted (`black`)
 - [ ] Linting passes (`ruff`)
 - [ ] Type checking passes (`mypy`)
+- [ ] Tests pass (`pytest`)
 - [ ] Documentation is updated
 - [ ] CHANGELOG is updated (for significant changes)
 - [ ] Commit messages follow conventions
@@ -175,6 +177,104 @@ class MyWorkflowExecutor(WorkflowExecutor):
 
     def get_workflow_type(self) -> str:
         return "my_workflow"
+```
+
+## Adding New Tools
+
+Tools are self-describing functions that wrap data providers or other functionality for use by LLMs or independently. To add a new tool:
+
+1. Create a class implementing the `Tool` interface from `domain/ports/tools.py`
+2. Implement `get_name()`, `get_description()`, `get_schema()`, and `execute()`
+3. Add tests for the tool
+4. Register the tool in a `ToolRegistry` or use factory functions
+
+### For Data Provider Tools
+
+If your tool wraps a data provider, extend `BaseDataProviderTool`:
+
+```python
+from typing import Any
+
+from copinanceos.domain.ports.data_providers import MarketDataProvider
+from copinanceos.domain.ports.tools import ToolResult, ToolSchema
+from copinanceos.infrastructure.tools.data_provider.base import BaseDataProviderTool
+
+class MyDataProviderTool(BaseDataProviderTool[MarketDataProvider]):
+    """Tool for getting custom data."""
+
+    def get_name(self) -> str:
+        return "get_custom_data"
+
+    def get_description(self) -> str:
+        return "Get custom data for a given symbol."
+
+    def get_schema(self) -> ToolSchema:
+        return self._build_schema(
+            name=self.get_name(),
+            description=self.get_description(),
+            parameters={
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Stock ticker symbol",
+                    }
+                },
+                "required": ["symbol"],
+            },
+        )
+
+    async def execute(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
+        return await self._execute_with_cache(force_refresh=force_refresh, **kwargs)
+
+    async def _execute_impl(self, **kwargs: Any) -> ToolResult:
+        validated = self.validate_parameters(**kwargs)
+        symbol = validated["symbol"]
+        
+        data = await self._provider.get_custom_data(symbol)
+        
+        return self._create_success_result(
+            data=data,
+            metadata={"symbol": symbol},
+        )
+```
+
+### For Standalone Tools
+
+For tools that don't wrap data providers, implement `Tool` directly:
+
+```python
+from copinanceos.domain.ports.tools import Tool, ToolResult, ToolSchema
+
+class MyStandaloneTool(Tool):
+    """Tool for performing custom operations."""
+
+    def get_name(self) -> str:
+        return "my_custom_tool"
+
+    def get_description(self) -> str:
+        return "Perform a custom operation."
+
+    def get_schema(self) -> ToolSchema:
+        return ToolSchema(
+            name=self.get_name(),
+            description=self.get_description(),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "string",
+                        "description": "Input parameter",
+                    }
+                },
+                "required": ["input"],
+            },
+        )
+
+    async def execute(self, **kwargs: Any) -> ToolResult:
+        validated = self.validate_parameters(**kwargs)
+        # Perform operation
+        result = self._perform_operation(validated["input"])
+        return ToolResult(success=True, data=result)
 ```
 
 ## Adding New Repository Implementations

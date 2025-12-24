@@ -130,7 +130,7 @@ python -m copinanceos.cli research run AAPL --workflow static
 python -m copinanceos.cli research set-context <research-id> --profile-id <profile-id>
 ```
 
-## 🧪 Testing
+## Testing
 
 Run all tests:
 ```bash
@@ -149,7 +149,7 @@ pytest -m integration
 pytest --cov=copinance --cov-report=html
 ```
 
-## 🔧 Development
+## Development
 
 ### Code Quality
 
@@ -193,7 +193,7 @@ pre-commit run --all-files
 - **[Governance](GOVERNANCE.md)** - How we make decisions
 - **[Changelog](CHANGELOG.md)** - Development history
 
-## 🎯 Core Concepts
+## Core Concepts
 
 ### Research Profiles
 
