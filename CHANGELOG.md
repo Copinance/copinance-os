@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Enhanced CONTRIBUTING.md with commit message template reference, pull request template guidance, and comprehensive "Adding New Tools" section
+- Rewrote MANIFESTO.md for improved clarity, structure, and messaging around the project's mission and vision
+- Updated README.md section headers to remove emoji formatting for consistency
+
 ### Added
 
 - Hexagonal architecture with 21+ extension interfaces for data providers, analyzers, strategies, and workflows
