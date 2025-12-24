@@ -43,7 +43,7 @@ venv: ## Create a Python virtual environment
 
 setup: venv ## Set up development environment (create venv and install dev dependencies)
 	@echo "Installing development dependencies..."
-	$(VENV_BIN)/pip install -e ".[dev,docs]"
+	$(VENV_BIN)/pip install -e ".[dev]"
 	$(VENV_BIN)/pre-commit install
 	$(VENV_BIN)/pre-commit install --hook-type pre-push
 	@echo ""
@@ -51,6 +51,8 @@ setup: venv ## Set up development environment (create venv and install dev depen
 	@echo ""
 	@echo "Activate the virtual environment with:"
 	@echo "  source $(VENV_BIN)/activate"
+	@echo ""
+	@echo "To build documentation, see docs/README.md"
 
 install: ## Install package in production mode
 	@if [ -d "$(VENV)" ]; then \
@@ -61,10 +63,10 @@ install: ## Install package in production mode
 
 install-dev: ## Install package in development mode with all dependencies
 	@if [ -d "$(VENV)" ]; then \
-		$(VENV_BIN)/pip install -e ".[dev,docs]"; \
+		$(VENV_BIN)/pip install -e ".[dev]"; \
 		$(VENV_BIN)/pre-commit install; \
 	else \
-		$(PIP) install -e ".[dev,docs]"; \
+		$(PIP) install -e ".[dev]"; \
 		$(PRE_COMMIT) install; \
 	fi
 
@@ -116,19 +118,14 @@ clean-venv: ## Remove virtual environment
 cli: ## Show CLI help
 	copinance --help
 
-docs: ## Build documentation with MkDocs
-	@if [ -d "$(VENV)" ]; then \
-		$(VENV_BIN)/mkdocs build; \
-	else \
-		mkdocs build; \
-	fi
+docs: ## Build documentation with Nextra
+	@echo "Building documentation with Nextra..."
+	@cd docs && npm install && npm run build
+	@echo "Documentation built in docs/out/"
 
-docs-serve: ## Serve documentation locally
-	@if [ -d "$(VENV)" ]; then \
-		$(VENV_BIN)/mkdocs serve; \
-	else \
-		mkdocs serve; \
-	fi
+docs-serve: ## Serve documentation locally with Nextra
+	@echo "Starting Nextra development server..."
+	@cd docs && npm install && npm run dev
 
 pre-commit: ## Run pre-commit hooks on all files
 	pre-commit run --all-files

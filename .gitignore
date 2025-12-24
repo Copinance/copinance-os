@@ -63,7 +63,13 @@ logs/
 
 # Documentation builds
 docs/_build/
-site/
+docs/site/
+
+# Next.js/Nextra (docs folder)
+.next/
+out/
+node_modules/
+*.tsbuildinfo
 
 # Jupyter Notebook
 .ipynb_checkpoints

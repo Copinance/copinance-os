@@ -49,7 +49,7 @@ copinanceos/
 - Strategy interfaces (screening, due diligence, valuation, risk, thematic, monitoring)
 - Core interfaces (repositories, workflows)
 
-See [Architecture](docs/developer-guide/architecture.md) for details.
+See [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture) for details.
 
 ## Quick Start
 
@@ -188,6 +188,7 @@ pre-commit run --all-files
   - [User Guide](https://copinance.github.io/copinance-os/user-guide/cli/) - CLI reference and workflows
   - [Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/) - Architecture and extending
   - [API Reference](https://copinance.github.io/copinance-os/api-reference/data-providers/) - Interfaces and APIs
+- **[Documentation Setup](docs/README.md)** - Local development setup for documentation
 - **[Contributing](CONTRIBUTING.md)** - How to contribute
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards
 - **[Governance](GOVERNANCE.md)** - How we make decisions
@@ -224,7 +225,7 @@ Copinance OS is designed as a **pure library** that integrates into any Python a
 - **Flexible persistence** - use in-memory, PostgreSQL, MongoDB, or any database
 - **Framework agnostic** - works with any Python web framework or application
 
-See [Getting Started](docs/getting-started/quickstart.md) for detailed integration guides.
+See [Getting Started](https://copinance.github.io/copinance-os/getting-started/quickstart) for detailed integration guides.
 
 ## Contributing
 

@@ -35,4 +35,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI interface with research, profile, stock, and cache management commands
 - Interactive profile creation prompts for personalized analysis
 - Comprehensive test suite with unit and integration tests
-- Complete documentation with MkDocs deployed to GitHub Pages
+- Complete documentation with Nextra deployed to GitHub Pages

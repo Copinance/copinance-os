@@ -1,6 +1,6 @@
 # Workflows
 
-Copinance OS supports two types of workflows for stock research.
+Copinance OS supports multiple types of workflows for stock research.
 
 ## Static Workflows
 
@@ -56,7 +56,7 @@ copinance research ask AAPL "What are the key financial risks?"
 
 ### Setup Required
 
-See [Configuration](configuration.md) for setting up Gemini API key.
+See [Configuration](configuration) for setting up Gemini API key.
 
 ## Timeframes
 
@@ -77,6 +77,30 @@ Both workflow types adapt to the research timeframe:
 - **Data**: Last 2 years, weekly intervals
 - **Use case**: Investment decisions
 
+## Fundamentals Workflows
+
+Fundamentals workflows focus specifically on fundamental analysis and financial metrics.
+
+### What It Does
+
+1. Retrieves comprehensive fundamental data
+2. Analyzes financial statements
+3. Calculates key financial ratios
+4. Provides fundamental metrics and trends
+
+### When to Use
+
+- ✅ Deep fundamental analysis
+- ✅ Financial statement review
+- ✅ Ratio analysis
+- ✅ No API key required
+
+### Example
+
+```bash
+copinance research run AAPL --workflow fundamentals --timeframe long_term
+```
+
 ## Choosing a Workflow
 
 **Use Static if:**
@@ -88,6 +112,11 @@ Both workflow types adapt to the research timeframe:
 - You have specific questions
 - You want adaptive analysis
 - You have an API key configured
+
+**Use Fundamentals if:**
+- You need detailed financial analysis
+- You want to focus on financial statements and ratios
+- You don't need AI-powered insights
 
 ## Research Lifecycle: Create, Execute, and Run
 
@@ -163,5 +192,6 @@ copinance research run AAPL --workflow static
 
 ## Next Steps
 
-- [CLI Reference](cli.md) - Command details
-- [Configuration](configuration.md) - Setting up API keys
+- [CLI Reference](cli) - Command details
+- [Configuration](configuration) - Setting up API keys
+

@@ -55,11 +55,21 @@ copinance profile list
 copinance profile get <profile-id>
 ```
 
+### Get Current Profile
+
+```bash
+copinance profile current
+```
+
+Shows the currently active profile (if any).
+
 ### Set Current Profile
 
 ```bash
 copinance profile set-current <profile-id>
 ```
+
+Set a profile as the current default. Omit the profile ID to clear the current profile.
 
 ### Delete Profile
 
@@ -97,7 +107,7 @@ copinance research create AAPL --workflow static --timeframe mid_term
 ```
 
 **Options:**
-- `--workflow <type>`: `static` or `agentic` (default: `static`)
+- `--workflow <type>`: `static`, `agentic`, or `fundamentals` (default: `static`)
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--profile-id <id>`: Profile ID for context (optional)
 
@@ -139,7 +149,7 @@ copinance research run AAPL --workflow agentic --question "Analyze this stock"
 ```
 
 **Options:**
-- `--workflow <type>`: `static` or `agentic` (default: `static`)
+- `--workflow <type>`: `static`, `agentic`, or `fundamentals` (default: `static`)
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--profile-id <id>`: Profile ID for context (optional)
 - `--question <question>`: Custom question for agentic workflows (optional)
@@ -173,7 +183,7 @@ copinance research ask AAPL "What is the current price and P/E ratio?"
 - `--profile-id <id>`: Profile ID for context (optional)
 
 **Note:**
-- Requires Gemini API key - see [Configuration](configuration.md)
+- Requires Gemini API key - see [Configuration](configuration)
 - If no profile is provided and you don't have a current profile, you'll be prompted to set your financial literacy level for personalized analysis
 
 ### Set Research Context
@@ -219,10 +229,52 @@ copinance research execute <research-id>
 copinance research get <research-id>
 ```
 
+## Cache Commands
+
+Copinance OS includes a built-in caching system to reduce API calls and improve performance.
+
+### Clear Cache
+
+Clear cached tool data:
+
+```bash
+# Clear all cache
+copinance cache clear
+
+# Clear cache for a specific tool
+copinance cache clear --tool <tool-name>
+```
+
+### Refresh Cache
+
+Refresh (delete) cache for a specific tool to force fresh data on next call:
+
+```bash
+# Refresh cache for a tool
+copinance cache refresh <tool-name>
+
+# Refresh cache for a tool with a specific symbol
+copinance cache refresh <tool-name> --symbol AAPL
+```
+
+### Cache Information
+
+View cache configuration and status:
+
+```bash
+copinance cache info
+```
+
+This shows:
+- Cache backend type
+- Cache directory location
+
 ## Getting Help
 
 ```bash
 copinance --help
 copinance research --help
 copinance profile --help
+copinance cache --help
 ```
+
