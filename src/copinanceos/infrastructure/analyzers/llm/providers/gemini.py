@@ -161,6 +161,14 @@ class GeminiProvider(LLMProvider):
         """
         return "gemini"
 
+    def get_model_name(self) -> str | None:
+        """Get the model name being used by this provider.
+
+        Returns:
+            Model name (e.g., "gemini-1.5-pro") or None if not configured
+        """
+        return self._model_name
+
     def _extract_response_text(self, response: Any) -> str:
         """Extract text from Gemini API response.
 
@@ -529,12 +537,35 @@ class GeminiProvider(LLMProvider):
                     if len(recent_tool_calls) > max_recent_history:
                         recent_tool_calls.pop(0)
 
+                    # Serialize response data for storage
+                    response_data = None
+                    if tool_result.success and tool_result.data is not None:
+                        # Serialize data, potentially truncating very large responses
+                        serialized_data = self._make_json_serializable(tool_result.data)
+                        # Truncate large lists (e.g., historical data with 1000+ points)
+                        if isinstance(serialized_data, list) and len(serialized_data) > 100:
+                            response_data = {
+                                "_truncated": True,
+                                "_total_items": len(serialized_data),
+                                "_items_shown": 100,
+                                "data": serialized_data[:100],
+                                "note": f"Response truncated: showing first 100 of {len(serialized_data)} items",
+                            }
+                        else:
+                            response_data = serialized_data
+
                     tool_calls_made.append(
                         {
                             "tool": tool_name,
                             "args": tool_args,
                             "success": tool_result.success,
                             "error": tool_result.error,
+                            "response": response_data,
+                            "metadata": (
+                                self._make_json_serializable(tool_result.metadata)
+                                if tool_result.metadata
+                                else None
+                            ),
                         }
                     )
 

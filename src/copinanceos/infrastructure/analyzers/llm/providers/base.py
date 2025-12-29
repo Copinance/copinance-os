@@ -62,6 +62,14 @@ class LLMProvider(ABC):
         """
         pass
 
+    def get_model_name(self) -> str | None:
+        """Get the model name being used by this provider.
+
+        Returns:
+            Model name (e.g., "gemini-1.5-pro", "llama2") or None if not available
+        """
+        return None
+
     async def generate_with_tools(
         self,
         prompt: str,

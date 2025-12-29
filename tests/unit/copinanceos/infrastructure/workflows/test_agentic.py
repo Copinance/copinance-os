@@ -72,6 +72,7 @@ class TestAgenticWorkflowExecutor:
         mock_llm = MagicMock(spec=LLMAnalyzer)
         mock_provider = MagicMock()
         mock_provider.get_provider_name = MagicMock(return_value="test_provider")
+        mock_provider.get_model_name = MagicMock(return_value="test-model")
         mock_provider.generate_with_tools = AsyncMock(
             return_value={
                 "text": "Test analysis",
@@ -105,6 +106,7 @@ class TestAgenticWorkflowExecutor:
         assert results["analysis_type"] == "agentic"
         assert results["status"] == "completed"
         assert results["llm_provider"] == "test_provider"
+        assert results["llm_model"] == "test-model"
         assert "analysis" in results
 
     async def test_execute_with_different_timeframes(self) -> None:

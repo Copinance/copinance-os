@@ -7,6 +7,7 @@ from copinanceos.domain.ports.data_providers import (
     MarketDataProvider,
 )
 from copinanceos.domain.ports.tools import Tool
+from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
 from copinanceos.infrastructure.tools.data_provider.fundamental_data import (
     FundamentalDataGetFinancialStatementsTool,
     FundamentalDataGetFundamentalsTool,
@@ -146,6 +147,9 @@ class DataProviderToolRegistry:
         if market_data_provider:
             tools = create_market_data_tools(market_data_provider)
             self._registry.register_many(tools)
+            # Also register market regime detection tools
+            regime_tools = create_market_regime_tools(market_data_provider)
+            self._registry.register_many(regime_tools)
 
         if fundamental_data_provider:
             tools = create_fundamental_data_tools(fundamental_data_provider)
