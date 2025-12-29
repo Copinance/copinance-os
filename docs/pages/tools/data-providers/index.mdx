@@ -1,0 +1,206 @@
+# Data Provider Tools
+
+Data provider tools wrap data provider methods, making them accessible to AI agents and workflows. These tools automatically handle caching, error handling, and parameter validation.
+
+## Market Data Tools
+
+Tools for accessing market data including quotes, historical prices, and stock search.
+
+### Available Tools
+
+#### `get_stock_quote`
+Get current stock quote including price, volume, and market data.
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+
+**Returns:**
+- Current price, previous close, open, high, low, volume, market cap, currency, exchange
+
+**Example:**
+```python
+from copinanceos.infrastructure.tools.data_provider import create_market_data_tools
+
+tools = create_market_data_tools(provider)
+quote_tool = tools[0]  # MarketDataGetQuoteTool
+result = await quote_tool.execute(symbol="AAPL")
+```
+
+#### `get_historical_stock_data`
+Get historical stock price data (OHLCV) for a given symbol and date range.
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `start_date` (required): Start date in ISO format (YYYY-MM-DD)
+- `end_date` (required): End date in ISO format (YYYY-MM-DD)
+- `interval` (optional, default: "1d"): Data interval (1d, 1wk, 1mo, 1h, 5m, 15m, 30m, 60m)
+
+**Returns:**
+- Array of historical stock data points with OHLCV data
+
+**Example:**
+```python
+result = await historical_tool.execute(
+    symbol="AAPL",
+    start_date="2024-01-01",
+    end_date="2024-12-31",
+    interval="1d"
+)
+```
+
+#### `search_stocks`
+Search for stocks by symbol or company name.
+
+**Parameters:**
+- `query` (required): Search query (symbol or company name)
+- `limit` (optional, default: 10): Maximum number of results
+
+**Returns:**
+- List of matching stocks with symbol, name, exchange, etc.
+
+## Fundamental Data Tools
+
+Tools for accessing fundamental data including financial statements, SEC filings, and comprehensive fundamentals.
+
+### Available Tools
+
+#### `get_fundamentals`
+Get comprehensive fundamental data for a stock.
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `periods` (optional, default: 5): Number of periods to retrieve
+- `period_type` (optional, default: "annual"): "annual" or "quarterly"
+
+**Returns:**
+- Comprehensive fundamentals including financial statements, ratios, and metrics
+
+#### `get_financial_statements`
+Get specific financial statements (income statement, balance sheet, or cash flow).
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `statement_type` (required): "income_statement", "balance_sheet", or "cash_flow"
+- `period` (optional, default: "annual"): "annual" or "quarterly"
+
+**Returns:**
+- Financial statement data
+
+#### `get_sec_filings`
+Get SEC filings from EDGAR.
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `filing_types` (required): List of filing types (e.g., ["10-K", "10-Q", "8-K"])
+- `limit` (optional, default: 10): Maximum number of filings
+
+**Returns:**
+- List of SEC filings with metadata
+
+#### `get_sec_filing_content`
+Get the full content of a specific SEC filing.
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `filing_url` (required): URL or identifier of the filing
+- `filing_type` (optional): Type of filing
+
+**Returns:**
+- Full text content of the SEC filing
+
+## Creating Tools
+
+### Market Data Tools
+
+```python
+from copinanceos.infrastructure.tools.data_provider import create_market_data_tools
+from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+
+provider = YFinanceMarketProvider()
+tools = create_market_data_tools(provider, cache_manager=cache_manager)
+```
+
+### Fundamental Data Tools
+
+```python
+from copinanceos.infrastructure.tools.data_provider import (
+    create_fundamental_data_tools,
+    create_fundamental_data_tools_with_providers,
+)
+
+# Single provider
+tools = create_fundamental_data_tools(provider, cache_manager=cache_manager)
+
+# Multiple providers (e.g., different provider for SEC filings)
+tools = create_fundamental_data_tools_with_providers(
+    default_provider=fundamental_provider,
+    sec_filings_provider=edgar_provider,
+    cache_manager=cache_manager,
+)
+```
+
+## Caching
+
+All data provider tools support optional caching to reduce API calls and improve performance. When a cache manager is provided, tools will:
+
+- Cache successful results
+- Return cached data when available
+- Respect cache TTL settings
+- Support cache invalidation with `force_refresh=True`
+
+**Example:**
+```python
+from copinanceos.infrastructure.cache import CacheManager
+
+cache_manager = CacheManager()
+tools = create_market_data_tools(provider, cache_manager=cache_manager)
+
+# First call - fetches from API
+result1 = await tool.execute(symbol="AAPL")
+
+# Second call - returns cached data
+result2 = await tool.execute(symbol="AAPL")
+
+# Force refresh - bypasses cache
+result3 = await tool.execute(symbol="AAPL", force_refresh=True)
+```
+
+## Provider Selection
+
+Some tools support provider selection, allowing different providers for different operations:
+
+```python
+from copinanceos.infrastructure.tools.data_provider.provider_selector import (
+    MultiProviderSelector,
+)
+
+selector = MultiProviderSelector[FundamentalDataProvider]()
+selector.register_provider("default", yfinance_provider)
+selector.register_provider("sec_filings", edgar_provider, capabilities=["sec_filings"])
+
+tools = create_fundamental_data_tools(selector, cache_manager=cache_manager)
+```
+
+## Tool Registry
+
+Use `DataProviderToolRegistry` for automatic tool creation and registration:
+
+```python
+from copinanceos.infrastructure.tools.data_provider import DataProviderToolRegistry
+
+registry = DataProviderToolRegistry(
+    market_data_provider=market_provider,
+    fundamental_data_provider=fundamental_provider,
+)
+
+tool_registry = registry.get_registry()
+all_tools = tool_registry.get_all()
+```
+
+## See Also
+
+- [Tools Overview](../index) - All available tools
+- [Analysis Tools](../analysis) - Market regime and other analysis tools
+- [API Reference](../../api-reference/data-providers) - Data provider interfaces
+- [Workflows](../../user-guide/workflows) - Using tools in workflows
+

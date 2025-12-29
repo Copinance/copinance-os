@@ -17,6 +17,7 @@ from copinanceos.infrastructure.tools import (
     create_fundamental_data_tools,
     create_fundamental_data_tools_with_providers,
     create_market_data_tools,
+    create_market_regime_tools,
 )
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
@@ -125,6 +126,14 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
                 cache_enabled=self._cache_manager is not None,
             )
 
+            # Add market regime detection tools
+            regime_tools = create_market_regime_tools(self._market_data_provider)
+            tools.extend(regime_tools)
+            logger.debug(
+                "Added market regime detection tools",
+                count=len(regime_tools),
+            )
+
         if self._fundamental_data_provider:
             # Use provider selection if SEC filings provider is specified
             if self._sec_filings_provider:
@@ -211,6 +220,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         results["tool_calls"] = llm_result.get("tool_calls", [])
         results["iterations"] = llm_result.get("iterations", 1)
         results["llm_provider"] = llm_provider.get_provider_name()
+        results["llm_model"] = llm_provider.get_model_name()
         results["tools_used"] = [tc.get("tool") for tc in results["tool_calls"]]
 
         logger.info(

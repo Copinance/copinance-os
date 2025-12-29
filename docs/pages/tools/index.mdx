@@ -1,0 +1,78 @@
+# Tools Overview
+
+Copinance OS provides a comprehensive suite of tools for stock research and analysis. Tools are executable functions that can be used in workflows, especially agentic workflows where AI agents can dynamically select and use tools to answer questions.
+
+## Tool Categories
+
+### Analysis Tools
+Advanced analytical functions for market regime detection, technical analysis, and other research capabilities.
+
+- **Market Regime Detection**: Identify bull/bear markets, volatility regimes, and market cycles
+- See [Analysis Tools](./analysis) for details
+
+### Data Provider Tools
+Tools that wrap data provider methods, making them accessible to AI agents and workflows.
+
+- **Market Data Tools**: Get quotes, historical prices, search stocks
+- **Fundamental Data Tools**: Access financial statements, SEC filings, fundamentals
+- See [Data Provider Tools](./data-providers) for details
+
+## Using Tools
+
+### In Agentic Workflows
+
+Tools are automatically available when using agentic workflows:
+
+```bash
+copinance research ask AAPL "What is the current market trend?"
+```
+
+The AI agent will automatically select and use the appropriate tools to answer your question.
+
+### Programmatic Usage
+
+```python
+from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+from copinanceos.infrastructure.tools.data_provider import create_market_data_tools
+from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+
+provider = YFinanceMarketProvider()
+
+# Create tools
+regime_tools = create_market_regime_tools(provider)
+data_tools = create_market_data_tools(provider)
+
+# Use tools
+result = await regime_tools[0].execute(symbol="AAPL")
+```
+
+### Tool Registry
+
+Tools can be registered in a central registry:
+
+```python
+from copinanceos.infrastructure.tools import ToolRegistry
+
+registry = ToolRegistry()
+registry.register_many(regime_tools)
+registry.register_many(data_tools)
+
+# Get tool by name
+tool = registry.get("detect_market_trend")
+```
+
+## Tool Architecture
+
+All tools implement the `Tool` interface, which provides:
+
+- **Schema Definition**: JSON Schema for LLM function calling
+- **Parameter Validation**: Automatic validation of inputs
+- **Error Handling**: Structured error responses
+- **Metadata**: Additional context in results
+
+## See Also
+
+- [API Reference](../api-reference/data-providers) - Data provider interfaces
+- [Workflows](../user-guide/workflows) - Using tools in workflows
+- [Developer Guide](../developer-guide/extending) - Creating custom tools
+

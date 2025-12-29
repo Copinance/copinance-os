@@ -252,6 +252,14 @@ class OllamaProvider(LLMProvider):
         """
         return "ollama"
 
+    def get_model_name(self) -> str | None:
+        """Get the model name being used by this provider.
+
+        Returns:
+            Model name (e.g., "llama2") or None if not configured
+        """
+        return self._model_name
+
     async def generate_with_tools(
         self,
         prompt: str,
@@ -371,6 +379,26 @@ class OllamaProvider(LLMProvider):
                                     break
                     return objects
 
+                # Helper function to make objects JSON serializable
+                def make_json_serializable(obj: Any) -> Any:
+                    """Recursively convert objects to JSON-serializable format."""
+                    if isinstance(obj, dict):
+                        return {k: make_json_serializable(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [make_json_serializable(item) for item in obj]
+                    elif hasattr(obj, "model_dump"):  # Pydantic models
+                        return obj.model_dump()
+                    elif hasattr(obj, "__dict__"):  # Other objects with __dict__
+                        return make_json_serializable(obj.__dict__)
+                    elif isinstance(obj, (int, float, str, bool, type(None))):
+                        return obj
+                    else:
+                        # Convert to string for other types (e.g., Decimal)
+                        try:
+                            return float(obj) if hasattr(obj, "__float__") else str(obj)
+                        except (ValueError, TypeError):
+                            return str(obj)
+
                 # Extract all JSON objects from response
                 json_objects = extract_json_objects(response_text)
 
@@ -440,12 +468,35 @@ class OllamaProvider(LLMProvider):
                     if len(recent_tool_calls) > max_recent_history:
                         recent_tool_calls.pop(0)
 
+                    # Serialize response data for storage
+                    response_data = None
+                    if tool_result.success and tool_result.data is not None:
+                        # Serialize data, potentially truncating very large responses
+                        serialized_data = make_json_serializable(tool_result.data)
+                        # Truncate large lists (e.g., historical data with 1000+ points)
+                        if isinstance(serialized_data, list) and len(serialized_data) > 100:
+                            response_data = {
+                                "_truncated": True,
+                                "_total_items": len(serialized_data),
+                                "_items_shown": 100,
+                                "data": serialized_data[:100],
+                                "note": f"Response truncated: showing first 100 of {len(serialized_data)} items",
+                            }
+                        else:
+                            response_data = serialized_data
+
                     tool_calls_made.append(
                         {
                             "tool": tool_name,
                             "args": tool_args,
                             "success": tool_result.success,
                             "error": tool_result.error,
+                            "response": response_data,
+                            "metadata": (
+                                make_json_serializable(tool_result.metadata)
+                                if tool_result.metadata
+                                else None
+                            ),
                         }
                     )
 
@@ -533,28 +584,6 @@ class OllamaProvider(LLMProvider):
                                 empty_result=is_empty_result,
                                 invalid_params=has_invalid_params,
                             )
-
-                    # Append tool result to prompt in generic JSON format
-                    # Caller is responsible for prompt structure and formatting
-                    # Make data JSON serializable (handle Decimal, etc.)
-                    def make_json_serializable(obj: Any) -> Any:
-                        """Recursively convert objects to JSON-serializable format."""
-                        if isinstance(obj, dict):
-                            return {k: make_json_serializable(v) for k, v in obj.items()}
-                        elif isinstance(obj, list):
-                            return [make_json_serializable(item) for item in obj]
-                        elif hasattr(obj, "model_dump"):  # Pydantic models
-                            return obj.model_dump()
-                        elif hasattr(obj, "__dict__"):  # Other objects with __dict__
-                            return make_json_serializable(obj.__dict__)
-                        elif isinstance(obj, (int, float, str, bool, type(None))):
-                            return obj
-                        else:
-                            # Convert to string for other types (e.g., Decimal)
-                            try:
-                                return float(obj) if hasattr(obj, "__float__") else str(obj)
-                            except (ValueError, TypeError):
-                                return str(obj)
 
                     # Append tool result to prompt in generic JSON format
                     # Caller is responsible for prompt structure and formatting

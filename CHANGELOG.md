@@ -36,3 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interactive profile creation prompts for personalized analysis
 - Comprehensive test suite with unit and integration tests
 - Complete documentation with Nextra deployed to GitHub Pages
+- Market regime detection tools with rule-based methodology:
+  - Trend detection tool (bull/bear/neutral) using moving averages and volatility-scaled momentum
+  - Volatility regime detection tool (high/normal/low) using rolling volatility analysis
+  - Market cycle detection tool using Wyckoff methodology (accumulation/markup/distribution/markdown phases)
+  - Extensible architecture supporting multiple detection methods (rule-based, statistical)

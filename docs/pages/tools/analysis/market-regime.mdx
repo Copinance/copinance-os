@@ -1,0 +1,460 @@
+# Market Regime Detection Tools
+
+Market regime detection tools identify different market conditions and phases, helping investors understand the current state of a stock and make informed decisions. These tools are part of the [Analysis Tools](../index) suite.
+
+## Overview
+
+Market regimes represent distinct periods characterized by different statistical properties, trends, and behaviors. Identifying these regimes is crucial for:
+
+- **Risk Management**: Adjusting position sizes based on volatility regimes
+- **Strategy Selection**: Choosing appropriate strategies for different market phases
+- **Timing Decisions**: Identifying optimal entry and exit points
+- **Portfolio Allocation**: Adapting asset allocation to market conditions
+
+## Detection Methods
+
+Copinance OS supports multiple methodologies for regime detection:
+
+### Rule-Based Detection (Current Implementation)
+
+Rule-based tools use technical indicators, moving averages, and threshold-based logic. These are fast, interpretable, and work well for most use cases.
+
+**Available Tools:**
+- Trend Detection (MA crossovers, momentum)
+- Volatility Detection (rolling volatility with thresholds)
+- Cycle Detection (Wyckoff methodology)
+
+### Statistical Inference (Future)
+
+Statistical methods will use probabilistic models like Hidden Markov Models (HMM) and Hamilton Regime Switching Models for more sophisticated regime inference.
+
+**Planned Tools:**
+- HMM-based regime detection
+- Hamilton Regime Switching Models
+- Bayesian regime detection
+
+**Usage:**
+```python
+# Rule-based tools (default, current)
+from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+tools = create_market_regime_tools(provider)
+
+# Or explicitly specify rule-based
+from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+    create_regime_tools_by_type,
+)
+rule_tools = create_regime_tools_by_type(provider, "rule_based")
+
+# Statistical tools (when implemented)
+stat_tools = create_regime_tools_by_type(provider, "statistical")
+
+# Get all available tools
+from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+    create_all_regime_tools,
+)
+all_tools = create_all_regime_tools(provider, methods=["rule_based", "statistical"])
+```
+
+## Rule-Based Tools
+
+### 1. Trend Detection Tool (`detect_market_trend`)
+
+**Method**: Rule-based using moving averages and momentum indicators
+
+Detects market trend regimes (bull, bear, or neutral) using moving averages and price momentum.
+
+**Methodology Improvements:**
+- **Log-Returns**: Uses log-returns (r_t = ln(P_t / P_{t-1})) instead of simple returns for:
+  - Better statistical properties (additivity, symmetry)
+  - Improved handling of high-volatility stocks (e.g., MSTR, crypto-related stocks)
+  - More accurate multi-period calculations
+- **Volatility-Scaled Thresholds**: Replaces hard thresholds (±5%, ±20%) with volatility-scaled momentum:
+  - AdjMomentum = log_return / σ
+  - Thresholds: ±0.25σ (medium confidence), ±1.0σ (high confidence)
+  - Prevents penalizing low-volatility stocks while maintaining sensitivity for high-volatility stocks
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol (e.g., 'AAPL', 'MSFT')
+- `lookback_days` (optional, default: 200): Number of days to analyze
+- `short_ma_period` (optional, default: 50): Short-term moving average period in days
+- `long_ma_period` (optional, default: 200): Long-term moving average period in days
+
+**Returns:**
+- `regime`: Classification ("bull", "bear", or "neutral")
+- `confidence`: Confidence level ("high", "medium", or "low")
+- `current_price`: Current stock price
+- `price_change_pct`: Log-return as percentage over the period (for display)
+- `log_return`: Raw log-return value (r_t = ln(P_t / P_0))
+- `volatility_scaled_momentum`: Momentum scaled by volatility (AdjMomentum = log_return / σ)
+- `recent_volatility`: Recent volatility (annualized, as percentage)
+- `momentum_20d_pct`: 20-day momentum percentage (using log-returns)
+- `short_ma`: Current short-term moving average value
+- `long_ma`: Current long-term moving average value
+- `ma_relationship`: Relationship between MAs ("bullish", "bearish", or "neutral")
+- `parameters_adjusted`: Boolean indicating if parameters were adapted for limited data
+- `methodology`: "log_returns_with_volatility_scaling"
+
+**Example:**
+```python
+from copinanceos.infrastructure.tools.analysis import MarketRegimeDetectTrendTool
+from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+
+provider = YFinanceMarketProvider()
+tool = MarketRegimeDetectTrendTool(provider)
+result = await tool.execute(symbol="AAPL", lookback_days=200)
+
+if result.success:
+    print(f"Regime: {result.data['regime']}")
+    print(f"Confidence: {result.data['confidence']}")
+```
+
+**Academic Foundation:**
+- **Faber (2007)**: A Quantitative Approach to Tactical Asset Allocation. Journal of Wealth Management, 9(4), 69-79. This tool implements the 10-month MA regime filter methodology adapted for shorter timeframes.
+- **Brock, Lakonishok, & LeBaron (1992)**: Simple Technical Trading Rules and the Stochastic Properties of Stock Returns. Journal of Finance, 47(5), 1731-1764. Validates the effectiveness of MA crossovers for trend detection.
+- **Moskowitz, Ooi, & Pedersen (2012)**: Time Series Momentum. Journal of Financial Economics, 104(2), 228-250. Provides the theoretical foundation for momentum-based trend alignment.
+
+### 2. Volatility Regime Detection Tool (`detect_volatility_regime`)
+
+**Method**: Rule-based using rolling volatility with statistical thresholds
+
+Detects volatility regimes (high, normal, or low) using rolling volatility analysis.
+
+**Why Rolling Volatility vs GARCH:**
+While GARCH models are theoretically superior, we use rolling volatility because:
+- **More stable** on individual stocks (GARCH can be unstable)
+- **Easier to explain** and interpret for users
+- **Less prone to overfitting** on retail investment horizons
+- **Robust and reliable** for practical applications
+
+**Current Implementation:**
+- Rolling volatility using log-returns (simple moving average)
+- Classification using μ ± σ thresholds
+
+**Future Improvements:**
+- **EWMA Volatility** (RiskMetrics style): More responsive to recent changes
+  - Formula: σ²_t = λ * σ²_{t-1} + (1 - λ) * r²_t
+  - Decay factor λ = 0.94 for daily data (RiskMetrics standard)
+- **Percentile-Based Regimes**: More robust to outliers
+  - Top 80% → High volatility
+  - Bottom 20% → Low volatility
+  - Middle → Normal volatility
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `lookback_days` (optional, default: 252): Number of days to analyze (typically 1 trading year)
+- `volatility_window` (optional, default: 20): Window size for volatility calculation in days
+
+**Returns:**
+- `regime`: Classification ("high", "normal", or "low")
+- `current_volatility`: Current volatility as percentage
+- `mean_volatility`: Mean volatility over the period
+- `max_volatility`: Maximum volatility observed
+- `min_volatility`: Minimum volatility observed
+- `volatility_percentile`: Current volatility percentile
+- `parameters_adjusted`: Boolean indicating if parameters were adapted
+
+**Example:**
+```python
+from copinanceos.infrastructure.tools.analysis import MarketRegimeDetectVolatilityTool
+
+tool = MarketRegimeDetectVolatilityTool(provider)
+result = await tool.execute(symbol="AAPL", lookback_days=252)
+
+if result.success:
+    print(f"Volatility Regime: {result.data['regime']}")
+    print(f"Current Volatility: {result.data['current_volatility']}%")
+```
+
+**Academic Foundation:**
+- **Andersen & Bollerslev (1998)**: Answering the Skeptics: Yes, Standard Volatility Models Do Provide Accurate Forecasts. International Economic Review, 39(4), 885-905. Validates the use of realized volatility models for forecasting.
+- **RiskMetrics Technical Document (J.P. Morgan, 1996)**: Provides the methodology for rolling volatility calculations with annualization for daily data.
+
+**How It Works:**
+The tool calculates rolling volatility as the standard deviation of **log-returns** over a specified window. Volatility is annualized assuming 252 trading days per year.
+
+**Current Classification (μ ± σ):**
+Regime classification is based on statistical deviation from the historical mean:
+- **High**: Current volatility > mean + 1 standard deviation
+- **Low**: Current volatility < mean - 1 standard deviation
+- **Normal**: Within one standard deviation of the mean
+
+**Future: Percentile-Based Classification:**
+A more robust alternative using percentiles:
+- **High**: Current volatility ≥ 80th percentile
+- **Low**: Current volatility ≤ 20th percentile
+- **Normal**: Between 20th and 80th percentile
+
+The percentile-based approach is more robust to outliers and provides clearer regime boundaries.
+
+### 3. Market Cycle Detection Tool (`detect_market_cycles`)
+
+**Method**: Rule-based using Wyckoff methodology
+
+Detects market cycles and regime transitions, identifying accumulation, markup, distribution, and markdown phases.
+
+**Parameters:**
+- `symbol` (required): Stock ticker symbol
+- `lookback_days` (optional, default: 252): Number of days to analyze
+
+**Returns:**
+- `current_phase`: Cycle phase ("accumulation", "markup", "distribution", "markdown", or "transition")
+- `phase_description`: Human-readable description of the phase
+- `price_position_pct`: Current price position within the period's range (0-100%)
+- `volume_ratio`: Recent volume relative to average volume
+- `current_price`: Current stock price
+- `ma_20`: 20-day moving average value
+- `ma_50`: 50-day moving average value
+- `recent_trend`: Short-term trend direction
+- `longer_trend`: Longer-term trend direction
+- `potential_regime_change`: Boolean indicating potential regime transition
+- `parameters_adjusted`: Boolean indicating if parameters were adapted
+
+**Example:**
+```python
+from copinanceos.infrastructure.tools.analysis import MarketRegimeDetectCyclesTool
+
+tool = MarketRegimeDetectCyclesTool(provider)
+result = await tool.execute(symbol="AAPL", lookback_days=252)
+
+if result.success:
+    print(f"Current Phase: {result.data['current_phase']}")
+    print(f"Description: {result.data['phase_description']}")
+    print(f"Regime Change Signal: {result.data['potential_regime_change']}")
+```
+
+**Academic Foundation:**
+- **Hamilton (1989)**: A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle. Econometrica, 57(2), 357-384. Provides the theoretical foundation for regime switching models in financial time series.
+- **Wyckoff Method (1930s, modernized)**: A technical analysis methodology that identifies four distinct market phases:
+  - **Accumulation**: Price near lows, low volume, smart money buying
+  - **Markup**: Price rising, increasing volume, public participation
+  - **Distribution**: Price near highs, high volume, smart money selling
+  - **Markdown**: Price falling, decreasing volume, public selling
+- **Lo (2004)**: The Adaptive Markets Hypothesis: Market Efficiency from an Evolutionary Perspective. Journal of Portfolio Management, 30(5), 15-29. Explains why market regimes exist and change over time through an evolutionary perspective.
+
+**Cycle Phases Explained:**
+
+1. **Accumulation Phase**
+   - Price position: Bottom 30% of range
+   - Volume: Below average
+   - Characteristics: Smart money accumulates positions, price stabilizes near lows
+   - Investment implication: Potential buying opportunity for long-term investors
+
+2. **Markup Phase**
+   - Price position: Rising, above moving averages
+   - Volume: Increasing, above average
+   - Characteristics: Strong uptrend, public participation increases
+   - Investment implication: Trend-following strategies perform well
+
+3. **Distribution Phase**
+   - Price position: Top 70% of range
+   - Volume: Elevated
+   - Characteristics: Smart money distributes holdings, price may stall
+   - Investment implication: Consider taking profits, prepare for potential reversal
+
+4. **Markdown Phase**
+   - Price position: Falling, below moving averages
+   - Volume: Decreasing
+   - Characteristics: Downtrend, public selling pressure
+   - Investment implication: Defensive positioning, avoid catching falling knives
+
+## Adaptive Data Handling
+
+All market regime detection tools include adaptive parameter adjustment for stocks with limited trading history. This is particularly important for:
+
+- **Newly listed stocks**: IPOs and recent listings
+- **Low-volume stocks**: Stocks with irregular trading
+- **International stocks**: May have different trading calendars
+
+**How It Works:**
+- Tools automatically adjust moving average periods and analysis windows based on available data
+- Minimum data requirements are enforced (10-20 data points depending on the tool)
+- Results include a `parameters_adjusted` flag and explanatory notes when adaptation occurs
+- Confidence levels are adjusted to reflect data limitations
+
+**Example:**
+```python
+result = await tool.execute(symbol="NEWLY_LISTED", lookback_days=200)
+
+if result.data.get('parameters_adjusted'):
+    print(f"Note: {result.data.get('note')}")
+    print(f"Adjusted parameters used: {result.data.get('short_ma_period_used')}/{result.data.get('long_ma_period_used')}")
+```
+
+## Using Tools in Workflows
+
+### Agentic Workflows
+
+Tools are automatically available in agentic workflows when a market data provider is configured:
+
+```bash
+copinance research ask AAPL "What is the current market trend and volatility regime?"
+```
+
+The LLM will automatically use the appropriate tools to answer your question.
+
+### Programmatic Usage
+
+```python
+from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+
+# Create tools
+provider = YFinanceMarketProvider()
+tools = create_market_regime_tools(provider)
+
+# Use individual tools
+trend_tool = tools[0]
+result = await trend_tool.execute(symbol="AAPL")
+```
+
+### Tool Registry
+
+Tools can also be registered in a tool registry for centralized management:
+
+```python
+from copinanceos.infrastructure.tools import ToolRegistry
+from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+
+registry = ToolRegistry()
+tools = create_market_regime_tools(provider)
+registry.register_many(tools)
+
+# Get a tool by name
+trend_tool = registry.get("detect_market_trend")
+```
+
+## Academic References
+
+### Complete Bibliography
+
+1. **Andersen, T. G., & Bollerslev, T. (1998)**. Answering the Skeptics: Yes, Standard Volatility Models Do Provide Accurate Forecasts. *International Economic Review*, 39(4), 885-905.
+
+2. **Brock, W., Lakonishok, J., & LeBaron, B. (1992)**. Simple Technical Trading Rules and the Stochastic Properties of Stock Returns. *Journal of Finance*, 47(5), 1731-1764.
+
+3. **Faber, M. T. (2007)**. A Quantitative Approach to Tactical Asset Allocation. *Journal of Wealth Management*, 9(4), 69-79.
+
+4. **Hamilton, J. D. (1989)**. A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle. *Econometrica*, 57(2), 357-384.
+
+5. **Jegadeesh, N., & Titman, S. (1993)**. Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency. *Journal of Finance*, 48(1), 65-91.
+
+6. **Lo, A. W. (2004)**. The Adaptive Markets Hypothesis: Market Efficiency from an Evolutionary Perspective. *Journal of Portfolio Management*, 30(5), 15-29.
+
+7. **Moskowitz, T. J., Ooi, Y. H., & Pedersen, L. H. (2012)**. Time Series Momentum. *Journal of Financial Economics*, 104(2), 228-250.
+
+8. **RiskMetrics Technical Document (J.P. Morgan, 1996)**. RiskMetrics—Technical Document (4th ed.). J.P. Morgan/Reuters.
+
+9. **Wyckoff, R. D. (1930s)**. The Wyckoff Method. (Modernized by various practitioners including David H. Weis, Tom Williams, and others).
+
+## Best Practices
+
+1. **Data Quality**: Ensure sufficient historical data for reliable regime detection
+2. **Multiple Timeframes**: Use different lookback periods to confirm regime signals
+3. **Combined Analysis**: Use all three tools together for comprehensive market assessment
+4. **Confidence Levels**: Pay attention to confidence indicators, especially with limited data
+5. **Regime Transitions**: Monitor `potential_regime_change` signals for early warning of shifts
+6. **Adaptive Parameters**: Be aware when parameters are adjusted and interpret results accordingly
+
+## Limitations
+
+- **Historical Data Dependency**: Tools require sufficient historical data for accurate detection
+- **Market-Specific**: Results may vary across different markets and asset classes
+- **Lagging Indicators**: Moving averages and volatility are lagging indicators
+- **False Signals**: No tool is perfect; combine with other analysis methods
+- **Data Quality**: Results depend on the quality of data from the underlying provider
+
+## Package Structure & Extensibility
+
+The market regime detection tools are organized in a modular structure to support multiple detection methodologies and future extensions.
+
+### Current Structure
+
+```
+infrastructure/tools/analysis/market_regime/
+├── __init__.py          # Public API exports (backward compatible)
+├── base.py              # Common interfaces and base classes
+├── rule_based.py        # Rule-based detection (current implementation)
+├── statistical.py       # Statistical inference (future: HMM, Hamilton models)
+└── registry.py          # Factory functions for unified tool creation
+```
+
+### Design Principles
+
+1. **Separation of Concerns**: Each detection method is in its own module
+2. **Common Interface**: All tools implement the `Tool` interface via `BaseRegimeDetectionTool`
+3. **Extensibility**: Easy to add new methods without breaking existing code
+4. **Backward Compatibility**: Existing code continues to work with default imports
+
+### Adding New Detection Methods
+
+To add a new detection method (e.g., machine learning-based):
+
+1. **Create a new module** (e.g., `machine_learning.py`):
+```python
+from copinanceos.infrastructure.tools.analysis.market_regime.base import (
+    BaseRegimeDetectionTool,
+)
+
+class MLRegimeDetectionTool(BaseRegimeDetectionTool):
+    def get_detection_method(self) -> str:
+        return "machine_learning"
+    
+    async def _detect_regime(self, symbol: str, **kwargs: Any) -> dict[str, Any]:
+        # Your ML-based detection logic
+        pass
+    
+    async def _execute_impl(self, **kwargs: Any) -> ToolResult:
+        # Implementation
+        pass
+```
+
+2. **Add factory function**:
+```python
+def create_ml_regime_tools(provider: MarketDataProvider) -> list[Tool]:
+    return [MLRegimeDetectionTool(provider)]
+```
+
+3. **Update `registry.py`** to include the new method in `create_all_regime_tools()`
+
+4. **Update `__init__.py`** to export the new tools
+
+### Using Different Methods
+
+```python
+# Rule-based tools (default, current)
+from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+tools = create_market_regime_tools(provider)
+
+# Explicitly specify method type
+from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+    create_regime_tools_by_type,
+)
+rule_tools = create_regime_tools_by_type(provider, "rule_based")
+stat_tools = create_regime_tools_by_type(provider, "statistical")  # When implemented
+
+# Get all available tools from multiple methods
+from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+    create_all_regime_tools,
+)
+all_tools = create_all_regime_tools(
+    provider, 
+    methods=["rule_based", "statistical"]  # Add more as they're implemented
+)
+```
+
+### Future Extensions
+
+The structure is designed to accommodate:
+- **Statistical Methods**: Hidden Markov Models (HMM), Hamilton Regime Switching Models
+- **Machine Learning**: LSTM, transformers, ensemble methods
+- **Real-time Detection**: Streaming regime detection
+- **Multi-asset**: Cross-asset regime correlation
+- **Probabilistic Models**: Bayesian inference, transition probabilities
+
+## See Also
+
+- [Tools Overview](../index) - All available tools
+- [Data Provider Tools](../data-providers) - Data provider tool implementations
+- [API Reference](../../api-reference/data-providers) - Data provider interfaces
+- [Workflows](../../user-guide/workflows) - How to use tools in workflows
+- [Developer Guide](../../developer-guide/extending) - Creating custom tools
+
