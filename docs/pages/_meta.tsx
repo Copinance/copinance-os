@@ -1,14 +1,14 @@
-{
-  "index": "Home",
+export default {
+  index: "Home",
   "getting-started": "Getting Started",
   "user-guide": "User Guide",
   "tools": "Tools",
   "developer-guide": "Developer Guide",
   "api-reference": "API Reference",
   "discussions": {
-    "title": "Discussions",
-    "type": "page",
-    "href": "https://github.com/copinance/copinance-os/discussions"
+    title: "Discussions",
+    type: "page",
+    href: "https://github.com/copinance/copinance-os/discussions"
   }
 }
 

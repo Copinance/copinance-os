@@ -64,7 +64,7 @@ all_tools = create_all_regime_tools(provider, methods=["rule_based", "statistica
 Detects market trend regimes (bull, bear, or neutral) using moving averages and price momentum.
 
 **Methodology Improvements:**
-- **Log-Returns**: Uses log-returns (r_t = ln(P_t / P_{t-1})) instead of simple returns for:
+- **Log-Returns**: Uses log-returns (r<sub>t</sub> = ln(P<sub>t</sub> / P<sub>t-1</sub>)) instead of simple returns for:
   - Better statistical properties (additivity, symmetry)
   - Improved handling of high-volatility stocks (e.g., MSTR, crypto-related stocks)
   - More accurate multi-period calculations
@@ -132,7 +132,7 @@ While GARCH models are theoretically superior, we use rolling volatility because
 
 **Future Improvements:**
 - **EWMA Volatility** (RiskMetrics style): More responsive to recent changes
-  - Formula: σ²_t = λ * σ²_{t-1} + (1 - λ) * r²_t
+  - Formula: σ²<sub>t</sub> = λ * σ²<sub>t-1</sub> + (1 - λ) * r²<sub>t</sub>
   - Decay factor λ = 0.94 for daily data (RiskMetrics standard)
 - **Percentile-Based Regimes**: More robust to outliers
   - Top 80% → High volatility

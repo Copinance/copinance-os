@@ -83,10 +83,8 @@ const config: DocsThemeConfig = {
   },
   docsRepositoryBase: 'https://github.com/copinance/copinance-os/blob/main',
   footer: {
-    text: 'Copyright © 2025 Copinance OS Contributors',
+    content: 'Copyright © 2025 Copinance OS Contributors',
   },
-  primaryHue: 210,
-  primarySaturation: 50,
 }
 
 export default config
