@@ -19,6 +19,9 @@ from copinanceos.infrastructure.tools import (
     create_market_data_tools,
     create_market_regime_tools,
 )
+from copinanceos.infrastructure.tools.analysis.market_regime.indicators import (
+    create_market_regime_indicators_tool,
+)
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
 logger = structlog.get_logger(__name__)
@@ -129,9 +132,15 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
             # Add market regime detection tools
             regime_tools = create_market_regime_tools(self._market_data_provider)
             tools.extend(regime_tools)
+
+            # Add market regime indicators tool
+            indicators_tool = create_market_regime_indicators_tool(self._market_data_provider)
+            tools.append(indicators_tool)
+
             logger.debug(
-                "Added market regime detection tools",
-                count=len(regime_tools),
+                "Added market regime detection tools and indicators",
+                regime_tools_count=len(regime_tools),
+                indicators_tool=True,
             )
 
         if self._fundamental_data_provider:
@@ -180,8 +189,10 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
 
         # Enhance question to include symbol if not explicitly mentioned
         # This helps the LLM know which stock symbol to use in tool calls
+        # Skip enhancement for market-wide questions (symbol == "MARKET")
         enhanced_question = question
-        if symbol.upper() not in question.upper():
+        is_market_wide = symbol == "MARKET"
+        if not is_market_wide and symbol.upper() not in question.upper():
             enhanced_question = f"About {symbol}: {question}"
 
         # Build tool descriptions and examples

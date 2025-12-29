@@ -8,6 +8,7 @@ from copinanceos.infrastructure.tools.analysis.market_regime import (
     MarketRegimeDetectCyclesTool,
     MarketRegimeDetectTrendTool,
     MarketRegimeDetectVolatilityTool,
+    MarketRegimeIndicatorsTool,
     create_market_regime_tools,
 )
 from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
@@ -20,6 +21,7 @@ __all__ = [
     "MarketRegimeDetectTrendTool",
     "MarketRegimeDetectVolatilityTool",
     "MarketRegimeDetectCyclesTool",
+    "MarketRegimeIndicatorsTool",
     "create_market_regime_tools",  # Backward compatibility
     # Registry functions
     "create_all_regime_tools",

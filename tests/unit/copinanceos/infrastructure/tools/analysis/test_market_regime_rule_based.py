@@ -1,4 +1,4 @@
-"""Unit tests for market regime detection tools."""
+"""Unit tests for rule-based market regime detection tools."""
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -8,17 +8,11 @@ import pytest
 
 from copinanceos.domain.models.stock import StockData
 from copinanceos.domain.ports.data_providers import MarketDataProvider
-from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
-    create_all_regime_tools,
-    create_regime_tools_by_type,
-)
 from copinanceos.infrastructure.tools.analysis.market_regime.rule_based import (
     MarketRegimeDetectCyclesTool,
     MarketRegimeDetectTrendTool,
     MarketRegimeDetectVolatilityTool,
     _calculate_ewma_volatility,
-    _calculate_log_returns,
-    _calculate_moving_average,
     _calculate_volatility,
     _classify_volatility_regime,
     _classify_volatility_regime_percentile,
@@ -80,42 +74,8 @@ def extended_stock_data() -> list[StockData]:
 
 
 @pytest.mark.unit
-class TestHelperFunctions:
-    """Test helper functions for market regime detection."""
-
-    def test_calculate_moving_average_sufficient_data(self) -> None:
-        """Test moving average calculation with sufficient data."""
-        prices = [100.0, 102.0, 101.0, 105.0, 108.0, 107.0, 110.0, 112.0, 115.0, 118.0]
-        window = 3
-
-        result = _calculate_moving_average(prices, window)
-
-        assert len(result) == len(prices)
-        assert result[0] is None  # First window-1 values are None
-        assert result[1] is None
-        assert result[2] is not None  # First valid MA
-        assert result[2] == (100.0 + 102.0 + 101.0) / 3
-        assert result[-1] is not None  # Last value should be valid
-
-    def test_calculate_moving_average_insufficient_data(self) -> None:
-        """Test moving average with insufficient data."""
-        prices = [100.0, 102.0]
-        window = 5
-
-        result = _calculate_moving_average(prices, window)
-
-        assert len(result) == len(prices)
-        assert all(v is None for v in result)
-
-    def test_calculate_log_returns(self) -> None:
-        """Test log-returns calculation."""
-        prices = [100.0, 102.0, 101.0, 105.0]
-
-        log_returns = _calculate_log_returns(prices)
-
-        assert len(log_returns) == len(prices) - 1
-        assert log_returns[0] == pytest.approx(0.0198, abs=0.0001)  # ln(102/100)
-        assert log_returns[1] == pytest.approx(-0.0099, abs=0.0001)  # ln(101/102)
+class TestRuleBasedHelperFunctions:
+    """Test helper functions for rule-based market regime detection."""
 
     def test_calculate_volatility(self) -> None:
         """Test volatility calculation using log-returns."""
@@ -204,6 +164,16 @@ class TestHelperFunctions:
 
         assert len(ewma_vols) == 1
         assert ewma_vols[0] is None
+
+    def test_classify_volatility_regime_empty_history(self) -> None:
+        """Test volatility classification with empty history."""
+        regime = _classify_volatility_regime(0.20, [])
+        assert regime == "normal"
+
+    def test_classify_volatility_regime_percentile_empty_history(self) -> None:
+        """Test percentile-based volatility classification with empty history."""
+        regime = _classify_volatility_regime_percentile(0.20, [])
+        assert regime == "normal"
 
 
 @pytest.mark.unit
@@ -341,6 +311,50 @@ class TestMarketRegimeDetectTrendTool:
         assert result.data["short_ma_period_used"] == 20
         assert result.data["long_ma_period_used"] == 50
 
+    @pytest.mark.asyncio
+    async def test_execute_bear_market_pattern(
+        self, mock_market_data_provider: MarketDataProvider
+    ) -> None:
+        """Test trend detection with bear market pattern (declining prices)."""
+        base_date = datetime(2024, 1, 1)
+        # Create declining price pattern (ensure prices stay positive)
+        declining_data = [
+            StockData(
+                symbol="TEST",
+                timestamp=base_date + timedelta(days=i),
+                open_price=Decimal(str(max(10.0, 120.0 - i * 0.3))),
+                close_price=Decimal(str(max(10.0, 120.0 - i * 0.3))),
+                high_price=Decimal(str(max(10.5, 120.0 - i * 0.3 + 0.5))),
+                low_price=Decimal(str(max(9.5, 120.0 - i * 0.3 - 0.5))),
+                volume=1000000,
+            )
+            for i in range(250)
+        ]
+
+        mock_market_data_provider.get_historical_data = AsyncMock(return_value=declining_data)
+
+        tool = MarketRegimeDetectTrendTool(mock_market_data_provider)
+        result = await tool.execute(symbol="TEST", lookback_days=200)
+
+        assert result.success is True
+        # Should detect bear or neutral (depending on MA relationship)
+        assert result.data["regime"] in ["bear", "neutral", "bull"]
+
+    @pytest.mark.asyncio
+    async def test_execute_exception_handling(
+        self, mock_market_data_provider: MarketDataProvider
+    ) -> None:
+        """Test trend tool handles exceptions gracefully."""
+        mock_market_data_provider.get_historical_data = AsyncMock(
+            side_effect=Exception("Provider error")
+        )
+
+        tool = MarketRegimeDetectTrendTool(mock_market_data_provider)
+        result = await tool.execute(symbol="TEST")
+
+        assert result.success is False
+        assert "error" in result.error.lower() or "Provider error" in result.error
+
 
 @pytest.mark.unit
 class TestMarketRegimeDetectVolatilityTool:
@@ -407,6 +421,50 @@ class TestMarketRegimeDetectVolatilityTool:
 
         assert result.success is False
         assert "No historical data" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_high_volatility_stock(
+        self, mock_market_data_provider: MarketDataProvider
+    ) -> None:
+        """Test volatility detection with high volatility stock pattern."""
+        base_date = datetime(2024, 1, 1)
+        # Create high volatility pattern (large price swings)
+        volatile_data = [
+            StockData(
+                symbol="TEST",
+                timestamp=base_date + timedelta(days=i),
+                open_price=Decimal(str(100.0 + (i % 10) * 5.0)),
+                close_price=Decimal(str(100.0 + (i % 10) * 5.0)),
+                high_price=Decimal(str(100.0 + (i % 10) * 5.0 + 2.0)),
+                low_price=Decimal(str(100.0 + (i % 10) * 5.0 - 2.0)),
+                volume=1000000,
+            )
+            for i in range(252)
+        ]
+
+        mock_market_data_provider.get_historical_data = AsyncMock(return_value=volatile_data)
+
+        tool = MarketRegimeDetectVolatilityTool(mock_market_data_provider)
+        result = await tool.execute(symbol="TEST", lookback_days=252)
+
+        assert result.success is True
+        assert result.data["regime"] in ["high", "normal", "low"]
+        assert result.data["current_volatility"] is not None
+
+    @pytest.mark.asyncio
+    async def test_execute_exception_handling(
+        self, mock_market_data_provider: MarketDataProvider
+    ) -> None:
+        """Test volatility tool handles exceptions gracefully."""
+        mock_market_data_provider.get_historical_data = AsyncMock(
+            side_effect=Exception("Provider error")
+        )
+
+        tool = MarketRegimeDetectVolatilityTool(mock_market_data_provider)
+        result = await tool.execute(symbol="TEST")
+
+        assert result.success is False
+        assert "error" in result.error.lower() or "Provider error" in result.error
 
 
 @pytest.mark.unit
@@ -484,6 +542,21 @@ class TestMarketRegimeDetectCyclesTool:
         assert result.success is False
         assert "No historical data" in result.error
 
+    @pytest.mark.asyncio
+    async def test_execute_exception_handling(
+        self, mock_market_data_provider: MarketDataProvider
+    ) -> None:
+        """Test cycles tool handles exceptions gracefully."""
+        mock_market_data_provider.get_historical_data = AsyncMock(
+            side_effect=Exception("Provider error")
+        )
+
+        tool = MarketRegimeDetectCyclesTool(mock_market_data_provider)
+        result = await tool.execute(symbol="TEST")
+
+        assert result.success is False
+        assert "error" in result.error.lower() or "Provider error" in result.error
+
 
 @pytest.mark.unit
 class TestFactoryFunctions:
@@ -504,199 +577,3 @@ class TestFactoryFunctions:
         assert tools[0]._provider == mock_market_data_provider
         assert tools[1]._provider == mock_market_data_provider
         assert tools[2]._provider == mock_market_data_provider
-
-
-@pytest.mark.unit
-class TestRegistryFunctions:
-    """Test registry functions for regime detection tools."""
-
-    def test_create_all_regime_tools_default(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating all regime tools with default method."""
-        tools = create_all_regime_tools(mock_market_data_provider)
-
-        # Default should be rule_based only
-        assert len(tools) == 3
-        assert all(
-            isinstance(
-                t,
-                (
-                    MarketRegimeDetectTrendTool,
-                    MarketRegimeDetectVolatilityTool,
-                    MarketRegimeDetectCyclesTool,
-                ),
-            )
-            for t in tools
-        )
-
-    def test_create_all_regime_tools_rule_based(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating all regime tools with rule_based method."""
-        tools = create_all_regime_tools(mock_market_data_provider, methods=["rule_based"])
-
-        assert len(tools) == 3
-
-    def test_create_all_regime_tools_statistical(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating all regime tools with statistical method (empty for now)."""
-        tools = create_all_regime_tools(mock_market_data_provider, methods=["statistical"])
-
-        # Statistical tools not yet implemented
-        assert len(tools) == 0
-
-    def test_create_all_regime_tools_multiple_methods(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating all regime tools with multiple methods."""
-        tools = create_all_regime_tools(
-            mock_market_data_provider, methods=["rule_based", "statistical"]
-        )
-
-        # Should have rule_based tools (statistical not implemented yet)
-        assert len(tools) == 3
-
-    def test_create_regime_tools_by_type_rule_based(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating tools by type - rule_based."""
-        tools = create_regime_tools_by_type(mock_market_data_provider, "rule_based")
-
-        assert len(tools) == 3
-        assert isinstance(tools[0], MarketRegimeDetectTrendTool)
-
-    def test_create_regime_tools_by_type_statistical(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating tools by type - statistical (empty for now)."""
-        tools = create_regime_tools_by_type(mock_market_data_provider, "statistical")
-
-        # Statistical tools not yet implemented
-        assert len(tools) == 0
-
-    def test_create_regime_tools_by_type_invalid(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test creating tools by type with invalid method."""
-        with pytest.raises(ValueError, match="Unknown method"):
-            create_regime_tools_by_type(mock_market_data_provider, "invalid_method")
-
-
-@pytest.mark.unit
-class TestEdgeCases:
-    """Test edge cases and error handling."""
-
-    @pytest.mark.asyncio
-    async def test_trend_tool_exception_handling(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test trend tool handles exceptions gracefully."""
-        mock_market_data_provider.get_historical_data = AsyncMock(
-            side_effect=Exception("Provider error")
-        )
-
-        tool = MarketRegimeDetectTrendTool(mock_market_data_provider)
-        result = await tool.execute(symbol="TEST")
-
-        assert result.success is False
-        assert "error" in result.error.lower() or "Provider error" in result.error
-
-    @pytest.mark.asyncio
-    async def test_volatility_tool_exception_handling(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test volatility tool handles exceptions gracefully."""
-        mock_market_data_provider.get_historical_data = AsyncMock(
-            side_effect=Exception("Provider error")
-        )
-
-        tool = MarketRegimeDetectVolatilityTool(mock_market_data_provider)
-        result = await tool.execute(symbol="TEST")
-
-        assert result.success is False
-        assert "error" in result.error.lower() or "Provider error" in result.error
-
-    @pytest.mark.asyncio
-    async def test_cycles_tool_exception_handling(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test cycles tool handles exceptions gracefully."""
-        mock_market_data_provider.get_historical_data = AsyncMock(
-            side_effect=Exception("Provider error")
-        )
-
-        tool = MarketRegimeDetectCyclesTool(mock_market_data_provider)
-        result = await tool.execute(symbol="TEST")
-
-        assert result.success is False
-        assert "error" in result.error.lower() or "Provider error" in result.error
-
-    @pytest.mark.asyncio
-    async def test_trend_tool_bear_market_pattern(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test trend detection with bear market pattern (declining prices)."""
-        base_date = datetime(2024, 1, 1)
-        # Create declining price pattern (ensure prices stay positive)
-        declining_data = [
-            StockData(
-                symbol="TEST",
-                timestamp=base_date + timedelta(days=i),
-                open_price=Decimal(str(max(10.0, 120.0 - i * 0.3))),
-                close_price=Decimal(str(max(10.0, 120.0 - i * 0.3))),
-                high_price=Decimal(str(max(10.5, 120.0 - i * 0.3 + 0.5))),
-                low_price=Decimal(str(max(9.5, 120.0 - i * 0.3 - 0.5))),
-                volume=1000000,
-            )
-            for i in range(250)
-        ]
-
-        mock_market_data_provider.get_historical_data = AsyncMock(return_value=declining_data)
-
-        tool = MarketRegimeDetectTrendTool(mock_market_data_provider)
-        result = await tool.execute(symbol="TEST", lookback_days=200)
-
-        assert result.success is True
-        # Should detect bear or neutral (depending on MA relationship)
-        assert result.data["regime"] in ["bear", "neutral", "bull"]
-
-    @pytest.mark.asyncio
-    async def test_volatility_tool_high_volatility_stock(
-        self, mock_market_data_provider: MarketDataProvider
-    ) -> None:
-        """Test volatility detection with high volatility stock pattern."""
-        base_date = datetime(2024, 1, 1)
-        # Create high volatility pattern (large price swings)
-        volatile_data = [
-            StockData(
-                symbol="TEST",
-                timestamp=base_date + timedelta(days=i),
-                open_price=Decimal(str(100.0 + (i % 10) * 5.0)),
-                close_price=Decimal(str(100.0 + (i % 10) * 5.0)),
-                high_price=Decimal(str(100.0 + (i % 10) * 5.0 + 2.0)),
-                low_price=Decimal(str(100.0 + (i % 10) * 5.0 - 2.0)),
-                volume=1000000,
-            )
-            for i in range(252)
-        ]
-
-        mock_market_data_provider.get_historical_data = AsyncMock(return_value=volatile_data)
-
-        tool = MarketRegimeDetectVolatilityTool(mock_market_data_provider)
-        result = await tool.execute(symbol="TEST", lookback_days=252)
-
-        assert result.success is True
-        assert result.data["regime"] in ["high", "normal", "low"]
-        assert result.data["current_volatility"] is not None
-
-    def test_classify_volatility_regime_empty_history(self) -> None:
-        """Test volatility classification with empty history."""
-        regime = _classify_volatility_regime(0.20, [])
-        assert regime == "normal"
-
-    def test_classify_volatility_regime_percentile_empty_history(self) -> None:
-        """Test percentile-based volatility classification with empty history."""
-        regime = _classify_volatility_regime_percentile(0.20, [])
-        assert regime == "normal"

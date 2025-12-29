@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced CONTRIBUTING.md with commit message template reference, pull request template guidance, and comprehensive "Adding New Tools" section
 - Rewrote MANIFESTO.md for improved clarity, structure, and messaging around the project's mission and vision
 - Updated README.md section headers to remove emoji formatting for consistency
+- Updated market regime detection documentation to include comprehensive guide for Market Regime Indicators Tool
 
 ### Added
 
@@ -41,3 +42,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Volatility regime detection tool (high/normal/low) using rolling volatility analysis
   - Market cycle detection tool using Wyckoff methodology (accumulation/markup/distribution/markdown phases)
   - Extensible architecture supporting multiple detection methods (rule-based, statistical)
+  - Market regime indicators tool providing VIX (volatility index), market breadth analysis, and sector rotation signals

@@ -23,6 +23,7 @@ Rule-based tools use technical indicators, moving averages, and threshold-based 
 - Trend Detection (MA crossovers, momentum)
 - Volatility Detection (rolling volatility with thresholds)
 - Cycle Detection (Wyckoff methodology)
+- Market Regime Indicators (VIX, market breadth, sector rotation)
 
 ### Statistical Inference (Future)
 
@@ -257,6 +258,154 @@ if result.success:
    - Characteristics: Downtrend, public selling pressure
    - Investment implication: Defensive positioning, avoid catching falling knives
 
+### Market Regime Indicators Tool (`get_market_regime_indicators`)
+
+**Method**: Market-wide indicators using VIX, sector ETFs, and market breadth analysis
+
+Provides comprehensive market regime indicators including VIX (volatility index), market breadth analysis, and sector rotation signals. This tool complements individual stock regime detection by providing broader market context.
+
+**What It Provides:**
+
+1. **VIX (Volatility Index)**: Measures market fear and complacency
+2. **Market Breadth**: Analyzes sector participation in market moves
+3. **Sector Rotation**: Identifies which sectors are gaining/losing momentum
+
+**Parameters:**
+- `market_index` (optional, default: "SPY"): Market index symbol for comparison
+- `lookback_days` (optional, default: 252): Number of days to analyze (~1 trading year)
+- `include_vix` (optional, default: true): Include VIX volatility index data
+- `include_market_breadth` (optional, default: true): Include market breadth analysis
+- `include_sector_rotation` (optional, default: true): Include sector rotation signals
+
+**Returns:**
+
+The tool returns a dictionary with three main sections:
+
+**VIX Data** (when `include_vix=true`):
+- `available`: Boolean indicating if VIX data is available
+- `current_vix`: Current VIX level
+- `recent_average_20d`: 20-day average VIX level
+- `recent_max_20d`: Maximum VIX in last 20 days
+- `recent_min_20d`: Minimum VIX in last 20 days
+- `regime`: VIX regime classification ("low", "normal", "high", "very_high")
+  - **low**: VIX &lt; 15 (complacent market)
+  - **normal**: 15 ≤ VIX &lt; 25 (normal volatility)
+  - **high**: 25 ≤ VIX &lt; 30 (fearful market)
+  - **very_high**: VIX ≥ 30 (panic)
+- `sentiment`: Market sentiment ("complacent", "normal", "fearful", "panic")
+- `data_points`: Number of data points used
+
+**Market Breadth** (when `include_market_breadth=true`):
+- `available`: Boolean indicating if breadth data is available
+- `breadth_ratio`: Percentage of sectors above 50-day moving average
+- `participation_ratio`: Percentage of sectors outperforming the market
+- `sectors_above_50ma`: Count of sectors above their 50-day MA
+- `sectors_outperforming`: Count of sectors outperforming the market
+- `total_sectors_analyzed`: Total number of sectors analyzed
+- `regime`: Breadth regime classification ("strong", "moderate", "weak")
+  - **strong**: ≥70% of sectors above MA and outperforming
+  - **moderate**: 40-70% participating
+  - **weak**: &lt;40% participating
+- `sector_details`: Dictionary with detailed performance for each sector ETF:
+  - `name`: Sector name
+  - `current_price`: Current sector ETF price
+  - `above_50ma`: Boolean indicating if above 50-day MA
+  - `relative_performance_pct`: Sector return vs. market return
+  - `sector_return_pct`: Sector return percentage
+  - `market_return_pct`: Market return percentage
+
+**Sector Rotation** (when `include_sector_rotation=true`):
+- `available`: Boolean indicating if rotation data is available
+- `rotation_theme`: Overall rotation theme ("defensive", "growth", "value", "mixed")
+  - **defensive**: Utilities (XLU) or Consumer Staples (XLP) leading
+  - **growth**: Technology (XLK) or Consumer Discretionary (XLY) leading
+  - **value**: Financials (XLF) or Industrials (XLI) leading
+  - **mixed**: No clear theme
+- `leading_sectors`: Top 3 sectors by momentum score (list of sector dictionaries)
+- `lagging_sectors`: Bottom 3 sectors by momentum score (list of sector dictionaries)
+- `all_sectors_ranked`: All sectors sorted by momentum score (highest first)
+- `market_return_20d`: Market return over last 20 days (percentage)
+- `market_return_60d`: Market return over last 60 days (percentage)
+
+Each sector in the rotation data includes:
+- `symbol`: Sector ETF symbol (e.g., "XLK")
+- `name`: Sector name (e.g., "Technology")
+- `momentum_score`: Weighted momentum score (20d: 60%, 60d: 40%)
+- `relative_momentum_20d`: Sector momentum vs. market (20-day)
+- `relative_momentum_60d`: Sector momentum vs. market (60-day)
+- `sector_return_20d`: Sector return over last 20 days
+- `sector_return_60d`: Sector return over last 60 days
+
+**Example:**
+```python
+from copinanceos.infrastructure.tools.analysis import MarketRegimeIndicatorsTool
+from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+
+provider = YFinanceMarketProvider()
+tool = MarketRegimeIndicatorsTool(provider)
+
+# Get all indicators
+result = await tool.execute(market_index="SPY", lookback_days=252)
+
+if result.success:
+    # VIX data
+    if result.data.get("vix", {}).get("available"):
+        print(f"Current VIX: {result.data['vix']['current_vix']}")
+        print(f"VIX Regime: {result.data['vix']['regime']}")
+        print(f"Market Sentiment: {result.data['vix']['sentiment']}")
+    
+    # Market breadth
+    if result.data.get("market_breadth", {}).get("available"):
+        breadth = result.data["market_breadth"]
+        print(f"Breadth Ratio: {breadth['breadth_ratio']}%")
+        print(f"Breadth Regime: {breadth['regime']}")
+        print(f"Sectors Above MA: {breadth['sectors_above_50ma']}/{breadth['total_sectors_analyzed']}")
+    
+    # Sector rotation
+    if result.data.get("sector_rotation", {}).get("available"):
+        rotation = result.data["sector_rotation"]
+        print(f"Rotation Theme: {rotation['rotation_theme']}")
+        print(f"Leading Sectors: {[s['name'] for s in rotation['leading_sectors']]}")
+        print(f"Lagging Sectors: {[s['name'] for s in rotation['lagging_sectors']]}")
+
+# Get only VIX data
+vix_result = await tool.execute(include_market_breadth=False, include_sector_rotation=False)
+```
+
+**Use Cases:**
+
+1. **Risk Assessment**: VIX levels help assess overall market risk and fear levels
+2. **Market Health**: Market breadth indicates whether market moves are broad-based or narrow
+3. **Sector Allocation**: Sector rotation signals help identify which sectors to overweight/underweight
+4. **Regime Confirmation**: Use alongside individual stock regime tools to confirm broader market context
+
+**Interpretation Guide:**
+
+**VIX Levels:**
+- **VIX &lt; 15**: Low volatility, complacent market. Often precedes volatility spikes.
+- **VIX 15-25**: Normal volatility range. Healthy market conditions.
+- **VIX 25-30**: Elevated fear. Market stress, potential buying opportunities for contrarians.
+- **VIX &gt; 30**: Panic levels. Extreme fear, often marks market bottoms.
+
+**Market Breadth:**
+- **Strong Breadth (≥70%)**: Healthy market with broad participation. Bull markets typically show strong breadth.
+- **Moderate Breadth (40-70%)**: Mixed signals. Some sectors leading, others lagging.
+- **Weak Breadth (&lt;40%)**: Narrow market. Few sectors driving gains, potential weakness ahead.
+
+**Sector Rotation Themes:**
+- **Defensive Rotation**: Utilities and staples leading. Often occurs during market uncertainty or downturns.
+- **Growth Rotation**: Technology and discretionary leading. Typical in risk-on environments and bull markets.
+- **Value Rotation**: Financials and industrials leading. Often signals economic recovery or reflation.
+- **Mixed Rotation**: No clear theme. Market in transition or uncertain phase.
+
+**Data Sources:**
+- All data is fetched using free sources via the yfinance provider
+- VIX: CBOE Volatility Index (^VIX)
+- Market Breadth: 11 sector ETFs (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE)
+- Sector Rotation: Same sector ETFs with momentum analysis
+
+**Note:** This tool analyzes market-wide indicators, not individual stocks. Use it in combination with individual stock regime detection tools for comprehensive analysis.
+
 ## Adaptive Data Handling
 
 All market regime detection tools include adaptive parameter adjustment for stocks with limited trading history. This is particularly important for:
@@ -295,16 +444,23 @@ The LLM will automatically use the appropriate tools to answer your question.
 ### Programmatic Usage
 
 ```python
-from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+from copinanceos.infrastructure.tools.analysis import (
+    create_market_regime_tools,
+    MarketRegimeIndicatorsTool,
+)
 from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
 
-# Create tools
+# Create rule-based detection tools
 provider = YFinanceMarketProvider()
 tools = create_market_regime_tools(provider)
 
-# Use individual tools
+# Use individual detection tools
 trend_tool = tools[0]
 result = await trend_tool.execute(symbol="AAPL")
+
+# Create and use indicators tool
+indicators_tool = MarketRegimeIndicatorsTool(provider)
+indicators_result = await indicators_tool.execute(market_index="SPY")
 ```
 
 ### Tool Registry
@@ -349,10 +505,13 @@ trend_tool = registry.get("detect_market_trend")
 
 1. **Data Quality**: Ensure sufficient historical data for reliable regime detection
 2. **Multiple Timeframes**: Use different lookback periods to confirm regime signals
-3. **Combined Analysis**: Use all three tools together for comprehensive market assessment
+3. **Combined Analysis**: Use all tools together for comprehensive market assessment:
+   - Individual stock tools (trend, volatility, cycles) for stock-specific analysis
+   - Market indicators tool for broader market context
 4. **Confidence Levels**: Pay attention to confidence indicators, especially with limited data
 5. **Regime Transitions**: Monitor `potential_regime_change` signals for early warning of shifts
 6. **Adaptive Parameters**: Be aware when parameters are adjusted and interpret results accordingly
+7. **Market Context**: Always consider market-wide indicators when analyzing individual stocks
 
 ## Limitations
 
@@ -373,6 +532,7 @@ infrastructure/tools/analysis/market_regime/
 ├── __init__.py          # Public API exports (backward compatible)
 ├── base.py              # Common interfaces and base classes
 ├── rule_based.py        # Rule-based detection (current implementation)
+├── indicators.py        # Market regime indicators (VIX, breadth, rotation)
 ├── statistical.py       # Statistical inference (future: HMM, Hamilton models)
 └── registry.py          # Factory functions for unified tool creation
 ```
@@ -421,8 +581,14 @@ def create_ml_regime_tools(provider: MarketDataProvider) -> list[Tool]:
 
 ```python
 # Rule-based tools (default, current)
-from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+from copinanceos.infrastructure.tools.analysis import (
+    create_market_regime_tools,
+    MarketRegimeIndicatorsTool,
+)
 tools = create_market_regime_tools(provider)
+
+# Market regime indicators tool (separate from detection tools)
+indicators_tool = MarketRegimeIndicatorsTool(provider)
 
 # Explicitly specify method type
 from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
@@ -439,6 +605,7 @@ all_tools = create_all_regime_tools(
     provider, 
     methods=["rule_based", "statistical"]  # Add more as they're implemented
 )
+# Note: MarketRegimeIndicatorsTool is separate and must be created explicitly
 ```
 
 ### Future Extensions

@@ -8,6 +8,10 @@ The package is organized to allow easy extension with new detection methods whil
 a consistent interface for all regime detection tools.
 """
 
+from copinanceos.infrastructure.tools.analysis.market_regime.indicators import (
+    MarketRegimeIndicatorsTool,
+    create_market_regime_indicators_tool,
+)
 from copinanceos.infrastructure.tools.analysis.market_regime.rule_based import (
     MarketRegimeDetectCyclesTool,
     MarketRegimeDetectTrendTool,
@@ -22,6 +26,9 @@ __all__ = [
     "MarketRegimeDetectVolatilityTool",
     "MarketRegimeDetectCyclesTool",
     "create_rule_based_regime_tools",
+    # Market regime indicators tool
+    "MarketRegimeIndicatorsTool",
+    "create_market_regime_indicators_tool",
     # Factory function (backward compatible)
     "create_market_regime_tools",
 ]

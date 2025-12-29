@@ -5,10 +5,66 @@ allowing rule-based and statistical methods to share a consistent interface.
 """
 
 from abc import ABC, abstractmethod
+from math import log
 from typing import Any
+
+import pandas as pd  # type: ignore[import-untyped]
 
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.tools import Tool, ToolResult
+
+
+def _calculate_moving_average(prices: list[float], window: int) -> list[float | None]:
+    """Calculate simple moving average using pandas.
+
+    Based on Brock, Lakonishok, & LeBaron (1992) methodology for technical trading rules.
+    Simple moving averages are fundamental to trend-following strategies and regime detection.
+
+    Uses pandas rolling window operations for efficient vectorized calculations.
+
+    Args:
+        prices: List of prices
+        window: Moving average window size
+
+    Returns:
+        List of moving average values (None for insufficient data)
+    """
+    if len(prices) < window:
+        return [None] * len(prices)
+
+    # Use pandas for efficient rolling mean calculation
+    series = pd.Series(prices)
+    ma_series = series.rolling(window=window, min_periods=window).mean()
+
+    # Convert to list with None for NaN values
+    return [None if pd.isna(val) else float(val) for val in ma_series]
+
+
+def _calculate_log_returns(prices: list[float]) -> list[float]:
+    """Calculate log-returns: r_t = ln(P_t / P_{t-1}) using pandas.
+
+    Log-returns have better statistical properties:
+    - Additivity: multi-period returns are sums of log-returns
+    - Better handling of high-volatility stocks
+    - More symmetric distribution
+
+    Uses pandas for efficient vectorized calculations.
+
+    Args:
+        prices: List of prices
+
+    Returns:
+        List of log-returns (one less than input prices)
+    """
+    if len(prices) < 2:
+        return []
+
+    # Calculate log(P_t / P_{t-1}) = log(P_t) - log(P_{t-1})
+    log_prices = pd.Series([log(p) if p > 0 else 0.0 for p in prices])
+    log_returns = log_prices.diff()
+
+    # Return as list, skipping first NaN value (first price has no previous price)
+    return [float(val) if pd.notna(val) else 0.0 for val in log_returns[1:]]
 
 
 class BaseRegimeDetectionTool(Tool, ABC):

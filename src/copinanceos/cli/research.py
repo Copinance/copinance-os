@@ -369,23 +369,42 @@ async def set_research_context(
 @research_app.command("ask")
 @async_command
 async def ask_question(
-    symbol: str = typer.Argument(..., help="Stock symbol"),
-    question: str = typer.Argument(..., help="Question to ask about the stock"),
+    question: str = typer.Argument(..., help="Question to ask (about a stock or the market)"),
+    symbol: str | None = typer.Option(
+        None, "--symbol", "-s", help="Stock symbol (optional for market-wide questions)"
+    ),
     timeframe: ResearchTimeframe = typer.Option(
         ResearchTimeframe.MID_TERM, help="Research timeframe"
     ),
     profile_id: UUID | None = typer.Option(None, help="Research profile ID for context"),
 ) -> None:
-    """Quick Q&A: Ask a question about a stock using agentic workflow."""
+    """Quick Q&A: Ask a question about a stock or the market using agentic workflow.
+
+    Examples:
+      # Market-wide question (no symbol needed)
+      copinance research ask "What's the current state of the overall market?"
+
+      # Stock-specific question
+      copinance research ask "What's the current state of the overall market?" --symbol AAPL
+      copinance research ask "What is Apple's P/E ratio?" --symbol AAPL
+    """
     # Ensure profile with literacy level exists
     final_profile_id = await _ensure_profile_with_literacy(profile_id)
 
-    console.print(f"[bold]Question about {symbol}:[/bold] {question}\n")
+    # Use generic placeholder for market-wide questions
+    # Research model requires stock_symbol, so we use a placeholder
+    research_symbol = symbol.upper() if symbol else "MARKET"
+    is_market_wide = symbol is None
+
+    if is_market_wide:
+        console.print(f"[bold]Market-wide question:[/bold] {question}\n")
+    else:
+        console.print(f"[bold]Question about {symbol}:[/bold] {question}\n")
 
     # Create research
     create_use_case = container.create_research_use_case()
     create_request = CreateResearchRequest(
-        stock_symbol=symbol,
+        stock_symbol=research_symbol,
         timeframe=timeframe,
         workflow_type="agentic",
         profile_id=final_profile_id,
@@ -400,7 +419,12 @@ async def ask_question(
         context={"question": question},
     )
 
-    with console.status(f"[bold blue]Analyzing {symbol} and preparing answer..."):
+    status_message = (
+        "[bold blue]Analyzing market and preparing answer..."
+        if is_market_wide
+        else f"[bold blue]Analyzing {symbol} and preparing answer..."
+    )
+    with console.status(status_message):
         execute_response = await execute_use_case.execute(execute_request)
 
     if execute_response.success:

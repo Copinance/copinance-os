@@ -67,62 +67,12 @@ import structlog
 
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.tools import Tool, ToolResult, ToolSchema
+from copinanceos.infrastructure.tools.analysis.market_regime.base import (
+    _calculate_log_returns,
+    _calculate_moving_average,
+)
 
 logger = structlog.get_logger(__name__)
-
-
-def _calculate_moving_average(prices: list[float], window: int) -> list[float | None]:
-    """Calculate simple moving average using pandas.
-
-    Based on Brock, Lakonishok, & LeBaron (1992) methodology for technical trading rules.
-    Simple moving averages are fundamental to trend-following strategies and regime detection.
-
-    Uses pandas rolling window operations for efficient vectorized calculations.
-
-    Args:
-        prices: List of prices
-        window: Moving average window size
-
-    Returns:
-        List of moving average values (None for insufficient data)
-    """
-    if len(prices) < window:
-        return [None] * len(prices)
-
-    # Use pandas for efficient rolling mean calculation
-    series = pd.Series(prices)
-    ma_series = series.rolling(window=window, min_periods=window).mean()
-
-    # Convert to list with None for NaN values (maintains backward compatibility)
-    return [None if pd.isna(val) else float(val) for val in ma_series]
-
-
-def _calculate_log_returns(prices: list[float]) -> list[float]:
-    """Calculate log-returns: r_t = ln(P_t / P_{t-1}) using pandas.
-
-    Log-returns have better statistical properties:
-    - Additivity: multi-period returns are sums of log-returns
-    - Better handling of high-volatility stocks
-    - More symmetric distribution
-
-    Uses pandas for efficient vectorized calculations.
-
-    Args:
-        prices: List of prices
-
-    Returns:
-        List of log-returns (one less than input prices)
-    """
-    if len(prices) < 2:
-        return []
-
-    # Use pandas for efficient log-return calculation
-    # Calculate log(P_t / P_{t-1}) = log(P_t) - log(P_{t-1})
-    log_prices = pd.Series([log(p) if p > 0 else 0.0 for p in prices])
-    log_returns = log_prices.diff()
-
-    # Return as list, skipping first NaN value (first price has no previous price)
-    return [float(val) if pd.notna(val) else 0.0 for val in log_returns[1:]]
 
 
 def _calculate_volatility(prices: list[float], window: int = 20) -> list[float | None]:
@@ -144,16 +94,17 @@ def _calculate_volatility(prices: list[float], window: int = 20) -> list[float |
     if len(prices) < window + 1:
         return [None] * len(prices)
 
-    # Use pandas for efficient calculation
-    # Calculate log-returns using pandas
-    # Calculate log(P_t / P_{t-1}) = log(P_t) - log(P_{t-1})
-    log_prices = pd.Series([log(p) if p > 0 else 0.0 for p in prices])
-    log_returns = log_prices.diff()
+    # Use log-returns from base module
+    log_returns_list = _calculate_log_returns(prices)
+
+    if len(log_returns_list) < window:
+        return [None] * len(prices)
+
+    # Convert to pandas Series for rolling calculations
+    log_returns = pd.Series(log_returns_list)
 
     # Calculate rolling standard deviation of log-returns
     # min_periods=window ensures we only get values when we have enough data
-    # Note: log_returns[0] is NaN (no previous price), so we need window valid returns
-    # starting from log_returns[1], which means first valid volatility is at index window+1
     rolling_std = log_returns.rolling(window=window, min_periods=window).std()
 
     # Annualize (assuming 252 trading days per year)
@@ -161,11 +112,24 @@ def _calculate_volatility(prices: list[float], window: int = 20) -> list[float |
 
     # Convert to list with None for NaN values
     # Structure: [None] (first price) + [None] * window (need window returns) + valid values
+    # log_returns_list has len(prices) - 1 elements
+    # annualized_vol has len(log_returns_list) elements, but first window are NaN
     result: list[float | None] = [None]  # First price (index 0) has no return
     # Add None for indices 1 to window (need window log-returns for first valid volatility)
     result.extend([None] * window)
-    # Add valid volatility values (starting from index window+1)
-    result.extend([None if pd.isna(val) else float(val) for val in annualized_vol[window + 1 :]])
+    # Add valid volatility values (skip first window NaN values)
+    valid_vols = [None if pd.isna(val) else float(val) for val in annualized_vol[window:]]
+    result.extend(valid_vols)
+
+    # Ensure result length matches input prices length
+    # If we have 50 prices, we need 50 volatility values
+    # log_returns has 49 elements, annualized_vol has 49 elements
+    # We add 1 None + window None + valid_vols
+    # Total should be: 1 + window + (len(log_returns) - window) = 1 + len(log_returns) = len(prices)
+    if len(result) > len(prices):
+        result = result[: len(prices)]
+    elif len(result) < len(prices):
+        result.extend([None] * (len(prices) - len(result)))
 
     return result
 

@@ -469,6 +469,7 @@ class OllamaProvider(LLMProvider):
                         recent_tool_calls.pop(0)
 
                     # Serialize response data for storage
+                    # Note: make_json_serializable is defined above in this function
                     response_data = None
                     if tool_result.success and tool_result.data is not None:
                         # Serialize data, potentially truncating very large responses
