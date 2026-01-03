@@ -4,10 +4,10 @@ from typing import Any
 
 import structlog
 
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.analyzers.llm.providers.base import LLMProvider
 from copinanceos.infrastructure.analyzers.llm.providers.gemini import GeminiProvider
 from copinanceos.infrastructure.analyzers.llm.providers.ollama import OllamaProvider
-from copinanceos.infrastructure.config import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -18,14 +18,14 @@ class LLMProviderFactory:
     @staticmethod
     def create_provider(
         provider_name: str,
-        settings: Settings | None = None,
+        llm_config: LLMConfig | None = None,
         **override_kwargs: Any,
     ) -> LLMProvider:
         """Create an LLM provider from configuration.
 
         Args:
             provider_name: Name of the provider (e.g., "gemini", "ollama", "openai")
-            settings: Settings instance. If None, will create a new one.
+            llm_config: LLM configuration. If None, provider-specific defaults will be used.
             **override_kwargs: Override any configuration values
 
         Returns:
@@ -34,25 +34,42 @@ class LLMProviderFactory:
         Raises:
             ValueError: If provider_name is not supported
         """
-        if settings is None:
-            settings = get_settings()
-
         provider_name_lower = provider_name.lower()
+
+        # Extract config values if provided
+        api_key = override_kwargs.get("api_key")
+        model_name = override_kwargs.get("model_name")
+        base_url = override_kwargs.get("base_url")
+        temperature = override_kwargs.get("temperature")
+        max_output_tokens = override_kwargs.get("max_output_tokens")
+
+        if llm_config:
+            # Use config values if not overridden
+            if api_key is None:
+                api_key = llm_config.api_key
+            if model_name is None:
+                model_name = llm_config.model
+            if base_url is None:
+                base_url = llm_config.base_url
+            if temperature is None:
+                temperature = llm_config.temperature
+            if max_output_tokens is None:
+                max_output_tokens = llm_config.max_tokens
 
         if provider_name_lower == "gemini":
             return GeminiProvider(
-                api_key=override_kwargs.get("api_key", settings.gemini_api_key),
-                model_name=override_kwargs.get("model_name", settings.gemini_model),
-                temperature=override_kwargs.get("temperature", settings.llm_temperature),
-                max_output_tokens=override_kwargs.get("max_output_tokens", settings.llm_max_tokens),
+                api_key=api_key,
+                model_name=model_name or "gemini-1.5-pro",
+                temperature=temperature or 0.7,
+                max_output_tokens=max_output_tokens,
             )
 
         elif provider_name_lower == "ollama":
             return OllamaProvider(
-                base_url=override_kwargs.get("base_url", settings.ollama_base_url),
-                model_name=override_kwargs.get("model_name", settings.ollama_model),
-                temperature=override_kwargs.get("temperature", settings.llm_temperature),
-                max_output_tokens=override_kwargs.get("max_output_tokens", settings.llm_max_tokens),
+                base_url=base_url or "http://localhost:11434",
+                model_name=model_name or "llama2",
+                temperature=temperature or 0.7,
+                max_output_tokens=max_output_tokens,
             )
 
         # TODO: Add OpenAI and Anthropic providers when implemented
@@ -74,62 +91,27 @@ class LLMProviderFactory:
             )
 
     @staticmethod
-    def parse_workflow_provider_mapping(
-        mapping_str: str | None,
-    ) -> dict[str, str]:
-        """Parse workflow:provider mapping string.
-
-        Args:
-            mapping_str: Comma-separated string like "static:ollama,agentic:gemini"
-
-        Returns:
-            Dictionary mapping workflow_type -> provider_name
-        """
-        if not mapping_str:
-            return {}
-
-        mapping: dict[str, str] = {}
-        for pair in mapping_str.split(","):
-            pair = pair.strip()
-            if ":" in pair:
-                workflow_type, provider_name = pair.split(":", 1)
-                mapping[workflow_type.strip()] = provider_name.strip()
-            else:
-                logger.warning(
-                    "Invalid workflow:provider mapping format",
-                    pair=pair,
-                    expected_format="workflow_type:provider_name",
-                )
-
-        return mapping
-
-    @staticmethod
     def get_provider_for_workflow(
         workflow_type: str,
-        settings: Settings | None = None,
+        llm_config: LLMConfig | None = None,
         default_provider: str | None = None,
     ) -> str:
         """Get the provider name for a specific workflow.
 
         Args:
             workflow_type: The workflow type (e.g., "static", "agentic", "fundamentals")
-            settings: Settings instance. If None, will create a new one.
+            llm_config: LLM configuration. If None, uses default_provider.
             default_provider: Default provider to use if no mapping is found
 
         Returns:
             Provider name to use for this workflow
         """
-        if settings is None:
-            settings = get_settings()
+        if llm_config:
+            return llm_config.get_provider_for_workflow(workflow_type)
 
-        # Parse workflow provider mapping
-        workflow_mapping = LLMProviderFactory.parse_workflow_provider_mapping(
-            settings.workflow_llm_providers
-        )
+        # Fall back to default provider
+        if default_provider:
+            return default_provider
 
-        # Check if there's a specific mapping for this workflow
-        if workflow_type in workflow_mapping:
-            return workflow_mapping[workflow_type]
-
-        # Fall back to default provider or global llm_provider setting
-        return default_provider or settings.llm_provider
+        # Last resort: use "gemini" as default
+        return "gemini"

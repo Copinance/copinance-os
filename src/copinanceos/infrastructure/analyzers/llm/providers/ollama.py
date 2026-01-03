@@ -29,14 +29,28 @@ class OllamaProvider(LLMProvider):
     """Ollama local LLM provider implementation.
 
     This provider uses Ollama for running LLMs locally.
-    Configure using COPINANCEOS_OLLAMA_BASE_URL and COPINANCEOS_OLLAMA_MODEL environment variables.
+
+    For CLI usage, configure using COPINANCEOS_OLLAMA_BASE_URL and COPINANCEOS_OLLAMA_MODEL
+    environment variables. For library integration, provide LLMConfig with base_url and model.
 
     Example:
         ```python
         from copinanceos.infrastructure.analyzers.llm.providers import OllamaProvider
 
+        # Direct instantiation
         provider = OllamaProvider(base_url="http://localhost:11434", model_name="llama2")
         response = await provider.generate_text("Analyze this stock...")
+
+        # Using LLMConfig (recommended for library integration)
+        from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+        from copinanceos.infrastructure.analyzers.llm.providers.factory import LLMProviderFactory
+
+        llm_config = LLMConfig(
+            provider="ollama",
+            base_url="http://localhost:11434",
+            model="llama2"
+        )
+        provider = LLMProviderFactory.create_provider("ollama", llm_config=llm_config)
         ```
     """
 
@@ -209,7 +223,7 @@ class OllamaProvider(LLMProvider):
                         f"Ollama API endpoint not found (404). "
                         f"This usually means:\n"
                         f"  1. Ollama is not running - start it with: ollama serve\n"
-                        f"  2. The base URL is incorrect - check COPINANCEOS_OLLAMA_BASE_URL\n"
+                        f"  2. The base URL is incorrect - check your LLMConfig base_url setting\n"
                         f"  3. The model '{self._model_name}' doesn't exist - pull it with: ollama pull {self._model_name}\n"
                         f"Original error: {str(e)}"
                     )

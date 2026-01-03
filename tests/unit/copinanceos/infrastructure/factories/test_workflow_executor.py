@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.factories.workflow_executor import WorkflowExecutorFactory
 
 
@@ -37,7 +38,6 @@ class TestWorkflowExecutorFactory:
         assert mock_executor in result
         mock_static_executor.assert_called_once()
 
-    @patch("copinanceos.infrastructure.factories.workflow_executor.get_settings")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMProviderFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMAnalyzerFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.AgenticWorkflowExecutor")
@@ -48,14 +48,11 @@ class TestWorkflowExecutorFactory:
         mock_agentic: MagicMock,
         mock_llm_factory: MagicMock,
         mock_provider_factory: MagicMock,
-        mock_settings: MagicMock,
         mock_dependencies: dict,
     ) -> None:
         """Test create_all when LLM analyzer is available."""
         # Setup mocks
-        mock_settings_instance = MagicMock()
-        mock_settings_instance.llm_provider = "gemini"
-        mock_settings.return_value = mock_settings_instance
+        llm_config = LLMConfig(provider="gemini", api_key="test-key")
         mock_provider_factory.get_provider_for_workflow.return_value = "gemini"
         mock_llm_analyzer = MagicMock()
         mock_llm_analyzer._llm_provider = MagicMock()
@@ -66,14 +63,13 @@ class TestWorkflowExecutorFactory:
         mock_agentic_executor = MagicMock()
         mock_agentic.return_value = mock_agentic_executor
 
-        result = WorkflowExecutorFactory.create_all(**mock_dependencies)
+        result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
         assert len(result) == 2
         assert mock_static_executor in result
         assert mock_agentic_executor in result
         mock_agentic.assert_called_once()
 
-    @patch("copinanceos.infrastructure.factories.workflow_executor.get_settings")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMProviderFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMAnalyzerFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.AgenticWorkflowExecutor")
@@ -84,14 +80,11 @@ class TestWorkflowExecutorFactory:
         mock_agentic: MagicMock,
         mock_llm_factory: MagicMock,
         mock_provider_factory: MagicMock,
-        mock_settings: MagicMock,
         mock_dependencies: dict,
     ) -> None:
         """Test create_all when LLM analyzer has no API key."""
         # Setup mocks
-        mock_settings_instance = MagicMock()
-        mock_settings_instance.llm_provider = "gemini"
-        mock_settings.return_value = mock_settings_instance
+        llm_config = LLMConfig(provider="gemini", api_key=None)  # No API key
         mock_provider_factory.get_provider_for_workflow.return_value = "gemini"
         mock_llm_analyzer = MagicMock()
         mock_llm_analyzer._llm_provider = MagicMock()
@@ -100,14 +93,13 @@ class TestWorkflowExecutorFactory:
         mock_static_executor = MagicMock()
         mock_static.return_value = mock_static_executor
 
-        result = WorkflowExecutorFactory.create_all(**mock_dependencies)
+        result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
         # Should only return static executor when API key is missing
         assert len(result) == 1
         assert mock_static_executor in result
         mock_agentic.assert_not_called()
 
-    @patch("copinanceos.infrastructure.factories.workflow_executor.get_settings")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMProviderFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMAnalyzerFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.StaticWorkflowExecutor")
@@ -116,19 +108,16 @@ class TestWorkflowExecutorFactory:
         mock_static: MagicMock,
         mock_llm_factory: MagicMock,
         mock_provider_factory: MagicMock,
-        mock_settings: MagicMock,
         mock_dependencies: dict,
     ) -> None:
         """Test create_all handles exception when creating LLM analyzer."""
         # Setup mocks
-        mock_settings_instance = MagicMock()
-        mock_settings_instance.llm_provider = "gemini"
-        mock_settings.return_value = mock_settings_instance
+        llm_config = LLMConfig(provider="gemini", api_key="test-key")
         mock_provider_factory.get_provider_for_workflow.side_effect = Exception("Config error")
         mock_static_executor = MagicMock()
         mock_static.return_value = mock_static_executor
 
-        result = WorkflowExecutorFactory.create_all(**mock_dependencies)
+        result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
         # Should still return static executor even if LLM creation fails
         assert len(result) == 1

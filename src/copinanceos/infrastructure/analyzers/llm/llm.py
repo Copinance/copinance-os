@@ -72,13 +72,16 @@ class GeminiLLMAnalyzer(LLMAnalyzerImpl):
         """Initialize Gemini LLM analyzer.
 
         Args:
-            api_key: Gemini API key. If not provided, will try to get from environment
-                     variable COPINANCEOS_GEMINI_API_KEY.
+            api_key: Gemini API key. Required for cloud usage.
             model_name: Gemini model to use (default: "gemini-1.5-pro")
                        Options: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
                        All support function calling for agentic workflows
             temperature: Default temperature for generation (0.0-1.0)
             max_output_tokens: Default max output tokens. If None, uses provider default.
+
+        Note:
+            For library integration, prefer using LLMAnalyzerFactory with LLMConfig instead
+            of direct instantiation.
         """
         provider = GeminiProvider(
             api_key=api_key,

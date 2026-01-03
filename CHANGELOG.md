@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: Refactored LLM configuration to use `LLMConfig` dataclass instead of reading from environment variables. Library integrators must now provide `LLMConfig` directly when creating containers. CLI usage remains backward compatible via environment variables.
 - Enhanced CONTRIBUTING.md with commit message template reference, pull request template guidance, and comprehensive "Adding New Tools" section
 - Rewrote MANIFESTO.md for improved clarity, structure, and messaging around the project's mission and vision
 - Updated README.md section headers to remove emoji formatting for consistency
@@ -20,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `LLMConfig` dataclass for programmatic LLM configuration (provider, API keys, model, temperature, etc.)
+- `load_llm_config_from_env()` helper function for backward compatibility with CLI environment variable configuration
 - Hexagonal architecture with 21+ extension interfaces for data providers, analyzers, strategies, and workflows
 - Research status tracking (pending, in_progress, completed, failed)
 - Static workflow executor with predefined analysis pipelines

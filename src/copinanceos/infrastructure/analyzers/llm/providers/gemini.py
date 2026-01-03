@@ -27,14 +27,24 @@ class GeminiProvider(LLMProvider):
     """Google Gemini LLM provider implementation.
 
     This provider uses Google's Gemini API for text generation.
-    Configure using the COPINANCEOS_GEMINI_API_KEY environment variable.
+
+    For CLI usage, configure using the COPINANCEOS_GEMINI_API_KEY environment variable.
+    For library integration, provide LLMConfig with api_key parameter.
 
     Example:
         ```python
         from copinanceos.infrastructure.analyzers.llm.providers import GeminiProvider
 
+        # Direct instantiation
         provider = GeminiProvider(api_key="your-api-key")
         response = await provider.generate_text("Analyze this stock...")
+
+        # Using LLMConfig (recommended for library integration)
+        from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+        from copinanceos.infrastructure.analyzers.llm.providers.factory import LLMProviderFactory
+
+        llm_config = LLMConfig(provider="gemini", api_key="your-api-key")
+        provider = LLMProviderFactory.create_provider("gemini", llm_config=llm_config)
         ```
     """
 
@@ -48,7 +58,7 @@ class GeminiProvider(LLMProvider):
         """Initialize Gemini provider.
 
         Args:
-            api_key: Gemini API key. If not provided, will try to get from environment.
+            api_key: Gemini API key. Required for cloud usage.
             model_name: Gemini model to use (default: "gemini-1.5-pro")
                        Options: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
                        All support function calling for agentic workflows

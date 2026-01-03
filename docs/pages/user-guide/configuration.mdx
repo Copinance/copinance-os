@@ -2,9 +2,18 @@
 
 Configure Copinance OS for your needs.
 
-## Environment Variables
+## Configuration Methods
 
-Configuration is done through environment variables or a `.env` file.
+Copinance OS supports two ways to configure LLM settings:
+
+1. **CLI Usage**: Environment variables (for command-line usage)
+2. **Library Integration**: `LLMConfig` object (for programmatic usage)
+
+> **Note for Library Integrators**: If you're integrating Copinance OS into your application, you should provide `LLMConfig` directly instead of relying on environment variables. See [Library Integration](#library-integration) below.
+
+## Environment Variables (CLI Usage)
+
+For CLI usage, configuration is done through environment variables or a `.env` file.
 
 ### Creating .env File
 
@@ -200,4 +209,75 @@ COPINANCEOS_WORKFLOW_LLM_PROVIDERS=static:ollama,agentic:gemini
 ```
 
 This allows you to use local models for simple tasks and cloud models for complex analysis.
+
+## Library Integration
+
+If you're integrating Copinance OS into your application as a library, you should provide LLM configuration using the `LLMConfig` class instead of environment variables.
+
+### Using LLMConfig
+
+```python
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinanceos.infrastructure.containers import get_container
+
+# Create LLM configuration
+llm_config = LLMConfig(
+    provider="gemini",
+    api_key="your-api-key",
+    model="gemini-1.5-pro",
+    temperature=0.7,
+)
+
+# Create container with LLM config
+container = get_container(llm_config=llm_config)
+
+# Use the container
+use_case = container.get_stock_use_case()
+# ... use the use case
+```
+
+### Per-Workflow Provider Configuration
+
+You can configure different providers for different workflows:
+
+```python
+llm_config = LLMConfig(
+    provider="gemini",  # Default provider
+    api_key="your-gemini-key",
+    workflow_providers={
+        "static": "ollama",      # Use Ollama for static workflows
+        "agentic": "gemini",     # Use Gemini for agentic workflows
+    },
+)
+```
+
+### Direct Provider Creation
+
+You can also create providers directly:
+
+```python
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinanceos.infrastructure.analyzers.llm.providers.factory import LLMProviderFactory
+from copinanceos.infrastructure.factories.llm_analyzer import LLMAnalyzerFactory
+
+# Create LLM config
+llm_config = LLMConfig(
+    provider="gemini",
+    api_key="your-api-key",
+    model="gemini-1.5-pro",
+)
+
+# Create provider
+provider = LLMProviderFactory.create_provider("gemini", llm_config=llm_config)
+
+# Create analyzer
+analyzer = LLMAnalyzerFactory.create("gemini", llm_config=llm_config)
+```
+
+### Why Use LLMConfig?
+
+- **Security**: API keys are not stored in environment variables
+- **Flexibility**: Different configurations for different parts of your application
+- **Testability**: Easy to mock and test with different configurations
+- **Type Safety**: Full type checking support with dataclasses
 

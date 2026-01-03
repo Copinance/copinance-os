@@ -24,6 +24,7 @@ from copinanceos.application.use_cases.stock import (
     GetStockUseCase,
     SearchStocksUseCase,
 )
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.factories import WorkflowExecutorFactory
 
 
@@ -37,6 +38,7 @@ def configure_use_cases(
     sec_filings_provider: providers.Provider,
     cache_manager: providers.Provider,
     profile_management_service: providers.Provider,
+    llm_config: LLMConfig | None = None,
 ) -> dict[str, providers.Provider]:
     """Configure use case providers.
 
@@ -50,6 +52,7 @@ def configure_use_cases(
         sec_filings_provider: SEC filings provider
         cache_manager: Cache manager provider
         profile_management_service: Profile management service provider
+        llm_config: Optional LLM configuration. If None, agentic workflows will not be available.
 
     Returns:
         Dictionary of use case providers
@@ -141,6 +144,7 @@ def configure_use_cases(
         fundamental_data_provider=fundamental_data_provider,
         sec_filings_provider=sec_filings_provider,
         cache_manager=cache_manager,
+        llm_config=llm_config,
     )
 
     # Execute research use case (defined after workflow_executors)

@@ -4,26 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.analyzers.llm.providers.factory import LLMProviderFactory
 from copinanceos.infrastructure.analyzers.llm.providers.gemini import GeminiProvider
 from copinanceos.infrastructure.analyzers.llm.providers.ollama import OllamaProvider
-from copinanceos.infrastructure.config import Settings
-
-
-def create_settings(**kwargs: str) -> Settings:
-    """Create Settings instance without reading from environment."""
-    defaults = {
-        "llm_provider": "gemini",
-        "gemini_api_key": None,
-        "gemini_model": "gemini-pro",
-        "ollama_base_url": "http://localhost:11434",
-        "ollama_model": "llama2",
-        "llm_temperature": 0.7,
-        "llm_max_tokens": None,
-        "workflow_llm_providers": None,
-    }
-    defaults.update(kwargs)
-    return Settings.model_construct(**defaults)
 
 
 @pytest.mark.unit
@@ -32,8 +16,12 @@ class TestLLMProviderFactory:
 
     def test_create_provider_gemini(self) -> None:
         """Test creating Gemini provider."""
-        settings = create_settings(gemini_api_key="test-key")
-        provider = LLMProviderFactory.create_provider("gemini", settings)
+        llm_config = LLMConfig(
+            provider="gemini",
+            api_key="test-key",
+            model="gemini-pro",
+        )
+        provider = LLMProviderFactory.create_provider("gemini", llm_config=llm_config)
 
         assert isinstance(provider, GeminiProvider)
         assert provider._api_key == "test-key"
@@ -41,9 +29,13 @@ class TestLLMProviderFactory:
 
     def test_create_provider_gemini_with_override_kwargs(self) -> None:
         """Test creating Gemini provider with override kwargs."""
-        settings = create_settings(gemini_api_key="default-key", gemini_model="default-model")
+        llm_config = LLMConfig(
+            provider="gemini",
+            api_key="default-key",
+            model="default-model",
+        )
         provider = LLMProviderFactory.create_provider(
-            "gemini", settings, api_key="override-key", model_name="override-model"
+            "gemini", llm_config=llm_config, api_key="override-key", model_name="override-model"
         )
 
         assert isinstance(provider, GeminiProvider)
@@ -52,8 +44,8 @@ class TestLLMProviderFactory:
 
     def test_create_provider_gemini_case_insensitive(self) -> None:
         """Test that provider name is case insensitive."""
-        settings = create_settings()
-        provider = LLMProviderFactory.create_provider("GEMINI", settings)
+        llm_config = LLMConfig(provider="gemini", api_key="test-key")
+        provider = LLMProviderFactory.create_provider("GEMINI", llm_config=llm_config)
 
         assert isinstance(provider, GeminiProvider)
 
@@ -63,8 +55,12 @@ class TestLLMProviderFactory:
         """Test creating Ollama provider."""
         mock_client = MagicMock()
         mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
-        settings = create_settings(ollama_base_url="http://custom:8080", ollama_model="mistral")
-        provider = LLMProviderFactory.create_provider("ollama", settings)
+        llm_config = LLMConfig(
+            provider="ollama",
+            base_url="http://custom:8080",
+            model="mistral",
+        )
+        provider = LLMProviderFactory.create_provider("ollama", llm_config=llm_config)
 
         assert isinstance(provider, OllamaProvider)
         assert provider._base_url == "http://custom:8080"
@@ -76,11 +72,16 @@ class TestLLMProviderFactory:
         """Test creating Ollama provider with override kwargs."""
         mock_client = MagicMock()
         mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
-        settings = create_settings(
-            ollama_base_url="http://default:11434", ollama_model="default-model"
+        llm_config = LLMConfig(
+            provider="ollama",
+            base_url="http://default:11434",
+            model="default-model",
         )
         provider = LLMProviderFactory.create_provider(
-            "ollama", settings, base_url="http://override:8080", model_name="override-model"
+            "ollama",
+            llm_config=llm_config,
+            base_url="http://override:8080",
+            model_name="override-model",
         )
 
         assert isinstance(provider, OllamaProvider)
@@ -97,143 +98,97 @@ class TestLLMProviderFactory:
             ) as mock_httpx:
                 mock_client = MagicMock()
                 mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
-                settings = create_settings()
-                provider = LLMProviderFactory.create_provider("OLLAMA", settings)
+                llm_config = LLMConfig(provider="ollama", base_url="http://localhost:11434")
+                provider = LLMProviderFactory.create_provider("OLLAMA", llm_config=llm_config)
 
                 assert isinstance(provider, OllamaProvider)
 
     def test_create_provider_openai_raises_error(self) -> None:
         """Test that creating OpenAI provider raises ValueError."""
-        settings = create_settings()
+        llm_config = LLMConfig(provider="openai", api_key="test-key")
         with pytest.raises(ValueError, match="OpenAI provider is not yet implemented"):
-            LLMProviderFactory.create_provider("openai", settings)
+            LLMProviderFactory.create_provider("openai", llm_config=llm_config)
 
     def test_create_provider_anthropic_raises_error(self) -> None:
         """Test that creating Anthropic provider raises ValueError."""
-        settings = create_settings()
+        llm_config = LLMConfig(provider="anthropic", api_key="test-key")
         with pytest.raises(ValueError, match="Anthropic provider is not yet implemented"):
-            LLMProviderFactory.create_provider("anthropic", settings)
+            LLMProviderFactory.create_provider("anthropic", llm_config=llm_config)
 
     def test_create_provider_unsupported_raises_error(self) -> None:
         """Test that creating unsupported provider raises ValueError."""
-        settings = create_settings()
+        llm_config = LLMConfig(provider="unsupported", api_key="test-key")
         with pytest.raises(ValueError, match="Unsupported LLM provider"):
-            LLMProviderFactory.create_provider("unsupported", settings)
+            LLMProviderFactory.create_provider("unsupported", llm_config=llm_config)
 
-    def test_create_provider_uses_default_settings_when_none(self) -> None:
-        """Test that create_provider uses get_settings when settings is None."""
-        with patch(
-            "copinanceos.infrastructure.analyzers.llm.providers.factory.get_settings"
-        ) as mock_get_settings:
-            mock_settings = create_settings(gemini_api_key="env-key")
-            mock_get_settings.return_value = mock_settings
+    def test_create_provider_uses_defaults_when_no_config(self) -> None:
+        """Test that create_provider uses defaults when llm_config is None."""
+        provider = LLMProviderFactory.create_provider("gemini", llm_config=None)
 
-            provider = LLMProviderFactory.create_provider("gemini")
-
-            assert isinstance(provider, GeminiProvider)
-            mock_get_settings.assert_called_once()
-
-    def test_parse_workflow_provider_mapping_valid(self) -> None:
-        """Test parsing valid workflow:provider mapping."""
-        mapping_str = "static:ollama,agentic:gemini,fundamentals:gemini"
-        result = LLMProviderFactory.parse_workflow_provider_mapping(mapping_str)
-
-        assert result == {
-            "static": "ollama",
-            "agentic": "gemini",
-            "fundamentals": "gemini",
-        }
-
-    def test_parse_workflow_provider_mapping_with_spaces(self) -> None:
-        """Test parsing mapping with spaces."""
-        mapping_str = "static : ollama , agentic : gemini"
-        result = LLMProviderFactory.parse_workflow_provider_mapping(mapping_str)
-
-        assert result == {
-            "static": "ollama",
-            "agentic": "gemini",
-        }
-
-    def test_parse_workflow_provider_mapping_empty_string(self) -> None:
-        """Test parsing empty mapping string."""
-        result = LLMProviderFactory.parse_workflow_provider_mapping("")
-        assert result == {}
-
-    def test_parse_workflow_provider_mapping_none(self) -> None:
-        """Test parsing None mapping."""
-        result = LLMProviderFactory.parse_workflow_provider_mapping(None)
-        assert result == {}
-
-    def test_parse_workflow_provider_mapping_invalid_format(self) -> None:
-        """Test parsing invalid mapping format (no colon)."""
-        with patch(
-            "copinanceos.infrastructure.analyzers.llm.providers.factory.logger"
-        ) as mock_logger:
-            result = LLMProviderFactory.parse_workflow_provider_mapping(
-                "static-ollama,agentic:gemini"
-            )
-
-            # Should only include valid pairs
-            assert result == {"agentic": "gemini"}
-            # Should log warning for invalid pair
-            assert mock_logger.warning.called
+        assert isinstance(provider, GeminiProvider)
+        # Should use default model when no config provided
+        assert provider._model_name == "gemini-1.5-pro"
 
     def test_get_provider_for_workflow_with_mapping(self) -> None:
         """Test getting provider for workflow with mapping configured."""
-        settings = create_settings(
-            workflow_llm_providers="static:ollama,agentic:gemini",
-            llm_provider="gemini",
+        llm_config = LLMConfig(
+            provider="gemini",
+            workflow_providers={"static": "ollama", "agentic": "gemini"},
         )
-        result = LLMProviderFactory.get_provider_for_workflow("static", settings)
+        result = LLMProviderFactory.get_provider_for_workflow("static", llm_config=llm_config)
 
         assert result == "ollama"
 
     def test_get_provider_for_workflow_without_mapping(self) -> None:
         """Test getting provider for workflow without mapping."""
-        settings = create_settings(llm_provider="gemini")
-        result = LLMProviderFactory.get_provider_for_workflow("static", settings)
+        llm_config = LLMConfig(provider="gemini")
+        result = LLMProviderFactory.get_provider_for_workflow("static", llm_config=llm_config)
 
         assert result == "gemini"
 
     def test_get_provider_for_workflow_with_default_provider(self) -> None:
         """Test getting provider for workflow with default_provider parameter."""
-        settings = create_settings(llm_provider="gemini")
         result = LLMProviderFactory.get_provider_for_workflow(
-            "static", settings, default_provider="ollama"
+            "static", llm_config=None, default_provider="ollama"
         )
 
         assert result == "ollama"
 
-    def test_get_provider_for_workflow_default_overrides_settings(self) -> None:
-        """Test that default_provider parameter overrides settings.llm_provider."""
-        settings = create_settings(llm_provider="gemini")
+    def test_get_provider_for_workflow_default_overrides_config(self) -> None:
+        """Test that default_provider parameter is used when llm_config is None."""
+        # When llm_config is None, default_provider should be used
         result = LLMProviderFactory.get_provider_for_workflow(
-            "unknown_workflow", settings, default_provider="ollama"
+            "unknown_workflow", llm_config=None, default_provider="ollama"
         )
 
         assert result == "ollama"
 
-    def test_get_provider_for_workflow_uses_settings_when_none(self) -> None:
-        """Test that get_provider_for_workflow uses get_settings when settings is None."""
-        with patch(
-            "copinanceos.infrastructure.analyzers.llm.providers.factory.get_settings"
-        ) as mock_get_settings:
-            mock_settings = create_settings(llm_provider="gemini")
-            mock_get_settings.return_value = mock_settings
+    def test_get_provider_for_workflow_config_takes_precedence(self) -> None:
+        """Test that llm_config provider is used when config is provided."""
+        # When llm_config is provided, it takes precedence over default_provider
+        llm_config = LLMConfig(provider="gemini")
+        result = LLMProviderFactory.get_provider_for_workflow(
+            "unknown_workflow", llm_config=llm_config, default_provider="ollama"
+        )
 
-            result = LLMProviderFactory.get_provider_for_workflow("static")
+        assert result == "gemini"  # Config provider takes precedence
 
-            assert result == "gemini"
-            mock_get_settings.assert_called_once()
+    def test_get_provider_for_workflow_uses_default_when_none(self) -> None:
+        """Test that get_provider_for_workflow uses default when llm_config is None."""
+        result = LLMProviderFactory.get_provider_for_workflow(
+            "static", llm_config=None, default_provider="gemini"
+        )
+
+        assert result == "gemini"
 
     def test_get_provider_for_workflow_mapping_takes_precedence(self) -> None:
         """Test that workflow mapping takes precedence over default."""
-        settings = create_settings(
-            workflow_llm_providers="static:ollama",
-            llm_provider="gemini",
+        llm_config = LLMConfig(
+            provider="gemini",
+            workflow_providers={"static": "ollama"},
         )
         result = LLMProviderFactory.get_provider_for_workflow(
-            "static", settings, default_provider="gemini"
+            "static", llm_config=llm_config, default_provider="gemini"
         )
 
         assert result == "ollama"

@@ -1,9 +1,9 @@
 """Factory for creating LLM analyzers."""
 
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.analyzers.llm.llm import LLMAnalyzerImpl
 from copinanceos.infrastructure.analyzers.llm.providers.factory import LLMProviderFactory
-from copinanceos.infrastructure.config import get_settings
 
 
 class LLMAnalyzerFactory:
@@ -15,7 +15,9 @@ class LLMAnalyzerFactory:
     """
 
     @staticmethod
-    def create(provider_name: str | None = None) -> LLMAnalyzer:
+    def create(
+        provider_name: str | None = None, llm_config: LLMConfig | None = None
+    ) -> LLMAnalyzer:
         """Create LLM analyzer for a specific provider.
 
         This method uses the generic LLMAnalyzerImpl class to maintain
@@ -23,7 +25,9 @@ class LLMAnalyzerFactory:
         instantiate them directly.
 
         Args:
-            provider_name: Name of the LLM provider. If None, uses default from settings.
+            provider_name: Name of the LLM provider. If None and llm_config is provided,
+                          uses provider from llm_config. Otherwise defaults to "gemini".
+            llm_config: LLM configuration. If None, provider-specific defaults will be used.
 
         Returns:
             LLM analyzer instance (LLMAnalyzerImpl wrapping the provider)
@@ -31,31 +35,43 @@ class LLMAnalyzerFactory:
         Example:
             ```python
             # Framework usage (provider-agnostic)
-            analyzer = LLMAnalyzerFactory.create("gemini")
+            from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+
+            config = LLMConfig(
+                provider="gemini",
+                api_key="your-api-key",
+                model="gemini-1.5-pro"
+            )
+            analyzer = LLMAnalyzerFactory.create("gemini", llm_config=config)
 
             # Direct usage (convenience)
             from copinanceos.infrastructure.analyzers import GeminiLLMAnalyzer
             analyzer = GeminiLLMAnalyzer(api_key="...")
             ```
         """
-        settings = get_settings()
         if provider_name is None:
-            provider_name = settings.llm_provider
-        provider = LLMProviderFactory.create_provider(provider_name, settings)
+            if llm_config:
+                provider_name = llm_config.provider
+            else:
+                provider_name = "gemini"  # Default fallback
+
+        provider = LLMProviderFactory.create_provider(provider_name, llm_config)
         return LLMAnalyzerImpl(provider)
 
     @staticmethod
-    def create_for_workflow(workflow_type: str) -> LLMAnalyzer:
+    def create_for_workflow(workflow_type: str, llm_config: LLMConfig | None = None) -> LLMAnalyzer:
         """Create LLM analyzer for a specific workflow type.
 
         Args:
             workflow_type: Type of workflow (e.g., "static", "agentic")
+            llm_config: LLM configuration. If None, defaults will be used.
 
         Returns:
             LLM analyzer instance configured for the workflow
         """
-        settings = get_settings()
-        provider_name = LLMProviderFactory.get_provider_for_workflow(
-            workflow_type, settings, default_provider=settings.llm_provider
-        )
-        return LLMAnalyzerFactory.create(provider_name)
+        if llm_config:
+            provider_name = llm_config.get_provider_for_workflow(workflow_type)
+        else:
+            provider_name = "gemini"  # Default fallback
+
+        return LLMAnalyzerFactory.create(provider_name, llm_config)
