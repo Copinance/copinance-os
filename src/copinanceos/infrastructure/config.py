@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings.
-    
+
     This class only handles application-level settings (storage, logging, etc.).
     LLM configuration is handled separately via LLMConfig and should not be
     included in this class.
