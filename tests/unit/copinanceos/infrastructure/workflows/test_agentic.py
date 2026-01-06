@@ -1,4 +1,4 @@
-"""Unit tests for agentic workflow executor."""
+"""Unit tests for agent workflow executor."""
 
 from unittest.mock import AsyncMock, MagicMock
 
@@ -14,9 +14,9 @@ class TestAgenticWorkflowExecutor:
     """Test AgenticWorkflowExecutor."""
 
     def test_get_workflow_type(self) -> None:
-        """Test that get_workflow_type returns 'agentic'."""
+        """Test that get_workflow_type returns 'agent'."""
         executor = AgenticWorkflowExecutor()
-        assert executor.get_workflow_type() == "agentic"
+        assert executor.get_workflow_type() == "agent"
 
     def test_initialization_without_llm_analyzer(self) -> None:
         """Test that executor can be initialized without LLM analyzer."""
@@ -30,23 +30,23 @@ class TestAgenticWorkflowExecutor:
         assert executor._llm_analyzer is mock_llm
 
     async def test_validate_returns_true_for_agentic_workflow(self) -> None:
-        """Test that validate returns True for agentic workflow type."""
+        """Test that validate returns True for agent workflow type."""
         executor = AgenticWorkflowExecutor()
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         result = await executor.validate(research)
         assert result is True
 
     async def test_validate_returns_false_for_non_agentic_workflow(self) -> None:
-        """Test that validate returns False for non-agentic workflow types."""
+        """Test that validate returns False for non-agent workflow types."""
         executor = AgenticWorkflowExecutor()
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         result = await executor.validate(research)
         assert result is False
@@ -57,7 +57,7 @@ class TestAgenticWorkflowExecutor:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         context = {"context_key": "context_value"}
 
@@ -65,7 +65,7 @@ class TestAgenticWorkflowExecutor:
 
         assert results["status"] == "failed"
         assert results["error"] == "LLM analyzer not configured"
-        assert results["message"] == "LLM analyzer is required for agentic workflows"
+        assert results["message"] == "LLM analyzer is required for agent workflows"
 
     async def test_execute_with_llm_analyzer(self) -> None:
         """Test execute when LLM analyzer is configured."""
@@ -94,16 +94,16 @@ class TestAgenticWorkflowExecutor:
         research = Research(
             stock_symbol="TSLA",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         context = {"question": "What is the current price of TSLA?"}
 
         results = await executor.execute(research, context)
 
-        assert results["workflow_type"] == "agentic"
+        assert results["workflow_type"] == "agent"
         assert results["stock_symbol"] == "TSLA"
         assert results["timeframe"] == "long_term"
-        assert results["analysis_type"] == "agentic"
+        assert results["analysis_type"] == "agent"
         assert results["status"] == "completed"
         assert results["llm_provider"] == "test_provider"
         assert results["llm_model"] == "test-model"
@@ -117,7 +117,7 @@ class TestAgenticWorkflowExecutor:
             research = Research(
                 stock_symbol="GOOGL",
                 timeframe=timeframe,
-                workflow_type="agentic",
+                workflow_type="agent",
             )
             results = await executor.execute(research, {})
             assert results["timeframe"] == timeframe.value

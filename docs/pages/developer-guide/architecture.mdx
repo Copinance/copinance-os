@@ -93,12 +93,15 @@ use_case = container.execute_research_use_case()
 
 ## Extension Points
 
-The architecture provides 21 port interfaces for extension:
+The architecture provides 22 port interfaces for extension:
 
-- **5 Data Provider interfaces**: Market, Alternative, Fundamental, Macro
-- **6 Analyzer interfaces**: NLP, LLM, Vision, Quant, Graph, Portfolio
+- **5 Data Provider interfaces**: Market, Alternative, Fundamental, Macro, Base DataProvider
+- **1 Analyzer interface**: LLM
 - **6 Strategy interfaces**: Screening, Due Diligence, Valuation, Risk, Thematic, Monitoring
-- **4 Core interfaces**: Repositories, Workflows
+- **4 Tool interfaces**: Tool, ToolParameter, ToolSchema, ToolResult
+- **3 Repository interfaces**: Research, Stock, ResearchProfile
+- **1 Workflow interface**: WorkflowExecutor
+- **2 Storage interfaces**: CacheBackend, Storage
 
 See [Extending](extending) for how to implement these.
 

@@ -36,6 +36,7 @@ def configure_use_cases(
     market_data_provider: providers.Provider,
     fundamental_data_provider: providers.Provider,
     sec_filings_provider: providers.Provider,
+    macro_data_provider: providers.Provider,
     cache_manager: providers.Provider,
     profile_management_service: providers.Provider,
     llm_config: LLMConfig | None = None,
@@ -52,7 +53,7 @@ def configure_use_cases(
         sec_filings_provider: SEC filings provider
         cache_manager: Cache manager provider
         profile_management_service: Profile management service provider
-        llm_config: Optional LLM configuration. If None, agentic workflows will not be available.
+        llm_config: Optional LLM configuration. If None, agent workflows will not be available.
 
     Returns:
         Dictionary of use case providers
@@ -140,6 +141,7 @@ def configure_use_cases(
         WorkflowExecutorFactory.create_all,
         get_stock_use_case=get_stock_use_case,
         market_data_provider=market_data_provider,
+        macro_data_provider=macro_data_provider,
         fundamentals_use_case=research_stock_fundamentals_use_case,
         fundamental_data_provider=fundamental_data_provider,
         sec_filings_provider=sec_filings_provider,

@@ -715,11 +715,11 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
     async def validate(self, research: Research) -> bool:
         """Validate if this executor can handle the given research.
 
-        Supports "static" workflow type, which includes comprehensive
+        Supports "stock" workflow type, which includes comprehensive
         fundamentals data along with market data and analysis.
         """
-        return research.workflow_type == "static"
+        return research.workflow_type == "stock"
 
     def get_workflow_type(self) -> str:
         """Get the workflow type identifier."""
-        return "static"
+        return "stock"

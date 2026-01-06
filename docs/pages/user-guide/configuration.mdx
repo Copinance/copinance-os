@@ -9,7 +9,35 @@ Copinance OS supports two ways to configure LLM settings:
 1. **CLI Usage**: Environment variables (for command-line usage)
 2. **Library Integration**: `LLMConfig` object (for programmatic usage)
 
-> **Note for Library Integrators**: If you're integrating Copinance OS into your application, you should provide `LLMConfig` directly instead of relying on environment variables. See [Library Integration](#library-integration) below.
+> **Library Integration**: When integrating Copinance OS as a library, you must provide an `LLMConfig` object directly. Environment variables only work for CLI usage. See [Library Integration](#library-integration) below.
+
+## LLMConfig Dataclass (Library Integration)
+
+For programmatic usage, you must provide an `LLMConfig` dataclass instance when creating containers. This replaces the previous environment variable approach for library integrators.
+
+```python
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+
+# Create LLM configuration
+llm_config = LLMConfig(
+    provider="gemini",           # Required: "gemini", "ollama", "openai", "anthropic"
+    api_key="your-api-key",      # Required for cloud providers
+    model="gemini-1.5-pro",      # Optional: defaults vary by provider
+    temperature=0.7,             # Optional: 0.0-1.0, default 0.7
+    max_tokens=4096,             # Optional: provider-dependent
+    base_url=None,               # Optional: for custom endpoints
+    workflow_providers={},       # Optional: per-workflow provider mapping
+    provider_config={},          # Optional: provider-specific settings
+)
+```
+
+**Required Parameters:**
+- `provider`: The LLM provider name
+
+**Provider-Specific Requirements:**
+- **Gemini/OpenAI/Anthropic**: `api_key` is required
+- **Ollama**: `model` should be set to your local model name (e.g., "llama2")
+- **Custom providers**: May require `base_url` for local/custom endpoints
 
 ## Environment Variables (CLI Usage)
 
@@ -26,7 +54,7 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 
 ## LLM Provider Setup
 
-Copinance OS supports multiple LLM providers for agentic workflows. You can use either Gemini (cloud-based) or Ollama (local).
+Copinance OS supports multiple LLM providers for agent workflows. You can use either Gemini (cloud-based) or Ollama (local).
 
 ### Gemini API (Cloud-based)
 
@@ -79,6 +107,42 @@ COPINANCEOS_GEMINI_MODEL=gemini-1.5-flash
 
 **Default:** `gemini-1.5-pro` (most capable). Use `gemini-2.5-flash` for faster responses.
 
+## FRED API Setup (Macroeconomic Data)
+
+FRED (Federal Reserve Economic Data) provides high-quality macroeconomic time series for rates, credit spreads, and commodities. While the macro workflow works with yfinance proxies, FRED provides more accurate data.
+
+### 1. Get API Key
+
+1. Go to [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html)
+2. Sign up for a free account
+3. Request an API key (free, no credit card required)
+4. Copy your API key
+
+### 2. Configure
+
+**Option A: .env file (Recommended)**
+```bash
+COPINANCEOS_FRED_API_KEY=your-fred-api-key-here
+```
+
+**Option B: Environment Variable**
+```bash
+export COPINANCEOS_FRED_API_KEY=your-fred-api-key-here
+```
+
+### 3. Verify
+
+```bash
+copinance research macro
+```
+
+If configured correctly, you'll see `"source": "fred"` in the results. If not, check:
+- `.env` file is in the project root
+- Variable name is exactly `COPINANCEOS_FRED_API_KEY`
+- No extra spaces around the `=` sign
+
+**Note:** The macro workflow will automatically fall back to yfinance proxies if FRED is unavailable, so it works without an API key (with lower data quality).
+
 ## Storage Configuration
 
 Configure where data is stored:
@@ -98,11 +162,14 @@ COPINANCEOS_STORAGE_PATH=~/.copinanceos
 # LLM Provider (optional, default: gemini)
 COPINANCEOS_LLM_PROVIDER=gemini
 
-# Gemini API (required for agentic workflows with Gemini)
+# Gemini API (required for agent workflows with Gemini)
 COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-actual-key
 
 # Model selection (optional, default: gemini-1.5-pro)
 COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro
+
+# FRED API (optional, for high-quality macro data)
+COPINANCEOS_FRED_API_KEY=your-fred-api-key
 
 # Storage (optional)
 COPINANCEOS_STORAGE_TYPE=file
@@ -126,13 +193,13 @@ COPINANCEOS_STORAGE_PATH=~/.copinanceos
 **Mixed Configuration (per-workflow):**
 ```bash
 # Use different providers for different workflows
-COPINANCEOS_WORKFLOW_LLM_PROVIDERS=static:ollama,agentic:gemini
+COPINANCEOS_WORKFLOW_LLM_PROVIDERS=agent:gemini
 
-# Gemini API (for agentic workflows)
+# Gemini API (for agent workflows)
 COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-actual-key
 COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro
 
-# Ollama (for static workflows)
+# Ollama (for agent workflows)
 COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
 COPINANCEOS_OLLAMA_MODEL=llama2
 ```
@@ -204,36 +271,35 @@ copinance research ask "What is the current price?" --symbol AAPL
 You can use different providers for different workflows:
 
 ```bash
-# Use Ollama for static workflows, Gemini for agentic
-COPINANCEOS_WORKFLOW_LLM_PROVIDERS=static:ollama,agentic:gemini
+# Use Ollama locally for agent workflows
+COPINANCEOS_WORKFLOW_LLM_PROVIDERS=agent:ollama
 ```
 
 This allows you to use local models for simple tasks and cloud models for complex analysis.
 
 ## Library Integration
 
-If you're integrating Copinance OS into your application as a library, you should provide LLM configuration using the `LLMConfig` class instead of environment variables.
+**Library integrators must provide `LLMConfig` when creating containers.** Environment variables only work for CLI usage.
 
-### Using LLMConfig
+### Basic LLMConfig Usage
 
 ```python
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.containers import get_container
 
-# Create LLM configuration
+# Create LLM configuration (REQUIRED for library integration)
 llm_config = LLMConfig(
     provider="gemini",
-    api_key="your-api-key",
-    model="gemini-1.5-pro",
-    temperature=0.7,
+    api_key="your-api-key",      # Required for Gemini
+    model="gemini-1.5-pro",      # Optional, defaults to provider default
 )
 
-# Create container with LLM config
+# Create container with LLM config (REQUIRED parameter)
 container = get_container(llm_config=llm_config)
 
 # Use the container
 use_case = container.get_stock_use_case()
-# ... use the use case
+# ... integrate into your application
 ```
 
 ### Per-Workflow Provider Configuration
@@ -245,8 +311,7 @@ llm_config = LLMConfig(
     provider="gemini",  # Default provider
     api_key="your-gemini-key",
     workflow_providers={
-        "static": "ollama",      # Use Ollama for static workflows
-        "agentic": "gemini",     # Use Gemini for agentic workflows
+        "agent": "gemini",     # Use Gemini for agent workflows
     },
 )
 ```
@@ -273,6 +338,25 @@ provider = LLMProviderFactory.create_provider("gemini", llm_config=llm_config)
 # Create analyzer
 analyzer = LLMAnalyzerFactory.create("gemini", llm_config=llm_config)
 ```
+
+### Providing FRED API Key
+
+For library integrators, you can provide your own FRED API key when creating the container:
+
+```python
+from copinanceos.infrastructure.containers import get_container
+
+# Create container with your FRED API key
+container = get_container(fred_api_key="your-fred-api-key")
+
+# Use the container
+macro_provider = container.macro_data_provider()
+```
+
+This allows you to:
+- Manage API keys in your own configuration system
+- Use different keys for different environments
+- Avoid relying on environment variables
 
 ### Why Use LLMConfig?
 

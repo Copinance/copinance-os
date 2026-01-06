@@ -1,4 +1,4 @@
-"""Unit tests for static workflow executor."""
+"""Unit tests for stock workflow executor."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -30,28 +30,28 @@ class TestStaticWorkflowExecutor:
     """Test StaticWorkflowExecutor."""
 
     def test_get_workflow_type(self) -> None:
-        """Test that get_workflow_type returns 'static'."""
+        """Test that get_workflow_type returns 'stock'."""
         executor = StaticWorkflowExecutor()
-        assert executor.get_workflow_type() == "static"
+        assert executor.get_workflow_type() == "stock"
 
     async def test_validate_returns_true_for_static_workflow(self) -> None:
-        """Test that validate returns True for static workflow type."""
+        """Test that validate returns True for stock workflow type."""
         executor = StaticWorkflowExecutor()
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         result = await executor.validate(research)
         assert result is True
 
     async def test_validate_returns_false_for_non_static_workflow(self) -> None:
-        """Test that validate returns False for non-static workflow types."""
+        """Test that validate returns False for non-stock workflow types."""
         executor = StaticWorkflowExecutor()
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         result = await executor.validate(research)
         assert result is False
@@ -110,14 +110,14 @@ class TestStaticWorkflowExecutor:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             parameters={"key": "value"},
         )
         context = {"context_key": "context_value"}
 
         results = await executor.execute(research, context)
 
-        assert results["workflow_type"] == "static"
+        assert results["workflow_type"] == "stock"
         assert results["stock_symbol"] == "AAPL"
         assert results["timeframe"] == "short_term"
         assert results["analysis_type"] == "comprehensive_static"
@@ -129,7 +129,7 @@ class TestStaticWorkflowExecutor:
         assert "analysis" in results
         assert "summary" in results
         assert results["status"] == "completed"
-        assert "Static workflow executed successfully" in results["message"]
+        assert "Stock workflow executed successfully" in results["message"]
 
     async def test_execute_with_different_timeframes(self) -> None:
         """Test execute with different timeframes."""
@@ -164,7 +164,7 @@ class TestStaticWorkflowExecutor:
             research = Research(
                 stock_symbol="MSFT",
                 timeframe=timeframe,
-                workflow_type="static",
+                workflow_type="stock",
             )
             results = await executor.execute(research, {})
             assert results["timeframe"] == timeframe.value
@@ -177,12 +177,12 @@ class TestStaticWorkflowExecutor:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
 
         results = await executor.execute(research, {})
 
-        assert results["workflow_type"] == "static"
+        assert results["workflow_type"] == "stock"
         assert results["stock_symbol"] == "AAPL"
         assert "stock_info" in results
         assert "current_quote" in results
@@ -201,12 +201,12 @@ class TestStaticWorkflowExecutor:
         research = Research(
             stock_symbol="INVALID",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
 
         results = await executor.execute(research, {})
 
-        assert results["workflow_type"] == "static"
+        assert results["workflow_type"] == "stock"
         # Workflow continues even when individual steps fail
         assert results["status"] == "completed"
         # Error is captured in the current_quote section
@@ -217,7 +217,7 @@ class TestStaticWorkflowExecutor:
 
 @pytest.mark.unit
 class TestStaticWorkflowFundamentals:
-    """Test that StaticWorkflowExecutor includes full fundamentals data."""
+    """Test that stock workflow includes full fundamentals data."""
 
     def _create_full_fundamentals(self) -> StockFundamentals:
         """Create full StockFundamentals with all data for testing."""
@@ -347,7 +347,7 @@ class TestStaticWorkflowFundamentals:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         context = {}
 

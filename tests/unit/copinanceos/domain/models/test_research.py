@@ -15,12 +15,12 @@ class TestResearchModel:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
 
         assert research.stock_symbol == "AAPL"
         assert research.timeframe == ResearchTimeframe.MID_TERM
-        assert research.workflow_type == "static"
+        assert research.workflow_type == "stock"
         assert research.status == ResearchStatus.PENDING
         assert research.profile_id is None
 
@@ -30,7 +30,7 @@ class TestResearchModel:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile.id,
         )
 
@@ -41,7 +41,7 @@ class TestResearchModel:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
 
         assert research.status == ResearchStatus.PENDING

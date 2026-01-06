@@ -12,7 +12,7 @@ import structlog
 from copinanceos.domain.exceptions import (
     DataProviderError,
     DataProviderUnavailableError,
-    DomainException,
+    DomainError,
 )
 
 logger = structlog.get_logger(__name__)
@@ -23,7 +23,7 @@ def convert_to_domain_exception(
     component: str,
     operation: str,
     context: dict[str, Any] | None = None,
-) -> DomainException:
+) -> DomainError:
     """Convert an infrastructure error to a domain exception.
 
     This function follows the error handling strategy where infrastructure errors
@@ -64,7 +64,7 @@ def convert_to_domain_exception(
     )
 
     # Convert specific error types to appropriate domain exceptions
-    if isinstance(error, DomainException):
+    if isinstance(error, DomainError):
         # Already a domain exception, return as-is
         return error
 
@@ -120,7 +120,7 @@ def handle_infrastructure_error(
         Default value if provided, otherwise raises domain exception
 
     Raises:
-        DomainException: If default_return is None, converts and raises the error
+        DomainError: If default_return is None, converts and raises the error
     """
     domain_exception = convert_to_domain_exception(error, component, operation, context)
 

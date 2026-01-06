@@ -13,6 +13,7 @@ from copinanceos.application.use_cases.research import (
     SetResearchContextResponse,
 )
 from copinanceos.cli.research import (
+    WorkflowType,
     create_research,
     execute_research,
     get_research,
@@ -46,7 +47,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         mock_create_response = CreateResearchResponse(research=mock_research)
         mock_create_use_case = AsyncMock()
@@ -65,7 +66,7 @@ class TestResearchCLI:
         create_research(
             symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow="static",
+            workflow=WorkflowType.STOCK,
             profile_id=None,
         )
 
@@ -74,7 +75,7 @@ class TestResearchCLI:
         call_args = mock_create_use_case.execute.call_args[0][0]
         assert call_args.stock_symbol == "AAPL"
         assert call_args.timeframe == ResearchTimeframe.MID_TERM
-        assert call_args.workflow_type == "static"
+        assert call_args.workflow_type == "stock"
         assert call_args.profile_id is None
 
         # Verify console output
@@ -102,7 +103,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
 
@@ -119,7 +120,7 @@ class TestResearchCLI:
         create_research(
             symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow="static",
+            workflow=WorkflowType.STOCK,
             profile_id=None,
         )
 
@@ -148,7 +149,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.COMPLETED,
             results={"key1": "value1", "key2": "value2"},
         )
@@ -175,7 +176,7 @@ class TestResearchCLI:
         run_research(
             symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow="static",
+            workflow=WorkflowType.STOCK,
             profile_id=None,
         )
 
@@ -209,7 +210,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.FAILED,
             error_message="Execution failed",
         )
@@ -236,7 +237,7 @@ class TestResearchCLI:
         run_research(
             symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow="static",
+            workflow=WorkflowType.STOCK,
             profile_id=None,
         )
 
@@ -263,7 +264,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.COMPLETED,
             results={"result": "success"},
             profile_id=profile_id,  # Research has a profile, so no prompting needed
@@ -318,7 +319,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.FAILED,
             error_message="Test error",
             profile_id=None,  # No profile, will prompt but user declines
@@ -365,7 +366,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.COMPLETED,
             results={"key": "value"},
         )
@@ -421,7 +422,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
 
@@ -455,7 +456,7 @@ class TestResearchCLI:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=None,
         )
 

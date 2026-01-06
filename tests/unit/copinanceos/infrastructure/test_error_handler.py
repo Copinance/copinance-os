@@ -16,12 +16,12 @@ from copinanceos.infrastructure.error_handler import (
 
 
 @pytest.mark.unit
-class TestConvertToDomainException:
+class TestConvertToDomainError:
     """Test convert_to_domain_exception function."""
 
     @patch("copinanceos.infrastructure.error_handler.logger")
     def test_convert_domain_exception_returns_as_is(self, mock_logger: MagicMock) -> None:
-        """Test that DomainException is returned as-is."""
+        """Test that DomainError is returned as-is."""
         original_error = StockNotFoundError("AAPL")
         context = {"symbol": "AAPL"}
 

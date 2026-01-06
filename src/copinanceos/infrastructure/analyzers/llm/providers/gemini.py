@@ -61,7 +61,7 @@ class GeminiProvider(LLMProvider):
             api_key: Gemini API key. Required for cloud usage.
             model_name: Gemini model to use (default: "gemini-1.5-pro")
                        Options: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
-                       All support function calling for agentic workflows
+                       All support function calling for agent workflows
             temperature: Default temperature for generation
             max_output_tokens: Default max output tokens
         """

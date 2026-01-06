@@ -99,7 +99,7 @@ class LLMProviderFactory:
         """Get the provider name for a specific workflow.
 
         Args:
-            workflow_type: The workflow type (e.g., "static", "agentic", "fundamentals")
+            workflow_type: The workflow type (e.g., "agent")
             llm_config: LLM configuration. If None, uses default_provider.
             default_provider: Default provider to use if no mapping is found
 

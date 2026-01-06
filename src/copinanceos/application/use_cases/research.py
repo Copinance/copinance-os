@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from copinanceos.application.use_cases.base import UseCase
 from copinanceos.domain.exceptions import (
-    DomainException,
+    DomainError,
     ProfileNotFoundError,
     ResearchNotFoundError,
     WorkflowExecutionError,
@@ -26,7 +26,7 @@ class CreateResearchRequest(BaseModel):
 
     stock_symbol: str = Field(..., description="Stock symbol to research")
     timeframe: ResearchTimeframe = Field(..., description="Research timeframe")
-    workflow_type: str = Field(..., description="Workflow type (static or agentic)")
+    workflow_type: str = Field(..., description="Workflow type (stock, macro, or agent)")
     parameters: dict[str, str] = Field(default_factory=dict, description="Research parameters")
     profile_id: UUID | None = Field(None, description="Optional research profile ID for context")
 
@@ -298,7 +298,7 @@ class ExecuteResearchUseCase(UseCase[ExecuteResearchRequest, ExecuteResearchResp
             results = await executor.execute(research, execution_context)
             research = await self._mark_research_completed(research, results)
             success = True
-        except DomainException as domain_error:
+        except DomainError as domain_error:
             # Domain exceptions are business logic errors - wrap in WorkflowExecutionError
             workflow_error = WorkflowExecutionError(
                 workflow_type=research.workflow_type,

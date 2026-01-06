@@ -5,10 +5,12 @@ technical analysis, and other analytical functions.
 """
 
 from copinanceos.infrastructure.tools.analysis.market_regime import (
+    MacroRegimeIndicatorsTool,
     MarketRegimeDetectCyclesTool,
     MarketRegimeDetectTrendTool,
     MarketRegimeDetectVolatilityTool,
     MarketRegimeIndicatorsTool,
+    create_macro_regime_indicators_tool,
     create_market_regime_tools,
 )
 from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
@@ -22,6 +24,8 @@ __all__ = [
     "MarketRegimeDetectVolatilityTool",
     "MarketRegimeDetectCyclesTool",
     "MarketRegimeIndicatorsTool",
+    "MacroRegimeIndicatorsTool",
+    "create_macro_regime_indicators_tool",
     "create_market_regime_tools",  # Backward compatibility
     # Registry functions
     "create_all_regime_tools",

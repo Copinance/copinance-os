@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "copinance-os"
 version = "0.1.0"
-description = "Open-source stock research platform and framework with agentic AI and static workflows"
+description = "Open-source stock research platform and framework with agent AI and stock/macro workflows"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
@@ -134,6 +134,7 @@ select = [
     "B",        # flake8-bugbear
     "C4",       # flake8-comprehensions
     "UP",       # pyupgrade
+    "N",        # pep8-naming: enforces Python naming conventions
     "PLC0415",  # import-outside-top-level: checks imports are not inside functions/blocks
 ]
 ignore = [

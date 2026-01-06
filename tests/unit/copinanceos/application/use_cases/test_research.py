@@ -52,7 +52,7 @@ class TestCreateResearchUseCase:
             id=uuid4(),
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             parameters={"key": "value"},
             profile_id=profile_id,
         )
@@ -62,7 +62,7 @@ class TestCreateResearchUseCase:
         request = CreateResearchRequest(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             parameters={"key": "value"},
             profile_id=profile_id,
         )
@@ -71,7 +71,7 @@ class TestCreateResearchUseCase:
         assert isinstance(response, CreateResearchResponse)
         assert response.research.stock_symbol == "AAPL"
         assert response.research.timeframe == ResearchTimeframe.MID_TERM
-        assert response.research.workflow_type == "static"
+        assert response.research.workflow_type == "stock"
         assert response.research.parameters == {"key": "value"}
         assert response.research.profile_id == profile_id
         assert response.research.status == ResearchStatus.PENDING
@@ -86,7 +86,7 @@ class TestCreateResearchUseCase:
             id=uuid4(),
             stock_symbol="MSFT",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         mock_repository.save = AsyncMock(return_value=research)
 
@@ -94,13 +94,13 @@ class TestCreateResearchUseCase:
         request = CreateResearchRequest(
             stock_symbol="MSFT",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         response = await use_case.execute(request)
 
         assert response.research.stock_symbol == "MSFT"
         assert response.research.timeframe == ResearchTimeframe.SHORT_TERM
-        assert response.research.workflow_type == "agentic"
+        assert response.research.workflow_type == "agent"
         assert response.research.parameters == {}
         assert response.research.profile_id is None
         assert response.research.status == ResearchStatus.PENDING
@@ -114,7 +114,7 @@ class TestCreateResearchUseCase:
             id=uuid4(),
             stock_symbol="GOOGL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             parameters={},
         )
         mock_repository.save = AsyncMock(return_value=research)
@@ -123,7 +123,7 @@ class TestCreateResearchUseCase:
         request = CreateResearchRequest(
             stock_symbol="GOOGL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             parameters={},
         )
         response = await use_case.execute(request)
@@ -151,7 +151,7 @@ class TestGetResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         mock_repository.get_by_id = AsyncMock(return_value=research)
 
@@ -208,7 +208,7 @@ class TestSetResearchContextUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=None,
         )
         profile = ResearchProfile(
@@ -220,7 +220,7 @@ class TestSetResearchContextUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
 
@@ -256,14 +256,14 @@ class TestSetResearchContextUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=uuid4(),
         )
         updated_research = Research(
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=None,
         )
 
@@ -322,7 +322,7 @@ class TestSetResearchContextUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
 
         mock_research_repo.get_by_id = AsyncMock(return_value=research)
@@ -385,19 +385,19 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         updated_research = Research(
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.COMPLETED,
             results={"result": "data"},
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(return_value={"result": "data"})
 
@@ -452,7 +452,7 @@ class TestExecuteResearchUseCase:
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=False)
 
         mock_research_repo.get_by_id = AsyncMock(return_value=research)
@@ -482,7 +482,7 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
         profile = ResearchProfile(
@@ -495,14 +495,14 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
             status=ResearchStatus.COMPLETED,
             results={"result": "data"},
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(return_value={"result": "data"})
 
@@ -539,21 +539,21 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
         updated_research = Research(
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
             status=ResearchStatus.COMPLETED,
             results={"result": "data"},
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(return_value={"result": "data"})
 
@@ -587,21 +587,21 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
         updated_research = Research(
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
             status=ResearchStatus.COMPLETED,
             results={"result": "data"},
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(return_value={"result": "data"})
 
@@ -633,19 +633,19 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         failed_research = Research(
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             status=ResearchStatus.FAILED,
             error_message="Workflow execution failed",
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(side_effect=Exception("Workflow execution failed"))
 
@@ -675,23 +675,23 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
         updated_research = Research(
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
             status=ResearchStatus.COMPLETED,
             results={"result": "data"},
         )
 
         mock_static_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_static_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_static_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_static_executor.validate = AsyncMock(return_value=False)
 
         mock_agentic_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_agentic_executor.get_workflow_type = MagicMock(return_value="agentic")
+        mock_agentic_executor.get_workflow_type = MagicMock(return_value="agent")
         mock_agentic_executor.validate = AsyncMock(return_value=True)
         mock_agentic_executor.execute = AsyncMock(return_value={"result": "data"})
 
@@ -727,7 +727,7 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
         )
         profile = ResearchProfile(
@@ -740,14 +740,14 @@ class TestExecuteResearchUseCase:
             id=research_id,
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.MID_TERM,
-            workflow_type="static",
+            workflow_type="stock",
             profile_id=profile_id,
             status=ResearchStatus.COMPLETED,
             results={"result": "data"},
         )
 
         mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="static")
+        mock_executor.get_workflow_type = MagicMock(return_value="stock")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(return_value={"result": "data"})
 

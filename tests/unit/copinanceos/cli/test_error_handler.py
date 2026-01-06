@@ -4,17 +4,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from copinanceos.application.exceptions import ApplicationException
+from copinanceos.application.exceptions import ApplicationError
 from copinanceos.cli.error_handler import (
     _handle_application_error,
     _handle_domain_error,
     _handle_unexpected_error,
     handle_cli_error,
 )
-from copinanceos.domain.exceptions import DomainException
+from copinanceos.domain.exceptions import DomainError
 
 
-class SampleDomainException(DomainException):
+class SampleDomainError(DomainError):
     """Sample domain exception for testing."""
 
     def __init__(self, message: str, details: dict | None = None) -> None:
@@ -23,7 +23,7 @@ class SampleDomainException(DomainException):
         self.details = details or {}
 
 
-class SampleApplicationException(ApplicationException):
+class SampleApplicationError(ApplicationError):
     """Sample application exception for testing."""
 
     def __init__(self, message: str, cause: Exception | None = None) -> None:
@@ -39,7 +39,7 @@ class TestErrorHandler:
     @patch("copinanceos.cli.error_handler.console")
     def test_handle_domain_error(self, mock_console: MagicMock) -> None:
         """Test handling domain exceptions."""
-        error = SampleDomainException("Invalid symbol", details={"symbol": "INVALID"})
+        error = SampleDomainError("Invalid symbol", details={"symbol": "INVALID"})
         context = {"command": "get_quote"}
 
         _handle_domain_error(error, context)
@@ -53,7 +53,7 @@ class TestErrorHandler:
     def test_handle_application_error(self, mock_console: MagicMock) -> None:
         """Test handling application exceptions."""
         cause = ValueError("Underlying error")
-        error = SampleApplicationException("Application error occurred", cause=cause)
+        error = SampleApplicationError("Application error occurred", cause=cause)
         context = {"command": "create_research"}
 
         _handle_application_error(error, context)
@@ -79,7 +79,7 @@ class TestErrorHandler:
     @patch("copinanceos.cli.error_handler._handle_domain_error")
     def test_handle_cli_error_domain_exception(self, mock_handle_domain: MagicMock) -> None:
         """Test handle_cli_error with domain exception."""
-        error = SampleDomainException("Domain error")
+        error = SampleDomainError("Domain error")
         context = {"symbol": "AAPL"}
 
         handle_cli_error(error, context)
@@ -89,7 +89,7 @@ class TestErrorHandler:
     @patch("copinanceos.cli.error_handler._handle_application_error")
     def test_handle_cli_error_application_exception(self, mock_handle_app: MagicMock) -> None:
         """Test handle_cli_error with application exception."""
-        error = SampleApplicationException("Application error")
+        error = SampleApplicationError("Application error")
         context = {"command": "test"}
 
         handle_cli_error(error, context)

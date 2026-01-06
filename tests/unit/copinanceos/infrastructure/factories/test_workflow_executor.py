@@ -18,6 +18,7 @@ class TestWorkflowExecutorFactory:
         return {
             "get_stock_use_case": MagicMock(),
             "market_data_provider": MagicMock(),
+            "macro_data_provider": MagicMock(),
             "fundamentals_use_case": MagicMock(),
             "fundamental_data_provider": MagicMock(),
             "sec_filings_provider": MagicMock(),
@@ -28,13 +29,13 @@ class TestWorkflowExecutorFactory:
     def test_create_all_returns_static_executor(
         self, mock_static_executor: MagicMock, mock_dependencies: dict
     ) -> None:
-        """Test that create_all returns at least static executor."""
+        """Test that create_all returns at least static executor (and other static executors)."""
         mock_executor = MagicMock()
         mock_static_executor.return_value = mock_executor
 
         result = WorkflowExecutorFactory.create_all(**mock_dependencies)
 
-        assert len(result) >= 1
+        assert len(result) >= 2
         assert mock_executor in result
         mock_static_executor.assert_called_once()
 
@@ -65,7 +66,7 @@ class TestWorkflowExecutorFactory:
 
         result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
-        assert len(result) == 2
+        assert len(result) == 3
         assert mock_static_executor in result
         assert mock_agentic_executor in result
         mock_agentic.assert_called_once()
@@ -96,7 +97,7 @@ class TestWorkflowExecutorFactory:
         result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
         # Should only return static executor when API key is missing
-        assert len(result) == 1
+        assert len(result) == 2
         assert mock_static_executor in result
         mock_agentic.assert_not_called()
 
@@ -120,5 +121,5 @@ class TestWorkflowExecutorFactory:
         result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
         # Should still return static executor even if LLM creation fails
-        assert len(result) == 1
+        assert len(result) == 2
         assert mock_static_executor in result

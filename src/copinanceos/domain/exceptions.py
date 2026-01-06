@@ -6,7 +6,7 @@ and handled appropriately at the application layer.
 """
 
 
-class DomainException(Exception):
+class DomainError(Exception):
     """Base exception for all domain errors."""
 
     def __init__(self, message: str, details: dict[str, str] | None = None) -> None:
@@ -21,7 +21,7 @@ class DomainException(Exception):
         self.details = details or {}
 
 
-class EntityNotFoundError(DomainException):
+class EntityNotFoundError(DomainError):
     """Raised when a requested entity is not found."""
 
     def __init__(
@@ -82,7 +82,7 @@ class ProfileNotFoundError(EntityNotFoundError):
         self.profile_id = profile_id
 
 
-class ValidationError(DomainException):
+class ValidationError(DomainError):
     """Raised when domain validation fails."""
 
     def __init__(self, field: str, message: str, details: dict[str, str] | None = None) -> None:
@@ -118,7 +118,7 @@ class InvalidStockSymbolError(ValidationError):
         self.reason = reason
 
 
-class WorkflowExecutionError(DomainException):
+class WorkflowExecutionError(DomainError):
     """Raised when a workflow execution fails."""
 
     def __init__(
@@ -141,7 +141,7 @@ class WorkflowExecutionError(DomainException):
         self.research_id = research_id
 
 
-class WorkflowNotFoundError(DomainException):
+class WorkflowNotFoundError(DomainError):
     """Raised when a requested workflow executor is not found."""
 
     def __init__(self, workflow_type: str, details: dict[str, str] | None = None) -> None:
@@ -156,7 +156,7 @@ class WorkflowNotFoundError(DomainException):
         self.workflow_type = workflow_type
 
 
-class DataProviderError(DomainException):
+class DataProviderError(DomainError):
     """Raised when a data provider operation fails."""
 
     def __init__(

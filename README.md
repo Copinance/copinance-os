@@ -7,14 +7,14 @@
 [![CI](https://github.com/copinance/copinance-os/actions/workflows/ci.yml/badge.svg)](https://github.com/copinance/copinance-os/actions/workflows/ci.yml)
 [![Docs](https://github.com/copinance/copinance-os/actions/workflows/docs.yml/badge.svg)](https://github.com/copinance/copinance-os/actions/workflows/docs.yml)
 
-Open-source stock research platform and framework with agentic AI and static workflows.
+Open-source stock research platform and framework with agent AI and stock/macro workflows.
 
 **Read [Manifesto](MANIFESTO.md)** to understand our vision for democratizing financial research.
 
 ## Features
 
 - **Adaptive Presentation**: Results can be tailored to financial literacy level (beginner, intermediate, advanced)
-- **Dual Workflow Support**: Both static analysis pipelines and agentic AI workflows
+- **Dual Workflow Support**: Deterministic stock/macro analysis and AI-powered agent workflows
 - **Extensible Framework**: Easy to add new research strategies and data sources
 - **Data Provider Integration**: Built-in yfinance and SEC EDGAR support + easy custom provider integration
 - **Multiple LLM Providers**: Support for Gemini and Ollama (local LLMs) with extensible provider architecture
@@ -101,7 +101,7 @@ python -m copinanceos.cli version
 **Without installation (from project root):**
 ```bash
 # Run directly as a module
-python -m copinanceos.cli research create AAPL --workflow static
+python -m copinanceos.cli research create AAPL --workflow stock
 python -m copinanceos.cli profile list
 python -m copinanceos.cli stock search "Apple"
 ```
@@ -109,7 +109,7 @@ python -m copinanceos.cli stock search "Apple"
 **After installation:**
 ```bash
 pip install -e .
-copinance research create AAPL --timeframe mid_term --workflow static
+copinance research create AAPL --timeframe mid_term --workflow stock
 copinance research execute <research-id>
 copinance research get <research-id>
 ```
@@ -126,8 +126,13 @@ python -m copinanceos.cli stock search "Apple"
 
 # Research with context
 python -m copinanceos.cli research create AAPL --profile-id <profile-id>
-python -m copinanceos.cli research run AAPL --workflow static
+python -m copinanceos.cli research run AAPL --workflow stock
 python -m copinanceos.cli research set-context <research-id> --profile-id <profile-id>
+
+# Macro regime analysis
+copinance research macro
+copinance research macro --market-index QQQ --lookback-days 180
+copinance research macro --no-include-vix --no-include-market-breadth
 ```
 
 ## Testing
@@ -227,19 +232,24 @@ Copinance OS is designed as a **pure library** that integrates into any Python a
 
 ### Library Integration Example
 
+**Library integrators must provide `LLMConfig` directly.** Environment variables only work for CLI usage.
+
 ```python
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.containers import get_container
 
-# Configure LLM (required for agentic workflows)
+# Configure LLM (REQUIRED for agent workflows in library integration)
 llm_config = LLMConfig(
     provider="gemini",
-    api_key="your-api-key",
-    model="gemini-1.5-pro",
+    api_key="your-api-key",      # Required for cloud providers
+    model="gemini-1.5-pro",      # Optional
 )
 
-# Create container with configuration
-container = get_container(llm_config=llm_config)
+# Create container with configuration (llm_config is REQUIRED)
+container = get_container(
+    llm_config=llm_config,       # REQUIRED parameter
+    fred_api_key="your-fred-api-key",  # Optional: for high-quality macro data
+)
 
 # Use the container
 use_case = container.get_stock_use_case()

@@ -1,5 +1,6 @@
 """Research-related CLI commands."""
 
+from enum import Enum
 from typing import Any
 from uuid import UUID
 
@@ -26,6 +27,14 @@ from copinanceos.infrastructure.containers import container
 
 research_app = typer.Typer(help="Research management commands")
 console = Console()
+
+
+class WorkflowType(str, Enum):
+    """Supported workflow types (validated by the CLI)."""
+
+    STOCK = "stock"
+    MACRO = "macro"
+    AGENT = "agent"
 
 
 async def _ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID | None:
@@ -99,7 +108,7 @@ async def _ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID 
 
 
 def _display_agentic_results(results: dict[str, Any]) -> None:
-    """Display agentic workflow results in a formatted way."""
+    """Display agent workflow results in a formatted way."""
     # Show metadata
     if "llm_provider" in results:
         console.print(f"\n[bold cyan]LLM Provider:[/bold cyan] {results['llm_provider']}")
@@ -140,7 +149,10 @@ async def create_research(
     timeframe: ResearchTimeframe = typer.Option(
         ResearchTimeframe.MID_TERM, help="Research timeframe"
     ),
-    workflow: str = typer.Option("static", help="Workflow type (static, agentic, or fundamentals)"),
+    workflow: WorkflowType = typer.Option(
+        WorkflowType.STOCK,
+        help="Workflow type",
+    ),
     profile_id: UUID | None = typer.Option(None, help="Research profile ID for context"),
 ) -> None:
     """Create a new research task."""
@@ -151,7 +163,7 @@ async def create_research(
     request = CreateResearchRequest(
         stock_symbol=symbol,
         timeframe=timeframe,
-        workflow_type=workflow,
+        workflow_type=workflow.value,
         profile_id=final_profile_id,
     )
     response = await use_case.execute(request)
@@ -175,10 +187,13 @@ async def run_research(
     timeframe: ResearchTimeframe = typer.Option(
         ResearchTimeframe.MID_TERM, help="Research timeframe"
     ),
-    workflow: str = typer.Option("static", help="Workflow type (static, agentic, or fundamentals)"),
+    workflow: WorkflowType = typer.Option(
+        WorkflowType.STOCK,
+        help="Workflow type",
+    ),
     profile_id: UUID | None = typer.Option(None, help="Research profile ID for context"),
     question: str | None = typer.Option(
-        None, "--question", "-q", help="Custom question for agentic workflows"
+        None, "--question", "-q", help="Custom question for agent workflows (LLM)"
     ),
 ) -> None:
     """Create and execute a research workflow in one command (quick testing)."""
@@ -190,7 +205,7 @@ async def run_research(
     create_request = CreateResearchRequest(
         stock_symbol=symbol,
         timeframe=timeframe,
-        workflow_type=workflow,
+        workflow_type=workflow.value,
         profile_id=final_profile_id,
     )
     create_response = await create_use_case.execute(create_request)
@@ -204,8 +219,8 @@ async def run_research(
         console.print(f"Profile ID: {create_response.research.profile_id}")
 
     # Prepare execution context
-    context: dict[str, str] = {}
-    if question and workflow == "agentic":
+    context: dict[str, Any] = {}
+    if question and workflow == WorkflowType.AGENT:
         context["question"] = question
         console.print(f"\n[dim]Question: {question}[/dim]")
 
@@ -223,8 +238,8 @@ async def run_research(
 
             results = execute_response.research.results
 
-            # Special formatting for agentic workflows
-            if workflow == "agentic" and results:
+            # Special formatting for agent workflows
+            if workflow == WorkflowType.AGENT and results:
                 _display_agentic_results(results)
             else:
                 console.print("\n[bold]Results:[/bold]")
@@ -235,7 +250,117 @@ async def run_research(
             console.print("\n✗ Research execution failed", style="bold red")
             console.print(f"Error: {execute_response.research.error_message}")
     except Exception as e:
-        handle_cli_error(e, context={"symbol": symbol, "workflow": workflow})
+        handle_cli_error(e, context={"symbol": symbol, "workflow": workflow.value})
+
+
+@research_app.command("macro")
+@async_command
+async def macro_regime(
+    market_index: str = typer.Option(
+        "SPY",
+        "--market-index",
+        "-m",
+        help="Market index symbol to analyze (e.g., SPY, QQQ, DIA, IWM). Default: SPY",
+    ),
+    lookback_days: int = typer.Option(
+        252,
+        "--lookback-days",
+        "-d",
+        help="Number of days to look back for analysis. Default: 252 (1 trading year)",
+    ),
+    include_vix: bool = typer.Option(
+        True,
+        "--include-vix/--no-include-vix",
+        help="Include VIX (volatility index) analysis. Default: enabled",
+    ),
+    include_market_breadth: bool = typer.Option(
+        True,
+        "--include-market-breadth/--no-include-market-breadth",
+        help="Include equity market breadth indicators (advancing/declining stocks). Default: enabled",
+    ),
+    include_sector_rotation: bool = typer.Option(
+        True,
+        "--include-sector-rotation/--no-include-sector-rotation",
+        help="Include sector rotation analysis. Default: enabled",
+    ),
+    include_rates: bool = typer.Option(
+        True,
+        "--include-rates/--no-include-rates",
+        help="Include interest rates analysis (10Y Treasury, yield curve). Uses FRED API if available, falls back to yfinance. Default: enabled",
+    ),
+    include_credit: bool = typer.Option(
+        True,
+        "--include-credit/--no-include-credit",
+        help="Include credit spread analysis (HYG, LQD spreads). Uses FRED API if available, falls back to yfinance. Default: enabled",
+    ),
+    include_commodities: bool = typer.Option(
+        True,
+        "--include-commodities/--no-include-commodities",
+        help="Include commodities/energy analysis (oil, natural gas). Uses FRED API if available, falls back to yfinance. Default: enabled",
+    ),
+) -> None:
+    """Run the macro + market regime workflow and print a combined result payload.
+
+    This command combines market regime indicators (VIX, breadth, sector rotation) with
+    macroeconomic indicators (rates, credit spreads, commodities) to provide a comprehensive
+    view of market conditions.
+
+    Examples:
+        # Full analysis with defaults
+        copinance research macro
+
+        # Custom index and lookback period
+        copinance research macro --market-index QQQ --lookback-days 180
+
+        # Only macro indicators (rates, credit, commodities)
+        copinance research macro --no-include-vix --no-include-market-breadth --no-include-sector-rotation
+
+        # Only market regime indicators
+        copinance research macro --no-include-rates --no-include-credit --no-include-commodities
+    """
+    create_use_case = container.create_research_use_case()
+    create_request = CreateResearchRequest(
+        stock_symbol="MARKET",
+        timeframe=ResearchTimeframe.MID_TERM,
+        workflow_type="macro",
+        profile_id=None,
+    )
+    create_response = await create_use_case.execute(create_request)
+    research_id = create_response.research.id
+
+    console.print("✓ Research created", style="bold green")
+    console.print(f"ID: {research_id}")
+    console.print("Workflow: macro")
+
+    context: dict[str, Any] = {
+        "market_index": market_index.upper(),
+        "lookback_days": lookback_days,
+        "include_vix": include_vix,
+        "include_market_breadth": include_market_breadth,
+        "include_sector_rotation": include_sector_rotation,
+        "include_rates": include_rates,
+        "include_credit": include_credit,
+        "include_commodities": include_commodities,
+    }
+
+    execute_use_case = container.execute_research_use_case()
+    execute_request = ExecuteResearchRequest(research_id=research_id, context=context)
+
+    try:
+        with console.status("[bold blue]Running macro + market regime analysis..."):
+            execute_response = await execute_use_case.execute(execute_request)
+
+        if execute_response.success:
+            console.print("\n✓ Completed", style="bold green")
+            results = execute_response.research.results or {}
+            console.print("\n[bold]Results:[/bold]")
+            for key, value in results.items():
+                console.print(f"  {key}: {value}")
+        else:
+            console.print("\n✗ Failed", style="bold red")
+            console.print(f"Error: {execute_response.research.error_message}")
+    except Exception as e:
+        handle_cli_error(e, context={"workflow": "macro", "market_index": market_index})
 
 
 @research_app.command("execute")
@@ -243,7 +368,7 @@ async def run_research(
 async def execute_research(
     research_id: UUID = typer.Argument(..., help="Research ID"),
     question: str | None = typer.Option(
-        None, "--question", "-q", help="Custom question for agentic workflows"
+        None, "--question", "-q", help="Custom question for agent workflows (LLM)"
     ),
 ) -> None:
     """Execute a research workflow."""
@@ -288,8 +413,8 @@ async def execute_research(
 
             results = response.research.results
 
-            # Special formatting for agentic workflows
-            if response.research.workflow_type == "agentic" and results:
+            # Special formatting for agent workflows
+            if response.research.workflow_type == "agent" and results:
                 _display_agentic_results(results)
             else:
                 console.print("\n[bold]Results:[/bold]")
@@ -378,7 +503,7 @@ async def ask_question(
     ),
     profile_id: UUID | None = typer.Option(None, help="Research profile ID for context"),
 ) -> None:
-    """Quick Q&A: Ask a question about a stock or the market using agentic workflow.
+    """Quick Q&A: Ask a question about a stock or the market using agent workflow.
 
     Examples:
       # Market-wide question (no symbol needed)
@@ -406,7 +531,7 @@ async def ask_question(
     create_request = CreateResearchRequest(
         stock_symbol=research_symbol,
         timeframe=timeframe,
-        workflow_type="agentic",
+        workflow_type="agent",
         profile_id=final_profile_id,
     )
     create_response = await create_use_case.execute(create_request)

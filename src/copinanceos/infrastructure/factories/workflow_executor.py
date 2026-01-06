@@ -4,13 +4,21 @@ import structlog
 
 from copinanceos.application.use_cases.fundamentals import ResearchStockFundamentalsUseCase
 from copinanceos.application.use_cases.stock import GetStockUseCase
-from copinanceos.domain.ports.data_providers import FundamentalDataProvider, MarketDataProvider
+from copinanceos.domain.ports.data_providers import (
+    FundamentalDataProvider,
+    MacroeconomicDataProvider,
+    MarketDataProvider,
+)
 from copinanceos.domain.ports.workflows import WorkflowExecutor
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.analyzers.llm.providers.factory import LLMProviderFactory
 from copinanceos.infrastructure.cache import CacheManager
 from copinanceos.infrastructure.factories.llm_analyzer import LLMAnalyzerFactory
-from copinanceos.infrastructure.workflows import AgenticWorkflowExecutor, StaticWorkflowExecutor
+from copinanceos.infrastructure.workflows import (
+    AgenticWorkflowExecutor,
+    MacroRegimeStaticWorkflowExecutor,
+    StaticWorkflowExecutor,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -22,6 +30,7 @@ class WorkflowExecutorFactory:
     def create_all(
         get_stock_use_case: GetStockUseCase,
         market_data_provider: MarketDataProvider,
+        macro_data_provider: MacroeconomicDataProvider,
         fundamentals_use_case: ResearchStockFundamentalsUseCase,
         fundamental_data_provider: FundamentalDataProvider,
         sec_filings_provider: FundamentalDataProvider,
@@ -37,7 +46,7 @@ class WorkflowExecutorFactory:
             fundamental_data_provider: Provider for fundamental data
             sec_filings_provider: Provider for SEC filings
             cache_manager: Cache manager for tool caching
-            llm_config: LLM configuration. If None, agentic workflows will not be available.
+            llm_config: LLM configuration. If None, agent workflows will not be available.
 
         Returns:
             List of workflow executors
@@ -48,14 +57,18 @@ class WorkflowExecutorFactory:
                 market_data_provider=market_data_provider,
                 fundamentals_use_case=fundamentals_use_case,
             ),
+            MacroRegimeStaticWorkflowExecutor(
+                market_data_provider=market_data_provider,
+                macro_data_provider=macro_data_provider,
+            ),
         ]
 
-        # Add agentic executor if LLM config is provided
+        # Add agent executor if LLM config is provided
         if llm_config:
             try:
-                # Get LLM analyzer for agentic workflow
+                # Get LLM analyzer for agent workflow
                 provider_name = LLMProviderFactory.get_provider_for_workflow(
-                    "agentic", llm_config=llm_config
+                    "agent", llm_config=llm_config
                 )
                 llm_analyzer = LLMAnalyzerFactory.create(provider_name, llm_config=llm_config)
 
@@ -74,6 +87,7 @@ class WorkflowExecutorFactory:
                             AgenticWorkflowExecutor(
                                 llm_analyzer=llm_analyzer,
                                 market_data_provider=market_data_provider,
+                                macro_data_provider=macro_data_provider,
                                 fundamental_data_provider=fundamental_data_provider,
                                 sec_filings_provider=sec_filings_provider,
                                 cache_manager=cache_manager,
@@ -81,17 +95,17 @@ class WorkflowExecutorFactory:
                         )
                 except Exception as e:
                     logger.warning(
-                        "Failed to initialize LLM analyzer for agentic workflow",
+                        "Failed to initialize LLM analyzer for agent workflow",
                         error=str(e),
                         hint="Check LLM configuration",
                     )
             except Exception as e:
                 logger.warning(
-                    "Failed to create LLM analyzer for agentic workflow",
+                    "Failed to create LLM analyzer for agent workflow",
                     error=str(e),
                     hint="Check LLM configuration",
                 )
         else:
-            logger.debug("LLM config not provided, skipping agentic workflow executor")
+            logger.debug("LLM config not provided, skipping agent workflow executor")
 
         return executors

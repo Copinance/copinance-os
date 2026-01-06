@@ -25,7 +25,7 @@ Static workflows follow a predefined analysis pipeline with consistent steps.
 ### Example
 
 ```bash
-copinance research run AAPL --workflow static --timeframe mid_term
+copinance research run AAPL --workflow stock --timeframe mid_term
 ```
 
 ## Agentic Workflows
@@ -98,7 +98,7 @@ Fundamentals workflows focus specifically on fundamental analysis and financial 
 ### Example
 
 ```bash
-copinance research run AAPL --workflow fundamentals --timeframe long_term
+copinance research run AAPL --workflow stock --timeframe long_term
 ```
 
 ## Choosing a Workflow
@@ -164,9 +164,9 @@ Copinance OS provides three commands for managing research: `create`, `execute`,
 **Batch Processing:**
 ```bash
 # Create multiple research tasks
-copinance research create AAPL --workflow static
-copinance research create MSFT --workflow static
-copinance research create GOOGL --workflow static
+copinance research create AAPL --workflow stock
+copinance research create MSFT --workflow stock
+copinance research create GOOGL --workflow stock
 
 # Execute them later (or in parallel)
 copinance research execute <research-id-1>
@@ -177,7 +177,7 @@ copinance research execute <research-id-3>
 **Iterative Analysis:**
 ```bash
 # Create research once
-copinance research create AAPL --workflow agentic
+copinance research create AAPL --workflow agent
 
 # Execute with different questions
 copinance research execute <research-id> --question "What are the key risks?"
@@ -187,7 +187,93 @@ copinance research execute <research-id> --question "What is the growth outlook?
 **Quick Analysis:**
 ```bash
 # One command for quick results
-copinance research run AAPL --workflow static
+copinance research run AAPL --workflow stock
+
+## Macro Regime Workflow
+
+The macro regime workflow combines market regime indicators with macroeconomic data to provide a comprehensive view of market conditions. Use the dedicated CLI command for easy access.
+
+### Quick Start
+
+```bash
+# Full analysis with defaults
+copinance research macro
+```
+
+### Customization
+
+**Market Index:**
+Choose which market index to analyze:
+```bash
+copinance research macro --market-index SPY    # S&P 500 (default)
+copinance research macro --market-index QQQ    # Nasdaq 100
+copinance research macro --market-index DIA     # Dow Jones
+copinance research macro --market-index IWM    # Russell 2000
+```
+
+**Lookback Period:**
+Adjust the analysis window:
+```bash
+copinance research macro --lookback-days 90    # 3 months
+copinance research macro --lookback-days 252    # 1 year (default)
+copinance research macro --lookback-days 504   # 2 years
+```
+
+**Indicator Selection:**
+Enable or disable specific indicators:
+
+```bash
+# Only macro indicators (rates, credit, commodities)
+copinance research macro \
+  --no-include-vix \
+  --no-include-market-breadth \
+  --no-include-sector-rotation
+
+# Only market regime indicators
+copinance research macro \
+  --no-include-rates \
+  --no-include-credit \
+  --no-include-commodities
+```
+
+### What It Analyzes
+
+**Market Regime Indicators:**
+- **VIX**: Volatility index measuring market fear
+- **Market Breadth**: Advancing vs declining stocks
+- **Sector Rotation**: Which sectors are leading/lagging
+
+**Macro Indicators:**
+- **Rates**: 10Y Treasury yields, yield curve analysis
+- **Credit**: Credit spreads (HYG, LQD)
+- **Commodities**: Energy prices (oil, natural gas)
+
+**Data Sources:**
+- Macro indicators prefer FRED API (if `COPINANCEOS_FRED_API_KEY` configured) for true yields/spreads
+- Falls back to yfinance proxies if FRED unavailable
+- Market regime indicators use yfinance
+
+### Use Cases
+
+- **Market Regime Detection**: Identify bull/bear markets, volatility regimes
+- **Macro Environment**: Understand interest rate environment, credit conditions
+- **Sector Analysis**: See which sectors are rotating in/out of favor
+- **Risk Assessment**: Combine volatility (VIX) with credit spreads for risk-on/risk-off signals
+
+### Examples
+
+```bash
+# Quick market check
+copinance research macro --lookback-days 90
+
+# Deep dive on Nasdaq
+copinance research macro --market-index QQQ --lookback-days 504
+
+# Focus on macro conditions
+copinance research macro \
+  --no-include-vix \
+  --no-include-market-breadth \
+  --no-include-sector-rotation
 ```
 
 ## Next Steps

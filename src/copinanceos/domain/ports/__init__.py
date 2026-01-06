@@ -1,5 +1,6 @@
 """Domain ports (interfaces) for external dependencies."""
 
+from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.domain.ports.data_providers import (
     AlternativeDataProvider,
@@ -25,7 +26,6 @@ from copinanceos.domain.ports.strategies import (
 from copinanceos.domain.ports.tools import (
     Tool,
     ToolParameter,
-    ToolResult,
     ToolSchema,
 )
 from copinanceos.domain.ports.workflows import WorkflowExecutor

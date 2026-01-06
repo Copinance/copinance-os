@@ -4,8 +4,9 @@ from typing import Any
 
 import structlog
 
+from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import FundamentalDataProvider
-from copinanceos.domain.ports.tools import ToolResult, ToolSchema
+from copinanceos.domain.ports.tools import ToolSchema
 from copinanceos.infrastructure.cache import CacheManager
 from copinanceos.infrastructure.tools.data_provider.base import BaseDataProviderTool
 from copinanceos.infrastructure.tools.data_provider.provider_selector import (
