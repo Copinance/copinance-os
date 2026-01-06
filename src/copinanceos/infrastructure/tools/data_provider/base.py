@@ -5,8 +5,9 @@ from typing import Any, Generic, TypeVar
 
 import structlog
 
+from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import DataProvider
-from copinanceos.domain.ports.tools import Tool, ToolResult, ToolSchema
+from copinanceos.domain.ports.tools import Tool, ToolSchema
 from copinanceos.infrastructure.cache import CacheManager
 
 logger = structlog.get_logger(__name__)

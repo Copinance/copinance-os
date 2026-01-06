@@ -8,7 +8,7 @@ It has no dependencies on other layers and represents the heart of the business 
 from copinanceos.domain.exceptions import (
     DataProviderError,
     DataProviderUnavailableError,
-    DomainException,
+    DomainError,
     EntityNotFoundError,
     InvalidStockSymbolError,
     ProfileNotFoundError,
@@ -23,7 +23,7 @@ from copinanceos.domain.validation import StockSymbolValidator
 
 __all__ = [
     # Exceptions
-    "DomainException",
+    "DomainError",
     "EntityNotFoundError",
     "StockNotFoundError",
     "ResearchNotFoundError",

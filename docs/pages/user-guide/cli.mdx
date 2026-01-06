@@ -103,11 +103,11 @@ Copinance OS provides three separate commands for research management: `create`,
 Create a new research task without executing it.
 
 ```bash
-copinance research create AAPL --workflow static --timeframe mid_term
+copinance research create AAPL --workflow stock --timeframe mid_term
 ```
 
 **Options:**
-- `--workflow <type>`: `static`, `agentic`, or `fundamentals` (default: `static`)
+- `--workflow <type>`: `stock`, `macro`, or `agent` (default: `stock`)
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--profile-id <id>`: Profile ID for context (optional)
 
@@ -129,7 +129,7 @@ copinance research execute <research-id> --question "What is the P/E ratio?"
 ```
 
 **Options:**
-- `--question <question>`: Custom question for agentic workflows (optional)
+- `--question <question>`: Custom question for agent workflows (optional)
 
 **Note:** If the research doesn't have a profile associated, you'll be prompted to set your financial literacy level for personalized analysis.
 
@@ -144,15 +144,15 @@ copinance research execute <research-id> --question "What is the P/E ratio?"
 Create and execute a research workflow in one command. Convenience method for quick analysis.
 
 ```bash
-copinance research run AAPL --workflow static
-copinance research run AAPL --workflow agentic --question "Analyze this stock"
+copinance research run AAPL --workflow stock
+copinance research run AAPL --workflow agent --question "Analyze this stock"
 ```
 
 **Options:**
-- `--workflow <type>`: `static`, `agentic`, or `fundamentals` (default: `static`)
+- `--workflow <type>`: `stock`, `macro`, or `agent` (default: `stock`)
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--profile-id <id>`: Profile ID for context (optional)
-- `--question <question>`: Custom question for agentic workflows (optional)
+- `--question <question>`: Custom question for agent workflows (optional)
 
 **Note:** If no profile is provided and you don't have a current profile, you'll be prompted to set your financial literacy level for personalized analysis.
 
@@ -172,7 +172,7 @@ copinance research get <research-id>
 
 ### Ask Question (Agentic)
 
-Quick Q&A using agentic workflow. Can ask questions about specific stocks or market-wide questions.
+Quick Q&A using agent workflow. Can ask questions about specific stocks or market-wide questions.
 
 **Stock-specific questions:**
 ```bash
@@ -216,7 +216,7 @@ copinance stock search "Apple"
 copinance profile create --literacy intermediate --name "Trader"
 
 # 3. Run research
-copinance research run AAPL --workflow static --timeframe mid_term
+copinance research run AAPL --workflow stock --timeframe mid_term
 ```
 
 ### Agentic Workflow
@@ -240,14 +240,121 @@ copinance research ask "Analyze this stock's regime and compare it to broader ma
 
 ```bash
 # Create research
-copinance research create MSFT --workflow static
+copinance research create MSFT --workflow stock
 
-# Execute later
-copinance research execute <research-id>
+## Macro Regime (Dedicated Command)
 
-# View results
-copinance research get <research-id>
+Run the combined macro + market regime workflow to get a comprehensive view of market conditions.
+
+### Basic Usage
+
+```bash
+# Full analysis with default settings
+copinance research macro
 ```
+
+This runs with:
+- Market index: `SPY` (S&P 500)
+- Lookback period: 252 days (1 trading year)
+- All indicators enabled
+
+### Customization Options
+
+**Market Index:**
+```bash
+# Analyze different market indices
+copinance research macro --market-index QQQ    # Nasdaq 100
+copinance research macro --market-index DIA     # Dow Jones
+copinance research macro --market-index IWM    # Russell 2000
+copinance research macro -m SPY                 # Short form
+```
+
+**Lookback Period:**
+```bash
+# Shorter lookback (3 months)
+copinance research macro --lookback-days 90
+
+# Longer lookback (2 years)
+copinance research macro --lookback-days 504
+
+# Short form
+copinance research macro -d 180
+```
+
+**Indicator Selection:**
+
+You can enable/disable specific indicators:
+
+```bash
+# Only macro indicators (rates, credit, commodities)
+copinance research macro \
+  --no-include-vix \
+  --no-include-market-breadth \
+  --no-include-sector-rotation
+
+# Only market regime indicators (VIX, breadth, sectors)
+copinance research macro \
+  --no-include-rates \
+  --no-include-credit \
+  --no-include-commodities
+
+# Minimal analysis (just rates and credit)
+copinance research macro \
+  --no-include-vix \
+  --no-include-market-breadth \
+  --no-include-sector-rotation \
+  --no-include-commodities
+```
+
+### Available Indicators
+
+**Market Regime Indicators:**
+- `--include-vix` / `--no-include-vix`: VIX (volatility index) - measures market fear/volatility
+- `--include-market-breadth` / `--no-include-market-breadth`: Equity market breadth (advancing/declining stocks)
+- `--include-sector-rotation` / `--no-include-sector-rotation`: Sector rotation analysis
+
+**Macro Indicators:**
+- `--include-rates` / `--no-include-rates`: Interest rates (10Y Treasury, yield curve)
+  - Uses FRED API if `COPINANCEOS_FRED_API_KEY` is configured, otherwise falls back to yfinance
+- `--include-credit` / `--no-include-credit`: Credit spreads (HYG, LQD)
+  - Uses FRED API if `COPINANCEOS_FRED_API_KEY` is configured, otherwise falls back to yfinance
+- `--include-commodities` / `--no-include-commodities`: Commodities/energy (oil, natural gas)
+  - Uses FRED API if `COPINANCEOS_FRED_API_KEY` is configured, otherwise falls back to yfinance
+
+### Complete Examples
+
+```bash
+# Quick 3-month analysis on Nasdaq
+copinance research macro --market-index QQQ --lookback-days 90
+
+# Full 2-year analysis on S&P 500
+copinance research macro --market-index SPY --lookback-days 504
+
+# Focus on macro conditions only
+copinance research macro \
+  --market-index SPY \
+  --lookback-days 180 \
+  --no-include-vix \
+  --no-include-market-breadth \
+  --no-include-sector-rotation
+
+# Focus on market regime only
+copinance research macro \
+  --market-index QQQ \
+  --lookback-days 252 \
+  --no-include-rates \
+  --no-include-credit \
+  --no-include-commodities
+```
+
+### Output
+
+The command creates a research entry, executes the workflow, and displays:
+- Market regime indicators (VIX, breadth, sector rotation)
+- Macro indicators (rates, credit spreads, commodities)
+- Combined analysis results
+
+**Note:** For best results with macro indicators (rates, credit, commodities), configure `COPINANCEOS_FRED_API_KEY` in your `.env` file. The workflow will automatically use FRED for true yields/spreads and fall back to yfinance proxies if FRED is unavailable. See [Configuration](configuration#fred-api-setup) for setup instructions.
 
 ## Cache Commands
 

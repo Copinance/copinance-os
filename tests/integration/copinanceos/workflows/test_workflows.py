@@ -34,7 +34,7 @@ class TestEndToEndWorkflow:
             CreateResearchRequest(
                 stock_symbol="AAPL",
                 timeframe=ResearchTimeframe.MID_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
         )
 
@@ -53,21 +53,21 @@ class TestEndToEndWorkflow:
 
     @pytest.mark.asyncio
     async def test_agentic_workflow_execution(self) -> None:
-        """Test agentic workflow execution."""
+        """Test agent workflow execution."""
         research_repo = ResearchRepositoryImpl()
         executors = [StaticWorkflowExecutor(), AgenticWorkflowExecutor()]
 
-        # Create agentic research
+        # Create agent research
         create_research_uc = CreateResearchUseCase(research_repo)
         research_response = await create_research_uc.execute(
             CreateResearchRequest(
                 stock_symbol="MSFT",
                 timeframe=ResearchTimeframe.SHORT_TERM,
-                workflow_type="agentic",
+                workflow_type="agent",
             )
         )
 
-        # Execute agentic research
+        # Execute agent research
         execute_research_uc = ExecuteResearchUseCase(research_repo, None, executors)
         execute_response = await execute_research_uc.execute(
             ExecuteResearchRequest(research_id=research_response.research.id)
@@ -94,7 +94,7 @@ class TestEndToEndWorkflow:
     async def test_static_workflow_with_fundamentals(
         self, fundamental_data_provider: FundamentalDataProvider
     ) -> None:
-        """Test static workflow execution includes full fundamentals data."""
+        """Test stock workflow execution includes full fundamentals data."""
         container = get_container()
         research_repo = ResearchRepositoryImpl()
         executors = [
@@ -106,20 +106,20 @@ class TestEndToEndWorkflow:
             AgenticWorkflowExecutor(),
         ]
 
-        # Create static research (which now includes full fundamentals)
+        # Create stock research (which now includes full fundamentals)
         create_research_uc = CreateResearchUseCase(research_repo)
         research_response = await create_research_uc.execute(
             CreateResearchRequest(
                 stock_symbol="AAPL",
                 timeframe=ResearchTimeframe.MID_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
         )
 
         assert research_response.research.stock_symbol == "AAPL"
         assert research_response.research.status == ResearchStatus.PENDING
 
-        # Execute static research
+        # Execute stock research
         execute_research_uc = ExecuteResearchUseCase(research_repo, None, executors)
         execute_response = await execute_research_uc.execute(
             ExecuteResearchRequest(research_id=research_response.research.id)
@@ -129,9 +129,9 @@ class TestEndToEndWorkflow:
         assert execute_response.research.status == ResearchStatus.COMPLETED
         assert len(execute_response.research.results) > 0
 
-        # Verify static workflow includes fundamentals data
+        # Verify stock workflow includes fundamentals data
         results = execute_response.research.results
-        assert results["workflow_type"] == "static"
+        assert results["workflow_type"] == "stock"
         assert results["stock_symbol"] == "AAPL"
         assert "fundamentals" in results
         assert "company_name" in results["fundamentals"]

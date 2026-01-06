@@ -201,7 +201,7 @@ No black boxes. No vendor lock-in. Just code, community, and collaboration.
 Works across timeframes—day trading, swing trading, long-term investing.
 
 ### 5. Human + AI Partnership
-Static workflows for consistency, agentic workflows for adaptability.
+Stock/macro workflows for consistency, agent workflows for adaptability.
 
 ### 6. Data Democracy
 Start with free data, scale as you grow. Your data, your control.

@@ -72,7 +72,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         mock_storage.get_collection = MagicMock(return_value={research.id: research})
 
@@ -106,7 +106,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
 
         result = await repository.save(research)
@@ -122,7 +122,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         research_dict = {research.id: research}
         mock_storage.get_collection = MagicMock(return_value=research_dict)
@@ -152,12 +152,12 @@ class TestResearchRepositoryImpl:
         research1 = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         research2 = Research(
             stock_symbol="MSFT",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
         )
 
         await repository.save(research1)
@@ -175,7 +175,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         research_dict = {research.id: research}
         mock_storage.get_collection = MagicMock(return_value=research_dict)
@@ -210,7 +210,7 @@ class TestResearchRepositoryImpl:
             Research(
                 stock_symbol=f"STOCK{i}",
                 timeframe=ResearchTimeframe.SHORT_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
             for i in range(5)
         ]
@@ -231,7 +231,7 @@ class TestResearchRepositoryImpl:
             Research(
                 stock_symbol=f"STOCK{i}",
                 timeframe=ResearchTimeframe.SHORT_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
             for i in range(10)
         ]
@@ -251,7 +251,7 @@ class TestResearchRepositoryImpl:
             Research(
                 stock_symbol=f"STOCK{i}",
                 timeframe=ResearchTimeframe.SHORT_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
             for i in range(5)
         ]
@@ -273,7 +273,7 @@ class TestResearchRepositoryImpl:
             Research(
                 stock_symbol=f"STOCK{i}",
                 timeframe=ResearchTimeframe.SHORT_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
             for i in range(10)
         ]
@@ -304,7 +304,7 @@ class TestResearchRepositoryImpl:
             Research(
                 stock_symbol=f"STOCK{i}",
                 timeframe=ResearchTimeframe.SHORT_TERM,
-                workflow_type="static",
+                workflow_type="stock",
             )
             for i in range(3)
         ]
@@ -327,7 +327,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         saved_research = await repo1.save(research)
 
@@ -354,7 +354,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.LONG_TERM,
-            workflow_type="agentic",
+            workflow_type="agent",
             profile_id=profile_id,
             status=ResearchStatus.IN_PROGRESS,
             parameters={"key": "value"},
@@ -382,7 +382,7 @@ class TestResearchRepositoryImpl:
         research = Research(
             stock_symbol="AAPL",
             timeframe=ResearchTimeframe.SHORT_TERM,
-            workflow_type="static",
+            workflow_type="stock",
         )
         original_id = research.id
 

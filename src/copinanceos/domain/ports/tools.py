@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from copinanceos.domain.models.tool_results import ToolResult
+
 
 class ToolParameter(BaseModel):
     """Schema for a tool parameter."""
@@ -25,15 +27,6 @@ class ToolSchema(BaseModel):
     description: str = Field(..., description="Tool description")
     parameters: dict[str, Any] = Field(..., description="JSON Schema for parameters")
     returns: dict[str, Any] | None = Field(default=None, description="JSON Schema for return value")
-
-
-class ToolResult(BaseModel):
-    """Result from tool execution."""
-
-    success: bool = Field(..., description="Whether tool execution succeeded")
-    data: Any = Field(..., description="Tool execution result data")
-    error: str | None = Field(default=None, description="Error message if execution failed")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class Tool(ABC):
@@ -57,14 +50,14 @@ class Tool(ABC):
         pass
 
     @abstractmethod
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, **kwargs: Any) -> ToolResult[Any]:
         """Execute the tool with given parameters.
 
         Args:
             **kwargs: Tool parameters (validated against schema)
 
         Returns:
-            ToolResult with execution outcome
+            ToolResult[Any] with execution outcome
 
         Raises:
             ValueError: If parameters are invalid

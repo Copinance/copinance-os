@@ -5,7 +5,7 @@ or represent application-specific concerns like use case execution failures.
 """
 
 
-class ApplicationException(Exception):
+class ApplicationError(Exception):
     """Base exception for all application layer errors."""
 
     def __init__(self, message: str, cause: Exception | None = None) -> None:

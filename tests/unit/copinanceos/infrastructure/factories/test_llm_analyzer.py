@@ -66,14 +66,14 @@ class TestLLMAnalyzerFactory:
         llm_config = LLMConfig(
             provider="gemini",
             api_key="test-key",
-            workflow_providers={"agentic": "gemini"},
+            workflow_providers={"agent": "gemini"},
         )
         mock_provider = MagicMock()
         mock_factory.create_provider.return_value = mock_provider
         mock_analyzer = MagicMock(spec=LLMAnalyzer)
         mock_llm_impl.return_value = mock_analyzer
 
-        result = LLMAnalyzerFactory.create_for_workflow("agentic", llm_config=llm_config)
+        result = LLMAnalyzerFactory.create_for_workflow("agent", llm_config=llm_config)
 
         assert result == mock_analyzer
         # create_for_workflow calls llm_config.get_provider_for_workflow() directly,

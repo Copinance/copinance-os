@@ -12,6 +12,10 @@ from copinanceos.infrastructure.tools.analysis.market_regime.indicators import (
     MarketRegimeIndicatorsTool,
     create_market_regime_indicators_tool,
 )
+from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
+    MacroRegimeIndicatorsTool,
+    create_macro_regime_indicators_tool,
+)
 from copinanceos.infrastructure.tools.analysis.market_regime.rule_based import (
     MarketRegimeDetectCyclesTool,
     MarketRegimeDetectTrendTool,
@@ -29,6 +33,9 @@ __all__ = [
     # Market regime indicators tool
     "MarketRegimeIndicatorsTool",
     "create_market_regime_indicators_tool",
+    # Macro regime indicators tool (rates/credit/commodities)
+    "MacroRegimeIndicatorsTool",
+    "create_macro_regime_indicators_tool",
     # Factory function (backward compatible)
     "create_market_regime_tools",
 ]

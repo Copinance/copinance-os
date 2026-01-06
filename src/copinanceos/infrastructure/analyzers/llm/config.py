@@ -19,7 +19,7 @@ class LLMConfig:
         temperature: Default temperature for generation (0.0 to 1.0)
         max_tokens: Default maximum tokens for generation
         workflow_providers: Optional mapping of workflow types to provider names
-                          (e.g., {"static": "ollama", "agentic": "gemini"})
+                          (e.g., {"agent": "gemini"})
         provider_config: Additional provider-specific configuration
     """
 
@@ -36,7 +36,7 @@ class LLMConfig:
         """Get the provider name for a specific workflow type.
 
         Args:
-            workflow_type: The workflow type (e.g., "static", "agentic", "fundamentals")
+            workflow_type: The workflow type (e.g., "agent")
 
         Returns:
             Provider name to use for this workflow

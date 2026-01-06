@@ -4,7 +4,8 @@ from typing import Any
 
 import structlog
 
-from copinanceos.domain.ports.tools import Tool, ToolResult
+from copinanceos.domain.models.tool_results import ToolResult
+from copinanceos.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)
 

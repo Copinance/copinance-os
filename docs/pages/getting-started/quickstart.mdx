@@ -15,10 +15,10 @@ This will show you matching stocks with their symbols.
 ### 2. Run a Static Workflow
 
 ```bash
-copinance research run AAPL --workflow static
+copinance research run AAPL --workflow stock
 ```
 
-This performs a comprehensive static analysis with:
+This performs a comprehensive stock workflow with:
 - Current market quote
 - Historical price data
 - Fundamental analysis
@@ -79,7 +79,7 @@ copinance profile create --literacy intermediate --name "My Profile"
 ### Use Profile in Research
 
 ```bash
-copinance research run AAPL --workflow static --profile-id <profile-id>
+copinance research run AAPL --workflow stock --profile-id <profile-id>
 ```
 
 Or simply use your current profile (set with `profile set-current`).
@@ -89,7 +89,7 @@ Or simply use your current profile (set with `profile set-current`).
 ### Quick Analysis
 ```bash
 # Static workflow (no API key needed)
-copinance research run AAPL --workflow static
+copinance research run AAPL --workflow stock
 
 # Agentic workflow (requires API key)
 copinance research ask AAPL "Analyze this stock for me"
@@ -105,10 +105,30 @@ Copinance OS provides three commands for research:
 
 ```bash
 # Quick analysis (creates and executes)
-copinance research run AAPL --workflow static
+copinance research run AAPL --workflow stock
 
 # Create research for later
-copinance research create AAPL --workflow static
+copinance research create AAPL --workflow stock
+
+## Macro Regime Dashboard
+
+Get a comprehensive view of market conditions and macroeconomic indicators:
+
+```bash
+# Full analysis with defaults (SPY, 252 days, all indicators)
+copinance research macro
+
+# Custom index and lookback period
+copinance research macro --market-index QQQ --lookback-days 180
+
+# Only macro indicators (rates, credit, commodities)
+copinance research macro \
+  --no-include-vix \
+  --no-include-market-breadth \
+  --no-include-sector-rotation
+```
+
+See [Workflows](../user-guide/workflows#macro-regime-workflow) for all customization options.
 
 # Execute existing research
 copinance research execute <research-id>

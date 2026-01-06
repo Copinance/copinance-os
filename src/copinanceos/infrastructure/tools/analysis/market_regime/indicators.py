@@ -13,8 +13,9 @@ from typing import Any
 
 import structlog
 
+from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MarketDataProvider
-from copinanceos.domain.ports.tools import Tool, ToolResult, ToolSchema
+from copinanceos.domain.ports.tools import Tool, ToolSchema
 from copinanceos.infrastructure.tools.analysis.market_regime.base import (
     _calculate_moving_average,
 )
@@ -132,24 +133,79 @@ class MarketRegimeIndicatorsTool(Tool):
                 "analysis_date": end_date.isoformat(),
             }
 
+            # Fetch shared data once if needed by multiple indicators
+            market_data = None
+            sector_data_cache: dict[str, list] = {}
+            needs_shared_data = include_market_breadth or include_sector_rotation
+
+            if needs_shared_data:
+                try:
+                    # Fetch market index data once (used by both breadth and rotation)
+                    market_data = await self._provider.get_historical_data(
+                        market_index, start_date, end_date, interval="1d"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to fetch market data for breadth/rotation analysis",
+                        market_index=market_index,
+                        error=str(e),
+                    )
+                    market_data = None
+
+                # Fetch all sector ETF data once (used by both breadth and rotation)
+                for sector_symbol in SECTOR_ETFS.keys():
+                    try:
+                        sector_data = await self._provider.get_historical_data(
+                            sector_symbol, start_date, end_date, interval="1d"
+                        )
+                        if sector_data:
+                            sector_data_cache[sector_symbol] = sector_data
+                    except Exception as e:
+                        logger.debug(
+                            "Failed to fetch sector data",
+                            sector=sector_symbol,
+                            error=str(e),
+                        )
+
             # Fetch VIX data
             if include_vix:
-                vix_data = await self._fetch_vix_data(start_date, end_date)
-                results["vix"] = vix_data
+                try:
+                    vix_data = await self._fetch_vix_data(start_date, end_date)
+                    results["vix"] = vix_data
+                except Exception as e:
+                    logger.warning("Failed to fetch VIX data", error=str(e))
+                    results["vix"] = {
+                        "available": False,
+                        "error": f"Failed to fetch VIX data: {str(e)}",
+                    }
 
-            # Fetch market breadth
+            # Fetch market breadth (using cached data)
             if include_market_breadth:
-                breadth_data = await self._calculate_market_breadth(
-                    market_index, start_date, end_date
-                )
-                results["market_breadth"] = breadth_data
+                try:
+                    breadth_data = await self._calculate_market_breadth(
+                        market_index, start_date, end_date, market_data, sector_data_cache
+                    )
+                    results["market_breadth"] = breadth_data
+                except Exception as e:
+                    logger.warning("Failed to calculate market breadth", error=str(e))
+                    results["market_breadth"] = {
+                        "available": False,
+                        "error": f"Failed to calculate market breadth: {str(e)}",
+                    }
 
-            # Fetch sector rotation signals
+            # Fetch sector rotation signals (using cached data)
             if include_sector_rotation:
-                rotation_data = await self._calculate_sector_rotation(
-                    market_index, start_date, end_date
-                )
-                results["sector_rotation"] = rotation_data
+                try:
+                    rotation_data = await self._calculate_sector_rotation(
+                        market_index, start_date, end_date, market_data, sector_data_cache
+                    )
+                    results["sector_rotation"] = rotation_data
+                except Exception as e:
+                    logger.warning("Failed to calculate sector rotation", error=str(e))
+                    results["sector_rotation"] = {
+                        "available": False,
+                        "error": f"Failed to calculate sector rotation: {str(e)}",
+                    }
 
             return ToolResult(
                 success=True,
@@ -247,7 +303,12 @@ class MarketRegimeIndicatorsTool(Tool):
             }
 
     async def _calculate_market_breadth(
-        self, market_index: str, start_date: datetime, end_date: datetime
+        self,
+        market_index: str,
+        start_date: datetime,
+        end_date: datetime,
+        market_data: list | None = None,
+        sector_data_cache: dict[str, list] | None = None,
     ) -> dict[str, Any]:
         """Calculate market breadth using sector ETFs.
 
@@ -264,10 +325,11 @@ class MarketRegimeIndicatorsTool(Tool):
             Dictionary with market breadth metrics
         """
         try:
-            # Fetch market index data
-            market_data = await self._provider.get_historical_data(
-                market_index, start_date, end_date, interval="1d"
-            )
+            # Use provided market data or fetch if not provided
+            if market_data is None:
+                market_data = await self._provider.get_historical_data(
+                    market_index, start_date, end_date, interval="1d"
+                )
 
             if not market_data:
                 return {
@@ -286,7 +348,10 @@ class MarketRegimeIndicatorsTool(Tool):
             # Get current market price
             current_market_price = market_prices[-1]
 
-            # Fetch sector ETF data
+            # Use cached sector data or fetch if not provided
+            if sector_data_cache is None:
+                sector_data_cache = {}
+
             sector_performance: dict[str, dict[str, Any]] = {}
             sectors_above_ma = 0
             sectors_above_market = 0
@@ -294,9 +359,13 @@ class MarketRegimeIndicatorsTool(Tool):
 
             for sector_symbol, sector_name in SECTOR_ETFS.items():
                 try:
-                    sector_data = await self._provider.get_historical_data(
-                        sector_symbol, start_date, end_date, interval="1d"
-                    )
+                    # Use cached data if available, otherwise fetch
+                    if sector_symbol in sector_data_cache:
+                        sector_data = sector_data_cache[sector_symbol]
+                    else:
+                        sector_data = await self._provider.get_historical_data(
+                            sector_symbol, start_date, end_date, interval="1d"
+                        )
 
                     if not sector_data:
                         continue
@@ -398,7 +467,12 @@ class MarketRegimeIndicatorsTool(Tool):
             }
 
     async def _calculate_sector_rotation(
-        self, market_index: str, start_date: datetime, end_date: datetime
+        self,
+        market_index: str,
+        start_date: datetime,
+        end_date: datetime,
+        market_data: list | None = None,
+        sector_data_cache: dict[str, list] | None = None,
     ) -> dict[str, Any]:
         """Calculate sector rotation signals.
 
@@ -417,10 +491,11 @@ class MarketRegimeIndicatorsTool(Tool):
             Dictionary with sector rotation signals
         """
         try:
-            # Fetch market index data
-            market_data = await self._provider.get_historical_data(
-                market_index, start_date, end_date, interval="1d"
-            )
+            # Use provided market data or fetch if not provided
+            if market_data is None:
+                market_data = await self._provider.get_historical_data(
+                    market_index, start_date, end_date, interval="1d"
+                )
 
             if not market_data:
                 return {
@@ -448,14 +523,22 @@ class MarketRegimeIndicatorsTool(Tool):
                 else 0
             )
 
-            # Fetch and analyze sector ETFs
+            # Use cached sector data or fetch if not provided
+            if sector_data_cache is None:
+                sector_data_cache = {}
+
+            # Analyze sector ETFs using cached data
             sector_momentum: list[dict[str, Any]] = []
 
             for sector_symbol, sector_name in SECTOR_ETFS.items():
                 try:
-                    sector_data = await self._provider.get_historical_data(
-                        sector_symbol, start_date, end_date, interval="1d"
-                    )
+                    # Use cached data if available, otherwise fetch
+                    if sector_symbol in sector_data_cache:
+                        sector_data = sector_data_cache[sector_symbol]
+                    else:
+                        sector_data = await self._provider.get_historical_data(
+                            sector_symbol, start_date, end_date, interval="1d"
+                        )
 
                     if not sector_data or len(sector_data) < 60:
                         continue

@@ -9,8 +9,8 @@ from typing import Any
 from rich.console import Console
 from rich.panel import Panel
 
-from copinanceos.application.exceptions import ApplicationException
-from copinanceos.domain.exceptions import DomainException
+from copinanceos.application.exceptions import ApplicationError
+from copinanceos.domain.exceptions import DomainError
 
 console = Console()
 
@@ -35,12 +35,12 @@ def handle_cli_error(error: Exception, context: dict[str, Any] | None = None) ->
     context = context or {}
 
     # Handle domain exceptions (business logic errors)
-    if isinstance(error, DomainException):
+    if isinstance(error, DomainError):
         _handle_domain_error(error, context)
         return
 
     # Handle application exceptions
-    if isinstance(error, ApplicationException):
+    if isinstance(error, ApplicationError):
         _handle_application_error(error, context)
         return
 
@@ -48,7 +48,7 @@ def handle_cli_error(error: Exception, context: dict[str, Any] | None = None) ->
     _handle_unexpected_error(error, context)
 
 
-def _handle_domain_error(error: DomainException, context: dict[str, Any]) -> None:
+def _handle_domain_error(error: DomainError, context: dict[str, Any]) -> None:
     """Handle domain exceptions with user-friendly messages."""
     # Extract error information
     message = error.message if hasattr(error, "message") else str(error)
@@ -70,7 +70,7 @@ def _handle_domain_error(error: DomainException, context: dict[str, Any]) -> Non
     console.print(Panel(user_message, border_style="red", title="Domain Error"))
 
 
-def _handle_application_error(error: ApplicationException, context: dict[str, Any]) -> None:
+def _handle_application_error(error: ApplicationError, context: dict[str, Any]) -> None:
     """Handle application exceptions with user-friendly messages."""
     message = error.message if hasattr(error, "message") else str(error)
     cause = error.cause if hasattr(error, "cause") else None

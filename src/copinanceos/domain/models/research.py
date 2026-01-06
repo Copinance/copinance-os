@@ -36,7 +36,7 @@ class Research(Entity):
     status: ResearchStatus = Field(
         default=ResearchStatus.PENDING, description="Current research status"
     )
-    workflow_type: str = Field(..., description="Type of workflow (static or agentic)")
+    workflow_type: str = Field(..., description="Type of workflow (stock, macro, or agent)")
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Research parameters and configuration"
     )

@@ -9,6 +9,7 @@ from copinanceos.domain.models.research import Research
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.domain.ports.data_providers import (
     FundamentalDataProvider,
+    MacroeconomicDataProvider,
     MarketDataProvider,
 )
 from copinanceos.domain.ports.tools import Tool
@@ -16,6 +17,7 @@ from copinanceos.infrastructure.analyzers.llm.resources import PromptManager
 from copinanceos.infrastructure.tools import (
     create_fundamental_data_tools,
     create_fundamental_data_tools_with_providers,
+    create_macro_regime_indicators_tool,
     create_market_data_tools,
     create_market_regime_tools,
 )
@@ -38,12 +40,13 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         self,
         llm_analyzer: LLMAnalyzer | None = None,
         market_data_provider: MarketDataProvider | None = None,
+        macro_data_provider: MacroeconomicDataProvider | None = None,
         fundamental_data_provider: FundamentalDataProvider | None = None,
         sec_filings_provider: FundamentalDataProvider | None = None,
         prompt_manager: PromptManager | None = None,
         cache_manager: Any | None = None,  # CacheManager type, avoiding circular import
     ) -> None:
-        """Initialize agentic workflow executor.
+        """Initialize agent workflow executor.
 
         Args:
             llm_analyzer: Optional LLM analyzer. If None, executor will work without LLM.
@@ -57,6 +60,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         """
         self._llm_analyzer = llm_analyzer
         self._market_data_provider = market_data_provider
+        self._macro_data_provider = macro_data_provider
         self._fundamental_data_provider = fundamental_data_provider
         self._sec_filings_provider = sec_filings_provider
         self._prompt_manager = prompt_manager or PromptManager()
@@ -66,7 +70,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         self, research: Research, context: dict[str, Any]
     ) -> dict[str, Any]:
         """
-        Execute an agentic workflow using LLM with tools.
+        Execute an agent workflow using LLM with tools.
 
         This executor uses LLM analyzers with data provider tools to perform
         dynamic AI-powered analysis. The LLM can fetch real-time data and
@@ -92,7 +96,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         if self._llm_analyzer is None:
             results["status"] = "failed"
             results["error"] = "LLM analyzer not configured"
-            results["message"] = "LLM analyzer is required for agentic workflows"
+            results["message"] = "LLM analyzer is required for agent workflows"
             logger.warning("Agentic workflow executed without LLM analyzer")
             return results
 
@@ -137,10 +141,18 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
             indicators_tool = create_market_regime_indicators_tool(self._market_data_provider)
             tools.append(indicators_tool)
 
+            # Add macro regime indicators tool (rates/credit/commodities) if configured
+            if self._macro_data_provider:
+                macro_tool = create_macro_regime_indicators_tool(
+                    self._macro_data_provider, self._market_data_provider
+                )
+                tools.append(macro_tool)
+
             logger.debug(
                 "Added market regime detection tools and indicators",
                 regime_tools_count=len(regime_tools),
                 indicators_tool=True,
+                macro_tool=bool(self._macro_data_provider),
             )
 
         if self._fundamental_data_provider:
@@ -172,8 +184,8 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         if not tools:
             results["status"] = "failed"
             results["error"] = "No data providers configured"
-            results["message"] = "At least one data provider is required for agentic workflows"
-            logger.warning("No tools available for agentic workflow")
+            results["message"] = "At least one data provider is required for agent workflows"
+            logger.warning("No tools available for agent workflow")
             return results
 
         # Validate that question is provided
@@ -182,7 +194,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
             results["status"] = "failed"
             results["error"] = "Question is required"
             results["message"] = (
-                f"A question is required for agentic workflows. What is your question about {symbol}?"
+                f"A question is required for agent workflows. What is your question about {symbol}?"
             )
             logger.warning("Agentic workflow executed without question", symbol=symbol)
             return results
@@ -245,11 +257,11 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
 
     async def validate(self, research: Research) -> bool:
         """Validate if this executor can handle the given research."""
-        return research.workflow_type == "agentic"
+        return research.workflow_type == "agent"
 
     def get_workflow_type(self) -> str:
         """Get the workflow type identifier."""
-        return "agentic"
+        return "agent"
 
     def _build_tool_descriptions(self, tools: list[Tool], symbol: str) -> tuple[str, str]:
         """Build tool descriptions and examples for prompts.

@@ -65,8 +65,9 @@ from typing import Any
 import pandas as pd  # type: ignore[import-untyped]
 import structlog
 
+from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MarketDataProvider
-from copinanceos.domain.ports.tools import Tool, ToolResult, ToolSchema
+from copinanceos.domain.ports.tools import Tool, ToolSchema
 from copinanceos.infrastructure.tools.analysis.market_regime.base import (
     _calculate_log_returns,
     _calculate_moving_average,

@@ -133,23 +133,23 @@ class TestLLMProviderFactory:
         """Test getting provider for workflow with mapping configured."""
         llm_config = LLMConfig(
             provider="gemini",
-            workflow_providers={"static": "ollama", "agentic": "gemini"},
+            workflow_providers={"stock": "ollama", "agent": "gemini"},
         )
-        result = LLMProviderFactory.get_provider_for_workflow("static", llm_config=llm_config)
+        result = LLMProviderFactory.get_provider_for_workflow("stock", llm_config=llm_config)
 
         assert result == "ollama"
 
     def test_get_provider_for_workflow_without_mapping(self) -> None:
         """Test getting provider for workflow without mapping."""
         llm_config = LLMConfig(provider="gemini")
-        result = LLMProviderFactory.get_provider_for_workflow("static", llm_config=llm_config)
+        result = LLMProviderFactory.get_provider_for_workflow("stock", llm_config=llm_config)
 
         assert result == "gemini"
 
     def test_get_provider_for_workflow_with_default_provider(self) -> None:
         """Test getting provider for workflow with default_provider parameter."""
         result = LLMProviderFactory.get_provider_for_workflow(
-            "static", llm_config=None, default_provider="ollama"
+            "stock", llm_config=None, default_provider="ollama"
         )
 
         assert result == "ollama"
@@ -176,7 +176,7 @@ class TestLLMProviderFactory:
     def test_get_provider_for_workflow_uses_default_when_none(self) -> None:
         """Test that get_provider_for_workflow uses default when llm_config is None."""
         result = LLMProviderFactory.get_provider_for_workflow(
-            "static", llm_config=None, default_provider="gemini"
+            "stock", llm_config=None, default_provider="gemini"
         )
 
         assert result == "gemini"
@@ -185,10 +185,10 @@ class TestLLMProviderFactory:
         """Test that workflow mapping takes precedence over default."""
         llm_config = LLMConfig(
             provider="gemini",
-            workflow_providers={"static": "ollama"},
+            workflow_providers={"stock": "ollama"},
         )
         result = LLMProviderFactory.get_provider_for_workflow(
-            "static", llm_config=llm_config, default_provider="gemini"
+            "stock", llm_config=llm_config, default_provider="gemini"
         )
 
         assert result == "ollama"

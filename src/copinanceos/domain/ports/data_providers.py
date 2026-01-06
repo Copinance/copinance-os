@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from copinanceos.domain.models.fundamentals import StockFundamentals
+from copinanceos.domain.models.macro import MacroDataPoint
 from copinanceos.domain.models.stock import StockData
 
 
@@ -199,37 +200,26 @@ class FundamentalDataProvider(DataProvider):
 
 
 class MacroeconomicDataProvider(DataProvider):
-    """Interface for macroeconomic data providers."""
+    """Interface for macroeconomic time-series data providers (e.g., FRED)."""
 
     @abstractmethod
-    async def get_central_bank_policy(
+    async def get_time_series(
         self,
-        country: str,
-    ) -> dict[str, Any]:
-        """Get central bank policy data."""
-        pass
-
-    @abstractmethod
-    async def get_geopolitical_risk_index(
-        self,
-        regions: list[str],
-    ) -> dict[str, Any]:
-        """Get geopolitical risk indices."""
-        pass
-
-    @abstractmethod
-    async def get_industry_indicators(
-        self,
-        industry: str,
-    ) -> dict[str, Any]:
-        """Get industry-specific economic indicators."""
-        pass
-
-    @abstractmethod
-    async def get_economic_calendar(
-        self,
+        series_id: str,
         start_date: datetime,
         end_date: datetime,
-    ) -> list[dict[str, Any]]:
-        """Get economic event calendar."""
-        pass
+        *,
+        frequency: str | None = None,
+    ) -> list[MacroDataPoint]:
+        """Get a macroeconomic time series as ordered date/value points.
+
+        Args:
+            series_id: Provider-specific series identifier (e.g., FRED series id like "DGS10")
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            frequency: Optional provider-specific frequency override (e.g., "d", "w", "m")
+
+        Returns:
+            Ordered list of MacroDataPoint values. Missing/invalid points may be omitted.
+        """
+        raise NotImplementedError

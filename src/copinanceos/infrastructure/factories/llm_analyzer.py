@@ -63,7 +63,7 @@ class LLMAnalyzerFactory:
         """Create LLM analyzer for a specific workflow type.
 
         Args:
-            workflow_type: Type of workflow (e.g., "static", "agentic")
+            workflow_type: Type of workflow (e.g., "agent")
             llm_config: LLM configuration. If None, defaults will be used.
 
         Returns:

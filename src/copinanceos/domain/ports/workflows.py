@@ -7,7 +7,7 @@ from copinanceos.domain.models.research import Research
 
 
 class WorkflowExecutor(ABC):
-    """Abstract interface for workflow execution (static or agentic)."""
+    """Abstract interface for workflow execution (stock, macro, or agent)."""
 
     @abstractmethod
     async def execute(self, research: Research, context: dict[str, Any]) -> dict[str, Any]:

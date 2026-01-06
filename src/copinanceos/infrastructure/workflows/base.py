@@ -86,13 +86,33 @@ class BaseWorkflowExecutor(WorkflowExecutor):
             # Execute workflow-specific logic
             workflow_results = await self._execute_workflow(research, context)
 
-            # Merge workflow results into common structure
-            results.update(workflow_results)
+            # Handle both dictionary and Pydantic model returns
+            if hasattr(workflow_results, "model_dump"):
+                # Pydantic model - convert to dict and merge
+                workflow_dict = workflow_results.model_dump()
+                results.update(workflow_dict)
+            else:
+                # Dictionary - merge directly
+                results.update(workflow_results)
+
+            # Allow workflows to post-process the result (e.g., remove irrelevant fields)
+            if hasattr(self, "_post_process_result"):
+                results = self._post_process_result(results)
 
             # Ensure status is set
             if "status" not in results:
                 results["status"] = "completed"
-            if "message" not in results:
+                # Add message for newly set status
+                if "message" not in results:
+                    results["message"] = (
+                        f"{workflow_type.capitalize()} workflow executed successfully"
+                    )
+            elif results.get("status") is None:
+                # If workflow explicitly set status to None, don't add message
+                # This allows workflows to return clean output without status/message
+                pass
+            elif "message" not in results:
+                # Only add message if status is not None
                 results["message"] = f"{workflow_type.capitalize()} workflow executed successfully"
 
             # Log successful completion

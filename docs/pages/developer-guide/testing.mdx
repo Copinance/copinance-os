@@ -48,7 +48,7 @@ def test_research_creation():
     research = Research(
         stock_symbol="AAPL",
         timeframe=ResearchTimeframe.MID_TERM,
-        workflow_type="static"
+        workflow_type="stock"
     )
     assert research.status == ResearchStatus.PENDING
 ```

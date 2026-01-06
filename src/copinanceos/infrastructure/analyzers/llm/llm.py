@@ -75,7 +75,7 @@ class GeminiLLMAnalyzer(LLMAnalyzerImpl):
             api_key: Gemini API key. Required for cloud usage.
             model_name: Gemini model to use (default: "gemini-1.5-pro")
                        Options: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
-                       All support function calling for agentic workflows
+                       All support function calling for agent workflows
             temperature: Default temperature for generation (0.0-1.0)
             max_output_tokens: Default max output tokens. If None, uses provider default.
 

@@ -37,14 +37,19 @@ class Container(containers.DeclarativeContainer):
         )
         container = get_container(llm_config=llm_config)
 
+    To provide your own FRED API key (for library integrators):
+        container = get_container(fred_api_key="your-fred-api-key")
+
     Or override after creation:
         container = Container()
         container.llm_config.override(llm_config)
+        container.fred_api_key_config.override("your-fred-api-key")
     """
 
     # Configuration
     config = providers.Configuration()
     llm_config = providers.Configuration()
+    fred_api_key_config = providers.Configuration()
 
     # Storage backend (singleton, configured from settings)
     storage_backend = configure_storage()
@@ -63,9 +68,14 @@ class Container(containers.DeclarativeContainer):
     profile_management_service = _services_config["profile_management_service"]
 
     # Data providers (singletons, can be overridden)
+    # fred_api_key_config is optional - if not provided, configure_data_providers will use settings
     _data_providers_config = providers.Callable(
         configure_data_providers,
         llm_config=llm_config,
+        fred_api_key=providers.Callable(
+            lambda key: key if key else None,
+            key=fred_api_key_config.provided,
+        ),
     )
     market_data_provider = providers.Callable(
         lambda config: config["market_data_provider"](),
@@ -77,6 +87,10 @@ class Container(containers.DeclarativeContainer):
     )
     sec_filings_provider = providers.Callable(
         lambda config: config["sec_filings_provider"](),
+        config=_data_providers_config,
+    )
+    macro_data_provider = providers.Callable(
+        lambda config: config["macro_data_provider"](),
         config=_data_providers_config,
     )
     cache_manager = providers.Callable(
@@ -102,6 +116,7 @@ class Container(containers.DeclarativeContainer):
         market_data_provider=market_data_provider,
         fundamental_data_provider=fundamental_data_provider,
         sec_filings_provider=sec_filings_provider,
+        macro_data_provider=macro_data_provider,
         cache_manager=cache_manager,
         profile_management_service=profile_management_service,
         llm_config=llm_config,
@@ -172,12 +187,19 @@ class Container(containers.DeclarativeContainer):
 _container: Container | None = None
 
 
-def get_container(llm_config: LLMConfig | None = None, load_from_env: bool = True) -> Container:
+def get_container(
+    llm_config: LLMConfig | None = None,
+    fred_api_key: str | None = None,
+    load_from_env: bool = True,
+) -> Container:
     """Get the global dependency injection container.
 
     Args:
         llm_config: Optional LLM configuration. If None and load_from_env is True,
                    will attempt to load from environment variables.
+        fred_api_key: Optional FRED API key. If None, uses COPINANCEOS_FRED_API_KEY from
+                     settings (for CLI users). Library integrators should pass their own
+                     API key here.
         load_from_env: If True and llm_config is None, attempt to load LLM config
                       from environment variables (for CLI backward compatibility).
 
@@ -185,7 +207,9 @@ def get_container(llm_config: LLMConfig | None = None, load_from_env: bool = Tru
         Container instance
     """
     global _container
-    if _container is None:
+    # For library integrators, always create a new container if fred_api_key is provided
+    # (to allow different API keys per instance)
+    if _container is None or fred_api_key is not None:
         container_instance = Container()
 
         # Load LLM config if not provided
@@ -195,7 +219,15 @@ def get_container(llm_config: LLMConfig | None = None, load_from_env: bool = Tru
         if llm_config is not None:
             container_instance.llm_config.override(llm_config)
 
-        _container = container_instance
+        # Override FRED API key if provided (for library integrators)
+        if fred_api_key is not None:
+            container_instance.fred_api_key_config.override(fred_api_key)
+
+        if _container is None:
+            _container = container_instance
+        else:
+            # Return new instance for library integrators with custom API key
+            return container_instance
     return _container
 
 
