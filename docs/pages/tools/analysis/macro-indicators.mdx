@@ -1,0 +1,424 @@
+# Comprehensive Macro Economic Indicators
+
+The macro economic indicators tool provides institutional-grade economic analysis across 9 comprehensive categories, supporting informed investment decision-making with 47+ economic indicators.
+
+## Overview
+
+Macro economic indicators are critical for understanding the broader economic environment that impacts all investments. This tool provides comprehensive coverage of economic data from labor markets to global indicators, with intelligent fallbacks from FRED to yfinance when primary data sources are unavailable.
+
+## Key Features
+
+- **47+ Economic Indicators** across 9 categories
+- **Smart Data Fallbacks**: FRED primary → yfinance secondary
+- **Automated Interpretation**: Economic condition analysis and signals
+- **Comprehensive Coverage**: Institutional-grade economic data
+- **Real-time Updates**: Latest available economic releases
+
+## Economic Categories
+
+### 1. Interest Rates & Yield Curve 📈
+
+Analyzes the term structure of interest rates and yield curve dynamics.
+
+**Indicators:**
+- Treasury yields: 10Y (DGS10), 2Y (DGS2), 3M (DGS3MO)
+- Real yields: 10Y Real (DFII10)
+- Inflation expectations: 10Y Breakeven (T10YIE)
+- Yield spreads: 10Y-2Y (T10Y2Y), 10Y-3M (T10Y3M)
+
+**Interpretation:**
+- **Yield Curve Inversions**: 10Y-2Y spread < 0 signals recession risk
+- **Trend Analysis**: Rising/falling/stable rate environments
+- **Duration Pressure**: Market expectations of future rate changes
+
+**Example Output:**
+```json
+{
+  "available": true,
+  "source": "fred",
+  "interpretation": {
+    "10y2y_spread_current": 0.7,
+    "yield_curve_inverted": false,
+    "recession_risk": "low",
+    "yield_curve_signal": "flattening"
+  }
+}
+```
+
+### 2. Credit Spreads & Risk Premiums 💰
+
+Measures credit market conditions and risk appetite.
+
+**Indicators:**
+- High-yield spreads: HY OAS (BAMLH0A0HYM2)
+- Investment grade spreads: IG OAS (BAMLC0A0CM)
+- Credit quality differential analysis
+
+**Interpretation:**
+- **Risk Appetite**: Tightening spreads indicate risk-on environment
+- **Credit Quality Valuation**: HY vs IG spread differentials
+- **Market Stress**: Elevated spreads signal economic uncertainty
+
+### 3. Commodities & Energy 🛢️
+
+Tracks commodity prices and energy market trends.
+
+**Indicators:**
+- WTI Crude Oil Spot (DCOILWTICO)
+- Energy price momentum and trend analysis
+
+**Interpretation:**
+- **Energy Impulse**: Cooling/heating/flat energy trends
+- **Price Momentum**: 20-day percentage changes
+- **Economic Activity**: Energy prices as leading indicators
+
+### 4. Labor Market Indicators 👷
+
+Comprehensive labor market analysis.
+
+**Indicators:**
+- Unemployment Rate (UNRATE)
+- Non-Farm Payrolls (PAYEMS)
+- JOLTS Data: Openings (JTSJOL), Hires (JTSHIR), Separations (JTSTSR), Quits (JTSQUR)
+
+**Interpretation:**
+- **Labor Tightness**: Unemployment levels and market conditions
+- **Employment Trends**: Payroll growth analysis
+- **Labor Market Health**: Comprehensive labor condition assessment
+
+### 5. Housing Market Data 🏠
+
+Residential real estate market analysis.
+
+**Indicators:**
+- New Home Sales (HSN1F)
+- Existing Home Sales (EXHOSLUSM495S)
+- Case-Shiller Indices: 20-city (CSUSHPISA), 10-city (SPCS10RSA)
+- FHFA House Price Index (USSTHPI)
+- Housing Starts (HOUST) & Building Permits (PERMIT)
+
+**Interpretation:**
+- **Home Price Trends**: 3-month appreciation rates
+- **Housing Demand**: Sales volume analysis
+- **Market Momentum**: Strong/moderate/flat/declining assessments
+
+### 6. Manufacturing Activity 🏭
+
+Industrial and manufacturing sector analysis.
+
+**Indicators:**
+- Industrial Production (INDPRO)
+- Capacity Utilization (TCU)
+- Manufacturing IP (IPMAN)
+- Durable Goods Orders (NEWORDER)
+- Factory Orders (AMTMTI)
+
+**Interpretation:**
+- **Manufacturing Capacity**: Near-full/normal/underutilized
+- **Production Trends**: Industrial activity momentum
+- **Order Flow**: Durable goods and factory order analysis
+
+### 7. Consumer Spending & Confidence 🛒
+
+Household spending and sentiment analysis.
+
+**Indicators:**
+- Retail Sales (RRSFS) with month-over-month changes
+- Consumer Confidence (UMCSENT)
+- Personal Consumption (PCEC), Income (PI), Saving Rate (PSAVERT)
+- Real PCE (PCEC96)
+
+**Interpretation:**
+- **Consumer Sentiment**: Optimistic/neutral/pessimistic
+- **Spending Trends**: Retail sales momentum
+- **Household Health**: Income, consumption, and savings analysis
+
+### 8. Global Market Indicators 🌍
+
+International markets and currency analysis.
+
+**Indicators:**
+- FX Rates: EUR/USD (EURUSD=X), USD/JPY (JPY=X), GBP/USD (GBPUSD=X), etc.
+- Emerging Market ETFs: VWO, EEM
+- Cross-currency analysis
+
+**Interpretation:**
+- **USD Strength**: Weakening/steady/strengthening vs major currencies
+- **Global Risk Appetite**: EM ETF performance
+- **Currency Trends**: Major currency pair analysis
+
+### 9. Advanced Economic Indicators 📊
+
+Forward-looking and specialized economic data.
+
+**Indicators:**
+- Federal Reserve Balance Sheet (WALCL)
+- Leading Economic Index (USSLIND)
+- CDS Spread Proxies (HYG/LQD ETF spreads)
+
+**Interpretation:**
+- **Monetary Policy**: Fed balance sheet size trends ($ trillions)
+- **Economic Leading Indicators**: LEI trend analysis
+- **Credit Risk**: CDS spread proxy analysis
+
+## Usage
+
+### CLI Usage
+
+```bash
+# Full macro analysis with all categories
+copinance research macro
+
+# Custom analysis with specific categories
+copinance research macro \
+  --include-labor \
+  --include-housing \
+  --include-manufacturing \
+  --include-consumer \
+  --include-global \
+  --include-advanced \
+  --lookback-days 90
+
+# Focus on specific economic areas
+copinance research macro \
+  --include-rates \
+  --include-credit \
+  --include-commodities \
+  --no-include-labor \
+  --no-include-housing \
+  --no-include-manufacturing \
+  --no-include-consumer \
+  --no-include-global \
+  --no-include-advanced
+```
+
+### Programmatic Usage
+
+```python
+from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
+    create_macro_regime_indicators_tool,
+)
+from copinanceos.infrastructure.data_providers import FredMacroeconomicProvider, YFinanceMarketProvider
+
+# Create providers
+fred_provider = FredMacroeconomicProvider(api_key="your-fred-key")
+yfinance_provider = YFinanceMarketProvider()
+
+# Create tool
+macro_tool = create_macro_regime_indicators_tool(fred_provider, yfinance_provider)
+
+# Get comprehensive macro analysis
+result = await macro_tool.execute(
+    lookback_days=90,
+    include_rates=True,
+    include_credit=True,
+    include_commodities=True,
+    include_labor=True,
+    include_housing=True,
+    include_manufacturing=True,
+    include_consumer=True,
+    include_global=True,
+    include_advanced=True,
+)
+
+# Access results
+rates_data = result.data["rates"]
+labor_data = result.data["labor"]
+housing_data = result.data["housing"]
+# ... etc
+```
+
+### Library Integration
+
+```python
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinanceos.infrastructure.containers import get_container
+
+# Configure LLM (required for agent workflows)
+llm_config = LLMConfig(
+    provider="gemini",
+    api_key="your-api-key",
+    model="gemini-1.5-pro"
+)
+
+# Create container with macro data providers
+container = get_container(
+    llm_config=llm_config,
+    fred_api_key="your-fred-api-key"  # Optional: enables high-quality macro data
+)
+
+# Get macro analysis
+macro_tool = container.get_macro_regime_indicators_tool()
+result = await macro_tool.execute(include_labor=True, include_housing=True)
+```
+
+## Data Sources & Quality
+
+### Primary Data Sources
+- **FRED (Federal Reserve Economic Data)**: High-quality, official economic data
+- **U.S. Treasury**: Official yield curve data
+- **Bureau of Labor Statistics**: Employment and labor market data
+- **Federal Reserve**: Monetary policy and balance sheet data
+
+### Fallback Sources
+- **yfinance**: Free market data for FX rates, ETFs, and proxies
+- **Automatic Switching**: Seamless fallback when FRED unavailable
+
+### Data Quality Features
+- **Official Sources**: Government and central bank data where available
+- **Real-time Updates**: Latest available economic releases
+- **Error Handling**: Robust null value and missing data handling
+- **Validation**: Data integrity checks and error reporting
+
+## Interpretation Guide
+
+### Economic Signals
+
+**Labor Market:**
+- **Tight (< 4.0%)**: Supports rate stability, inflationary pressures
+- **Normal (4.0-5.5%)**: Balanced labor conditions
+- **Loose (> 5.5%)**: Potential economic weakness
+
+**Yield Curve:**
+- **Normal (> 0.5%)**: Healthy economic expansion
+- **Flattening (0.2-0.5%)**: Slowing growth expectations
+- **Inverted (< 0%)**: Recession warning signal
+
+**Consumer Sentiment:**
+- **Optimistic (> 80)**: Strong consumer confidence
+- **Neutral (60-80)**: Moderate economic outlook
+- **Pessimistic (< 60)**: Weak consumer expectations
+
+**Manufacturing Capacity:**
+- **Near Full (> 80%)**: Supply constraints, potential inflation
+- **Normal (75-80%)**: Balanced capacity utilization
+- **Underutilized (< 75%)**: Economic slack, potential weakness
+
+## Configuration
+
+### FRED API Setup (Recommended)
+
+For best results with comprehensive macro indicators:
+
+```bash
+# Set environment variable
+export COPINANCEOS_FRED_API_KEY="your-fred-api-key"
+
+# Or add to .env file
+echo "COPINANCEOS_FRED_API_KEY=your-fred-api-key" >> .env
+```
+
+**FRED API Key Benefits:**
+- Access to 800,000+ economic time series
+- Official government and central bank data
+- Higher data quality and historical depth
+- No rate limits for research use
+
+Get your free API key at: https://fred.stlouisfed.org/docs/api/api_key.html
+
+### Without FRED API
+
+The system automatically falls back to yfinance proxies:
+- Treasury futures for yield curve data
+- ETF spreads for credit analysis
+- Energy ETFs for commodity trends
+- FX rates for global analysis
+
+## Current Economic Snapshot
+
+Based on latest available data:
+
+- **Labor Market**: Tight (4.4% unemployment)
+- **Yield Curve**: Flattening (10Y-2Y: 0.7%)
+- **Consumer Sentiment**: Pessimistic (51.0 index)
+- **Manufacturing**: Normal capacity utilization (76.0%)
+- **USD Strength**: Steady vs EUR
+
+*Data as of most recent economic releases*
+
+## Integration Examples
+
+### FastAPI Web Service
+
+```python
+from fastapi import FastAPI
+from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
+    create_macro_regime_indicators_tool,
+)
+
+app = FastAPI()
+
+@app.get("/api/macro/{category}")
+async def get_macro_data(category: str):
+    # Return specific macro category data
+    result = await macro_tool.execute(**{f"include_{category}": True})
+    return result.data.get(category, {})
+```
+
+### Investment Research Workflow
+
+```python
+# Multi-step investment analysis
+async def comprehensive_research(symbol: str):
+    # 1. Get individual stock analysis
+    stock_analysis = await stock_tool.execute(symbol=symbol)
+    
+    # 2. Get macro economic context
+    macro_analysis = await macro_tool.execute(
+        include_rates=True,
+        include_credit=True,
+        include_labor=True,
+        include_consumer=True
+    )
+    
+    # 3. Combine for investment recommendation
+    return generate_recommendation(stock_analysis, macro_analysis)
+```
+
+## Best Practices
+
+1. **Use FRED API**: Configure FRED API key for highest quality data
+2. **Category Selection**: Enable only needed categories for faster execution
+3. **Lookback Period**: Use 90-252 days for meaningful trend analysis
+4. **Interpretation**: Consider all categories together for comprehensive view
+5. **Regular Monitoring**: Economic conditions change frequently
+6. **Data Validation**: Check `available` and `error` fields for data quality
+
+## Troubleshooting
+
+### Common Issues
+
+**"No data points" errors:**
+- Check FRED API key configuration
+- Verify date ranges (some series have limited history)
+- Series may be discontinued
+
+**High latency:**
+- Reduce lookback period
+- Disable unused categories
+- Use cached results when possible
+
+**Missing interpretations:**
+- Check if series have sufficient data points
+- Some interpretations require 20+ data points
+
+### Data Availability
+
+**Monthly vs Daily Data:**
+- Labor/housing/consumer: Monthly releases
+- Rates/commodities: Daily updates
+- Global: Daily FX, weekly/monthly EM data
+
+**Release Schedules:**
+- Employment data: First Friday of month
+- CPI/PCE: Mid-month
+- FOMC meetings: 8 times per year
+- Treasury auctions: Weekly
+
+## See Also
+
+- [Market Regime Detection Tools](market-regime) - Individual stock regime analysis
+- [CLI Reference](../../user-guide/cli) - Command-line usage
+- [Configuration](../../user-guide/configuration) - Setup and configuration
+- [Data Providers](../data-providers) - Available data sources
+- [Workflows](../../user-guide/workflows) - Integration patterns

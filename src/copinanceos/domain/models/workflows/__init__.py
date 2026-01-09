@@ -1,13 +1,19 @@
 """Workflow-specific domain models."""
 
 from copinanceos.domain.models.workflows.macro import (
+    AdvancedData,
     CommoditiesData,
+    ConsumerData,
     CreditData,
+    GlobalData,
+    HousingData,
+    LaborData,
     MacroRegimeIndicatorsData,
     MacroRegimeIndicatorsResult,
     MacroRegimeWorkflowResult,
     MacroSeriesData,
     MacroSeriesMetadata,
+    ManufacturingData,
     RatesData,
 )
 from copinanceos.domain.models.workflows.market_regime import (
@@ -37,6 +43,12 @@ __all__ = [
     "RatesData",
     "CreditData",
     "CommoditiesData",
+    "LaborData",
+    "HousingData",
+    "ManufacturingData",
+    "ConsumerData",
+    "GlobalData",
+    "AdvancedData",
     # Market regime models
     "MarketRegimeIndicatorsResult",
     "MarketRegimeIndicatorsData",

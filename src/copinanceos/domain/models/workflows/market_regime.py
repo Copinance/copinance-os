@@ -36,6 +36,21 @@ class SectorDetail(BaseModel):
     )
     sector_return_pct: float = Field(..., description="Sector return percentage")
     market_return_pct: float = Field(..., description="Market return percentage")
+    return_1d: float | None = Field(None, description="1-day return percentage")
+    return_5d: float | None = Field(None, description="5-day return percentage")
+    return_120d: float | None = Field(None, description="120-day return percentage")
+    return_ytd: float | None = Field(None, description="Year-to-date return percentage")
+    price_above_200ma: bool | None = Field(
+        None, description="Whether sector is above its 200-day MA"
+    )
+    rsi_14d: float | None = Field(None, description="14-day Relative Strength Index (0-100)")
+    volatility_20d: float | None = Field(
+        None, description="20-day volatility (annualized percentage)"
+    )
+    market_cap: int | None = Field(None, description="Market capitalization in USD")
+    market_cap_rank: int | None = Field(
+        None, description="Market cap rank among all sectors (1 = largest)"
+    )
 
 
 class MarketBreadthData(BaseModel):
@@ -48,9 +63,9 @@ class MarketBreadthData(BaseModel):
     participation_ratio: float | None = Field(
         None, description="Percentage of sectors outperforming the market"
     )
-    sectors_above_50ma: int = Field(..., description="Count of sectors above their 50-day MA")
-    sectors_outperforming: int = Field(..., description="Count of sectors outperforming the market")
-    total_sectors_analyzed: int = Field(..., description="Total number of sectors analyzed")
+    sectors_above_50ma: int = Field(0, description="Count of sectors above their 50-day MA")
+    sectors_outperforming: int = Field(0, description="Count of sectors outperforming the market")
+    total_sectors_analyzed: int = Field(0, description="Total number of sectors analyzed")
     regime: Literal["strong", "moderate", "weak"] | None = Field(
         None, description="Breadth regime classification"
     )
@@ -88,10 +103,10 @@ class SectorRotationData(BaseModel):
         default_factory=list, description="All sectors sorted by momentum score (highest first)"
     )
     market_return_20d: float = Field(
-        ..., description="Market return over last 20 days (percentage)"
+        0.0, description="Market return over last 20 days (percentage)"
     )
     market_return_60d: float = Field(
-        ..., description="Market return over last 60 days (percentage)"
+        0.0, description="Market return over last 60 days (percentage)"
     )
 
 
@@ -126,7 +141,7 @@ class AnalysisMetadata(BaseModel):
 class MarketTrendData(BaseModel):
     """Market trend detection result data."""
 
-    regime: Literal["bull", "bear", "sideways"] = Field(..., description="Detected trend regime")
+    regime: Literal["bull", "bear", "neutral"] = Field(..., description="Detected trend regime")
     confidence: Literal["high", "medium", "low"] | float = Field(
         ..., description="Confidence level in the detection"
     )

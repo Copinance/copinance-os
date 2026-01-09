@@ -223,11 +223,20 @@ copinance research macro --lookback-days 504   # 2 years
 Enable or disable specific indicators:
 
 ```bash
-# Only macro indicators (rates, credit, commodities)
+# Only macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
 copinance research macro \
   --no-include-vix \
   --no-include-market-breadth \
   --no-include-sector-rotation
+
+# Advanced economic analysis (include all categories)
+copinance research macro \
+  --include-labor \
+  --include-housing \
+  --include-manufacturing \
+  --include-consumer \
+  --include-global \
+  --include-advanced
 
 # Only market regime indicators
 copinance research macro \

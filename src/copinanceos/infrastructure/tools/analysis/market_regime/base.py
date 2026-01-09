@@ -68,6 +68,53 @@ def _calculate_log_returns(prices: list[float]) -> list[float]:
     return [float(val) if pd.notna(val) else 0.0 for val in log_returns[1:]]
 
 
+def _calculate_rsi(prices: list[float], period: int = 14) -> float | None:
+    """Calculate Relative Strength Index (RSI) using pandas.
+
+    RSI is a momentum oscillator that measures the speed and magnitude of price changes.
+    Values range from 0 to 100:
+    - RSI > 70: Overbought (potential sell signal)
+    - RSI < 30: Oversold (potential buy signal)
+
+    Implementation follows Wilder's smoothing method (Wilder, 1978).
+
+    Args:
+        prices: List of prices (most recent last)
+        period: RSI period (default: 14)
+
+    Returns:
+        RSI value (0-100) or None if insufficient data
+    """
+    if len(prices) < period + 1:
+        return None
+
+    # Calculate price changes
+    price_series = pd.Series(prices)
+    price_changes = price_series.diff()
+
+    # Separate gains and losses
+    gains = price_changes.where(price_changes > 0, 0.0)
+    losses = -price_changes.where(price_changes < 0, 0.0)
+
+    # Calculate average gain and loss using Wilder's smoothing
+    # First average is simple average
+    avg_gain = gains.rolling(window=period, min_periods=period).mean().iloc[-1]
+    avg_loss = losses.rolling(window=period, min_periods=period).mean().iloc[-1]
+
+    if pd.isna(avg_gain) or pd.isna(avg_loss):
+        return None
+
+    # Avoid division by zero
+    if avg_loss == 0:
+        return 100.0
+
+    # Calculate RS (Relative Strength) and RSI
+    rs = avg_gain / avg_loss
+    rsi = 100.0 - (100.0 / (1.0 + rs))
+
+    return float(rsi)
+
+
 class BaseRegimeDetectionTool(Tool, ABC):
     """Base class for market regime detection tools.
 

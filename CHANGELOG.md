@@ -46,3 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Market cycle detection tool using Wyckoff methodology (accumulation/markup/distribution/markdown phases)
   - Extensible architecture supporting multiple detection methods (rule-based, statistical)
   - Market regime indicators tool providing VIX (volatility index), market breadth analysis, and sector rotation signals
+- **Comprehensive Macro Economic Indicators** (47+ indicators across 9 categories):
+  - **Interest Rates & Yield Curve**: 10Y, 2Y, 3M Treasury yields, real yields, breakeven inflation, yield spreads with recession risk analysis
+  - **Credit Spreads & Risk Premiums**: High-yield/investment grade OAS spreads, HY-IG differential for credit quality valuation
+  - **Labor Market**: Unemployment rate, non-farm payrolls, JOLTS openings/hires/separations/quits with market tightness assessment
+  - **Housing Market**: New/existing home sales, Case-Shiller indices, FHFA house prices, housing starts/permits
+  - **Manufacturing**: Industrial production, capacity utilization, durable goods orders, factory inventories with capacity analysis
+  - **Consumer Spending**: Retail sales, consumer confidence, personal income/consumption/saving rate with sentiment analysis
+  - **Global Indicators**: EUR/USD, USD/JPY, GBP/USD, USD/CHF, AUD/USD, USD/CAD FX rates, emerging market ETFs with USD strength analysis
+  - **Advanced Indicators**: Federal Reserve balance sheet, CDS spread proxies, Leading Economic Index (LEI) with trend analysis
+  - **Smart Fallbacks**: FRED primary data with yfinance proxies for global/advanced indicators when FRED unavailable

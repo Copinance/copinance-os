@@ -16,9 +16,10 @@ class MacroSeriesData(BaseModel):
     latest: dict[str, Any] | None = Field(
         None, description="Latest data point with timestamp and value"
     )
-    data_points: int = Field(..., description="Number of data points available")
+    data_points: int = Field(default=0, description="Number of data points available")
     change_20d: float | None = Field(None, description="20-day change")
     unit: str | None = Field(None, description="Data unit (e.g., 'percent', 'usd_per_barrel')")
+    error: str | None = Field(None, description="Error message if data is not available")
 
 
 class MacroSeriesMetadata(BaseModel):
@@ -69,12 +70,102 @@ class CommoditiesData(BaseModel):
     metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
 
 
+class LaborData(BaseModel):
+    """Labor market analysis data."""
+
+    available: bool = Field(..., description="Whether labor data is available")
+    source: str = Field(..., description="Data source (e.g., 'fred', 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual labor series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
+class HousingData(BaseModel):
+    """Housing market analysis data."""
+
+    available: bool = Field(..., description="Whether housing data is available")
+    source: str = Field(..., description="Data source (e.g., 'fred', 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual housing series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
+class ManufacturingData(BaseModel):
+    """Manufacturing analysis data."""
+
+    available: bool = Field(..., description="Whether manufacturing data is available")
+    source: str = Field(..., description="Data source (e.g., 'fred', 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual manufacturing series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
+class ConsumerData(BaseModel):
+    """Consumer analysis data."""
+
+    available: bool = Field(..., description="Whether consumer data is available")
+    source: str = Field(..., description="Data source (e.g., 'fred', 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual consumer series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
+class GlobalData(BaseModel):
+    """Global market analysis data."""
+
+    available: bool = Field(..., description="Whether global data is available")
+    source: str = Field(..., description="Data source (e.g., 'fred', 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual global series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
+class AdvancedData(BaseModel):
+    """Advanced economic indicators data."""
+
+    available: bool = Field(..., description="Whether advanced data is available")
+    source: str = Field(..., description="Data source (e.g., 'fred', 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual advanced series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
 class MacroRegimeIndicatorsData(BaseModel):
     """Complete macro regime indicators data structure."""
 
     rates: RatesData | None = Field(None, description="Interest rates analysis")
     credit: CreditData | None = Field(None, description="Credit spreads analysis")
     commodities: CommoditiesData | None = Field(None, description="Commodities analysis")
+    labor: LaborData | None = Field(None, description="Labor market analysis")
+    housing: HousingData | None = Field(None, description="Housing market analysis")
+    manufacturing: ManufacturingData | None = Field(None, description="Manufacturing analysis")
+    consumer: ConsumerData | None = Field(None, description="Consumer analysis")
+    global_data: GlobalData | None = Field(None, description="Global market analysis")
+    advanced: AdvancedData | None = Field(None, description="Advanced economic indicators")
 
 
 # Import ToolResult from the tool results

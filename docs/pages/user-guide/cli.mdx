@@ -286,11 +286,20 @@ copinance research macro -d 180
 You can enable/disable specific indicators:
 
 ```bash
-# Only macro indicators (rates, credit, commodities)
+# Only macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
 copinance research macro \
   --no-include-vix \
   --no-include-market-breadth \
   --no-include-sector-rotation
+
+# Advanced economic analysis (include all categories)
+copinance research macro \
+  --include-labor \
+  --include-housing \
+  --include-manufacturing \
+  --include-consumer \
+  --include-global \
+  --include-advanced
 
 # Only market regime indicators (VIX, breadth, sectors)
 copinance research macro \
@@ -354,7 +363,7 @@ The command creates a research entry, executes the workflow, and displays:
 - Macro indicators (rates, credit spreads, commodities)
 - Combined analysis results
 
-**Note:** For best results with macro indicators (rates, credit, commodities), configure `COPINANCEOS_FRED_API_KEY` in your `.env` file. The workflow will automatically use FRED for true yields/spreads and fall back to yfinance proxies if FRED is unavailable. See [Configuration](configuration#fred-api-setup) for setup instructions.
+**Note:** For best results with comprehensive macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced), configure `COPINANCEOS_FRED_API_KEY` in your `.env` file. The workflow automatically uses FRED for high-quality economic data and falls back to yfinance proxies when FRED is unavailable. See [Configuration](configuration#fred-api-setup) for setup instructions.
 
 ## Cache Commands
 

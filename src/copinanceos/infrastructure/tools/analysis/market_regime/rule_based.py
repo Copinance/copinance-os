@@ -310,6 +310,10 @@ class MarketRegimeDetectTrendTool(Tool):
                         "description": "Long-term moving average period (days)",
                         "default": 200,
                     },
+                    "historical_data": {
+                        "type": "array",
+                        "description": "Optional pre-fetched historical data. If provided, tool will use this instead of fetching.",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -327,17 +331,19 @@ class MarketRegimeDetectTrendTool(Tool):
             lookback_days = validated.get("lookback_days", 200)
             short_ma = validated.get("short_ma_period", 50)
             long_ma = validated.get("long_ma_period", 200)
+            historical_data = validated.get("historical_data")
 
-            # Get historical data
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=lookback_days)
+            # Use pre-fetched data if provided, otherwise fetch
+            if historical_data is None:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=lookback_days)
 
-            historical_data = await self._provider.get_historical_data(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                interval="1d",
-            )
+                historical_data = await self._provider.get_historical_data(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval="1d",
+                )
 
             if not historical_data:
                 return ToolResult(
@@ -601,6 +607,10 @@ class MarketRegimeDetectVolatilityTool(Tool):
                         "description": "Window size for volatility calculation (days)",
                         "default": 20,
                     },
+                    "historical_data": {
+                        "type": "array",
+                        "description": "Optional pre-fetched historical data. If provided, tool will use this instead of fetching.",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -617,17 +627,19 @@ class MarketRegimeDetectVolatilityTool(Tool):
             symbol = validated["symbol"].upper()
             lookback_days = validated.get("lookback_days", 252)
             vol_window = validated.get("volatility_window", 20)
+            historical_data = validated.get("historical_data")
 
-            # Get historical data
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=lookback_days)
+            # Use pre-fetched data if provided, otherwise fetch
+            if historical_data is None:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=lookback_days)
 
-            historical_data = await self._provider.get_historical_data(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                interval="1d",
-            )
+                historical_data = await self._provider.get_historical_data(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval="1d",
+                )
 
             if not historical_data:
                 return ToolResult(
@@ -788,6 +800,10 @@ class MarketRegimeDetectCyclesTool(Tool):
                         "description": "Number of days to analyze for cycle detection",
                         "default": 252,
                     },
+                    "historical_data": {
+                        "type": "array",
+                        "description": "Optional pre-fetched historical data. If provided, tool will use this instead of fetching.",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -803,17 +819,19 @@ class MarketRegimeDetectCyclesTool(Tool):
             validated = self.validate_parameters(**kwargs)
             symbol = validated["symbol"].upper()
             lookback_days = validated.get("lookback_days", 252)
+            historical_data = validated.get("historical_data")
 
-            # Get historical data
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=lookback_days)
+            # Use pre-fetched data if provided, otherwise fetch
+            if historical_data is None:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=lookback_days)
 
-            historical_data = await self._provider.get_historical_data(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                interval="1d",
-            )
+                historical_data = await self._provider.get_historical_data(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval="1d",
+                )
 
             if not historical_data:
                 return ToolResult(

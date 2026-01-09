@@ -7,7 +7,7 @@ This workflow is intentionally non-LLM and returns a combined payload containing
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -15,13 +15,19 @@ import structlog
 from copinanceos.domain.models.research import Research
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.models.workflows import (
+    AdvancedData,
     AnalysisMetadata,
     CommoditiesData,
+    ConsumerData,
     CreditData,
+    GlobalData,
+    HousingData,
+    LaborData,
     MacroRegimeIndicatorsData,
     MacroRegimeIndicatorsResult,
     MacroRegimeWorkflowResult,
     MacroSeriesMetadata,
+    ManufacturingData,
     MarketCyclesData,
     MarketRegimeDetectionResult,
     MarketRegimeIndicatorsData,
@@ -78,6 +84,12 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         include_rates = bool(context.get("include_rates", True))
         include_credit = bool(context.get("include_credit", True))
         include_commodities = bool(context.get("include_commodities", True))
+        include_labor = bool(context.get("include_labor", True))
+        include_housing = bool(context.get("include_housing", True))
+        include_manufacturing = bool(context.get("include_manufacturing", True))
+        include_consumer = bool(context.get("include_consumer", True))
+        include_global = bool(context.get("include_global", True))
+        include_advanced = bool(context.get("include_advanced", True))
 
         # Market regime indicators (VIX, breadth, rotation)
         market_indicators_tool = create_market_regime_indicators_tool(self._market_data_provider)
@@ -106,13 +118,37 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         )
 
         # Rule-based regime detections (trend/vol/cycles) on the chosen market index
+        # Fetch market data once and reuse for all regime detection tools to avoid duplicate API calls
+        end_date = datetime.now(UTC)
+        start_date = end_date - timedelta(days=lookback_days)
+        regime_historical_data = None
+
+        try:
+            regime_historical_data = await self._market_data_provider.get_historical_data(
+                symbol=market_index,
+                start_date=start_date,
+                end_date=end_date,
+                interval="1d",
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch market data for regime detection tools",
+                market_index=market_index,
+                error=str(e),
+            )
+
         regime_tools = create_market_regime_tools(self._market_data_provider)
         regime_detection_data: dict[str, ToolResult] = {}
 
         for tool in regime_tools:
             tool_name = tool.get_name()
             try:
-                tool_result = await tool.execute(symbol=market_index, lookback_days=lookback_days)
+                # Pass pre-fetched data to avoid duplicate API calls
+                tool_result = await tool.execute(
+                    symbol=market_index,
+                    lookback_days=lookback_days,
+                    historical_data=regime_historical_data,
+                )
                 regime_detection_data[tool_name] = ToolResult(
                     success=tool_result.success,
                     data=tool_result.data,
@@ -219,6 +255,12 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
             include_rates=include_rates,
             include_credit=include_credit,
             include_commodities=include_commodities,
+            include_labor=include_labor,
+            include_housing=include_housing,
+            include_manufacturing=include_manufacturing,
+            include_consumer=include_consumer,
+            include_global=include_global,
+            include_advanced=include_advanced,
         )
 
         # Construct typed macro regime indicators result
@@ -241,6 +283,38 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
                 commodities=(
                     CommoditiesData(**macro_result.data.get("commodities", {}), metadata=metadata)
                     if macro_result.data.get("commodities")
+                    else None
+                ),
+                labor=(
+                    LaborData(**macro_result.data.get("labor", {}), metadata=metadata)
+                    if macro_result.data.get("labor")
+                    else None
+                ),
+                housing=(
+                    HousingData(**macro_result.data.get("housing", {}), metadata=metadata)
+                    if macro_result.data.get("housing")
+                    else None
+                ),
+                manufacturing=(
+                    ManufacturingData(
+                        **macro_result.data.get("manufacturing", {}), metadata=metadata
+                    )
+                    if macro_result.data.get("manufacturing")
+                    else None
+                ),
+                consumer=(
+                    ConsumerData(**macro_result.data.get("consumer", {}), metadata=metadata)
+                    if macro_result.data.get("consumer")
+                    else None
+                ),
+                global_data=(
+                    GlobalData(**macro_result.data.get("global", {}), metadata=metadata)
+                    if macro_result.data.get("global")
+                    else None
+                ),
+                advanced=(
+                    AdvancedData(**macro_result.data.get("advanced", {}), metadata=metadata)
+                    if macro_result.data.get("advanced")
                     else None
                 ),
             )

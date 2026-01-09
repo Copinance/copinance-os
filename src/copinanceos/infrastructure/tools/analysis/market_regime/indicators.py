@@ -8,7 +8,8 @@ This module provides tools for fetching comprehensive market regime indicators i
 All data sources are free and use existing yfinance provider.
 """
 
-from datetime import datetime, timedelta
+import asyncio
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -18,6 +19,10 @@ from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.tools import Tool, ToolSchema
 from copinanceos.infrastructure.tools.analysis.market_regime.base import (
     _calculate_moving_average,
+    _calculate_rsi,
+)
+from copinanceos.infrastructure.tools.analysis.market_regime.rule_based import (
+    _calculate_volatility,
 )
 
 logger = structlog.get_logger(__name__)
@@ -122,10 +127,12 @@ class MarketRegimeIndicatorsTool(Tool):
             include_sector_rotation = validated.get("include_sector_rotation", True)
 
             # Calculate date range
+            # Add extra buffer to ensure we have enough data for 200-day MA calculation
+            # 252 trading days + 60 buffer = ~312 calendar days to account for weekends/holidays
             end_date = datetime.now()
             start_date = end_date - timedelta(
-                days=lookback_days + 30
-            )  # Add buffer for weekends/holidays
+                days=lookback_days + 60
+            )  # Increased buffer for weekends/holidays and to ensure 200+ trading days
 
             results: dict[str, Any] = {
                 "market_index": market_index,
@@ -176,6 +183,7 @@ class MarketRegimeIndicatorsTool(Tool):
                     logger.warning("Failed to fetch VIX data", error=str(e))
                     results["vix"] = {
                         "available": False,
+                        "data_points": 0,
                         "error": f"Failed to fetch VIX data: {str(e)}",
                     }
 
@@ -204,6 +212,8 @@ class MarketRegimeIndicatorsTool(Tool):
                     logger.warning("Failed to calculate sector rotation", error=str(e))
                     results["sector_rotation"] = {
                         "available": False,
+                        "market_return_20d": 0.0,
+                        "market_return_60d": 0.0,
                         "error": f"Failed to calculate sector rotation: {str(e)}",
                     }
 
@@ -248,6 +258,7 @@ class MarketRegimeIndicatorsTool(Tool):
             if not vix_data_list:
                 return {
                     "available": False,
+                    "data_points": 0,
                     "error": "No VIX data available",
                 }
 
@@ -257,6 +268,7 @@ class MarketRegimeIndicatorsTool(Tool):
             if not vix_prices:
                 return {
                     "available": False,
+                    "data_points": 0,
                     "error": "No valid VIX price data",
                 }
 
@@ -299,6 +311,7 @@ class MarketRegimeIndicatorsTool(Tool):
             logger.warning("Failed to fetch VIX data", error=str(e))
             return {
                 "available": False,
+                "data_points": 0,
                 "error": str(e),
             }
 
@@ -334,6 +347,9 @@ class MarketRegimeIndicatorsTool(Tool):
             if not market_data:
                 return {
                     "available": False,
+                    "sectors_above_50ma": 0,
+                    "sectors_outperforming": 0,
+                    "total_sectors_analyzed": 0,
                     "error": f"No data available for {market_index}",
                 }
 
@@ -342,6 +358,9 @@ class MarketRegimeIndicatorsTool(Tool):
             if len(market_prices) < 20:
                 return {
                     "available": False,
+                    "sectors_above_50ma": 0,
+                    "sectors_outperforming": 0,
+                    "total_sectors_analyzed": 0,
                     "error": "Insufficient market data for breadth calculation",
                 }
 
@@ -356,6 +375,15 @@ class MarketRegimeIndicatorsTool(Tool):
             sectors_above_ma = 0
             sectors_above_market = 0
             total_sectors = 0
+
+            # Get current date for YTD calculation
+            # Use UTC to ensure timezone consistency with StockData timestamps
+            current_date = datetime.now(UTC)
+            year_start_date = datetime(current_date.year, 1, 1, tzinfo=UTC)
+
+            # First pass: collect all sector data and market caps
+            sector_data_dict: dict[str, dict[str, Any]] = {}
+            market_caps: dict[str, int | None] = {}
 
             for sector_symbol, sector_name in SECTOR_ETFS.items():
                 try:
@@ -374,15 +402,172 @@ class MarketRegimeIndicatorsTool(Tool):
                         float(d.close_price) for d in sector_data if d.close_price is not None
                     ]
 
-                    if len(sector_prices) < 50:
+                    if (
+                        len(sector_prices) < 50
+                    ):  # Need at least 50 days for 50-day MA (minimum requirement)
                         continue
 
-                    # Calculate sector metrics
-                    sector_ma_50 = _calculate_moving_average(sector_prices, 50)
+                    # Fetch market cap from quote with retry logic
+                    # Some ETFs (like XLC, XLRE) may have intermittent API issues
+                    market_cap = None
+                    max_retries = 2
+                    for attempt in range(max_retries):
+                        try:
+                            quote = await self._provider.get_quote(sector_symbol)
+                            market_cap = quote.get("market_cap")
+                            if market_cap:
+                                market_caps[sector_symbol] = int(market_cap)
+                                break
+                            else:
+                                # If quote succeeded but market_cap is None, try alternative calculation
+                                # For ETFs, we can estimate from current price and shares outstanding
+                                current_price = quote.get("current_price")
+                                if current_price and hasattr(current_price, "__float__"):
+                                    # Try to get shares outstanding from quote if available
+                                    # Note: This is a fallback - yfinance may not provide this for all ETFs
+                                    logger.debug(
+                                        "Market cap not available in quote, attempting alternative",
+                                        sector=sector_symbol,
+                                    )
+                                market_caps[sector_symbol] = None
+                                break
+                        except Exception as e:
+                            if attempt < max_retries - 1:
+                                # Wait a bit before retry (exponential backoff)
+                                await asyncio.sleep(0.5 * (attempt + 1))
+                                logger.debug(
+                                    "Retrying market cap fetch",
+                                    sector=sector_symbol,
+                                    attempt=attempt + 1,
+                                    error=str(e),
+                                )
+                            else:
+                                logger.debug(
+                                    "Failed to fetch market cap for sector after retries",
+                                    sector=sector_symbol,
+                                    error=str(e),
+                                )
+                                market_caps[sector_symbol] = None
+
+                    # Store sector data for processing
+                    sector_data_dict[sector_symbol] = {
+                        "name": sector_name,
+                        "prices": sector_prices,
+                        "data": sector_data,
+                    }
+
+                except Exception as e:
+                    logger.debug(
+                        "Failed to fetch sector data",
+                        sector=sector_symbol,
+                        error=str(e),
+                    )
+                    continue
+
+            # Calculate market cap ranks
+            # Sort sectors by market cap (largest first), assign ranks
+            sorted_sectors_by_cap = sorted(
+                [
+                    (symbol, cap)
+                    for symbol, cap in market_caps.items()
+                    if cap is not None and symbol in sector_data_dict
+                ],
+                key=lambda x: x[1],
+                reverse=True,
+            )
+            market_cap_ranks: dict[str, int] = {}
+            for rank, (symbol, _) in enumerate(sorted_sectors_by_cap, start=1):
+                market_cap_ranks[symbol] = rank
+
+            # Second pass: calculate all metrics for each sector
+            for sector_symbol, sector_info in sector_data_dict.items():
+                try:
+                    sector_name = sector_info["name"]
+                    sector_prices = sector_info["prices"]
+                    sector_data = sector_info["data"]
+
                     current_sector_price = sector_prices[-1]
-                    current_sector_ma = (
+
+                    # Calculate moving averages
+                    sector_ma_50 = _calculate_moving_average(sector_prices, 50)
+                    # Only calculate 200-day MA if we have enough data
+                    sector_ma_200 = (
+                        _calculate_moving_average(sector_prices, 200)
+                        if len(sector_prices) >= 200
+                        else [None] * len(sector_prices)
+                    )
+                    current_sector_ma_50 = (
                         sector_ma_50[-1] if sector_ma_50[-1] is not None else current_sector_price
                     )
+                    current_sector_ma_200 = (
+                        sector_ma_200[-1] if sector_ma_200[-1] is not None else None
+                    )
+
+                    # Calculate returns for different periods
+                    return_1d = None
+                    return_5d = None
+                    return_120d = None
+                    return_ytd = None
+
+                    if len(sector_prices) >= 2:
+                        return_1d = (
+                            (sector_prices[-1] - sector_prices[-2]) / sector_prices[-2] * 100
+                            if sector_prices[-2] > 0
+                            else None
+                        )
+                    if len(sector_prices) >= 6:
+                        return_5d = (
+                            (sector_prices[-1] - sector_prices[-6]) / sector_prices[-6] * 100
+                            if sector_prices[-6] > 0
+                            else None
+                        )
+                    if len(sector_prices) >= 121:
+                        return_120d = (
+                            (sector_prices[-1] - sector_prices[-121]) / sector_prices[-121] * 100
+                            if sector_prices[-121] > 0
+                            else None
+                        )
+
+                    # Calculate YTD return
+                    # Find the price closest to year start
+                    if sector_data:
+                        # Find the first data point on or after year start
+                        # Normalize timestamps for comparison (handle both timezone-aware and naive)
+                        def normalize_datetime(dt: datetime) -> datetime:
+                            """Normalize datetime to UTC-aware for comparison."""
+                            if dt.tzinfo is None:
+                                # If naive, assume UTC
+                                return dt.replace(tzinfo=UTC)
+                            # If aware, convert to UTC
+                            return dt.astimezone(UTC)
+
+                        normalized_year_start = normalize_datetime(year_start_date)
+                        year_start_prices = [
+                            (d.timestamp, float(d.close_price))
+                            for d in sector_data
+                            if d.close_price is not None
+                            and normalize_datetime(d.timestamp) >= normalized_year_start
+                        ]
+                        if year_start_prices:
+                            # Get the earliest price in the year
+                            year_start_prices.sort(key=lambda x: x[0])
+                            ytd_start_price = year_start_prices[0][1]
+                            return_ytd = (
+                                (current_sector_price - ytd_start_price) / ytd_start_price * 100
+                                if ytd_start_price > 0
+                                else None
+                            )
+
+                    # Calculate RSI
+                    rsi_14d = _calculate_rsi(sector_prices, period=14)
+
+                    # Calculate volatility (20-day)
+                    volatility_list = _calculate_volatility(sector_prices, window=20)
+                    volatility_20d = (
+                        volatility_list[-1] * 100
+                        if volatility_list and volatility_list[-1] is not None
+                        else None
+                    )  # Convert to percentage
 
                     # Calculate performance vs. market
                     market_return = (
@@ -399,7 +584,14 @@ class MarketRegimeIndicatorsTool(Tool):
 
                     # Check if above MA
                     above_ma = (
-                        current_sector_price > current_sector_ma if current_sector_ma else False
+                        current_sector_price > current_sector_ma_50
+                        if current_sector_ma_50
+                        else False
+                    )
+                    above_200ma = (
+                        current_sector_price > current_sector_ma_200
+                        if current_sector_ma_200 is not None
+                        else None
                     )
                     above_market = relative_performance > 0
 
@@ -417,11 +609,22 @@ class MarketRegimeIndicatorsTool(Tool):
                         "relative_performance_pct": round(relative_performance, 2),
                         "sector_return_pct": round(sector_return, 2),
                         "market_return_pct": round(market_return, 2),
+                        "return_1d": round(return_1d, 2) if return_1d is not None else None,
+                        "return_5d": round(return_5d, 2) if return_5d is not None else None,
+                        "return_120d": round(return_120d, 2) if return_120d is not None else None,
+                        "return_ytd": round(return_ytd, 2) if return_ytd is not None else None,
+                        "price_above_200ma": above_200ma,
+                        "rsi_14d": round(rsi_14d, 2) if rsi_14d is not None else None,
+                        "volatility_20d": (
+                            round(volatility_20d, 2) if volatility_20d is not None else None
+                        ),
+                        "market_cap": market_caps.get(sector_symbol),
+                        "market_cap_rank": market_cap_ranks.get(sector_symbol),
                     }
 
                 except Exception as e:
                     logger.debug(
-                        "Failed to fetch sector data",
+                        "Failed to calculate sector metrics",
                         sector=sector_symbol,
                         error=str(e),
                     )
@@ -430,6 +633,9 @@ class MarketRegimeIndicatorsTool(Tool):
             if total_sectors == 0:
                 return {
                     "available": False,
+                    "sectors_above_50ma": 0,
+                    "sectors_outperforming": 0,
+                    "total_sectors_analyzed": 0,
                     "error": "No sector data available for breadth calculation",
                 }
 
@@ -463,6 +669,9 @@ class MarketRegimeIndicatorsTool(Tool):
             logger.warning("Failed to calculate market breadth", error=str(e))
             return {
                 "available": False,
+                "sectors_above_50ma": 0,
+                "sectors_outperforming": 0,
+                "total_sectors_analyzed": 0,
                 "error": str(e),
             }
 
@@ -500,6 +709,8 @@ class MarketRegimeIndicatorsTool(Tool):
             if not market_data:
                 return {
                     "available": False,
+                    "market_return_20d": 0.0,
+                    "market_return_60d": 0.0,
                     "error": f"No data available for {market_index}",
                 }
 
@@ -508,6 +719,8 @@ class MarketRegimeIndicatorsTool(Tool):
             if len(market_prices) < 20:
                 return {
                     "available": False,
+                    "market_return_20d": 0.0,
+                    "market_return_60d": 0.0,
                     "error": "Insufficient market data for rotation calculation",
                 }
 
@@ -592,6 +805,8 @@ class MarketRegimeIndicatorsTool(Tool):
             if not sector_momentum:
                 return {
                     "available": False,
+                    "market_return_20d": 0.0,
+                    "market_return_60d": 0.0,
                     "error": "No sector data available for rotation calculation",
                 }
 
@@ -640,6 +855,8 @@ class MarketRegimeIndicatorsTool(Tool):
             logger.warning("Failed to calculate sector rotation", error=str(e))
             return {
                 "available": False,
+                "market_return_20d": 0.0,
+                "market_return_60d": 0.0,
                 "error": str(e),
             }
 

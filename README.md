@@ -9,12 +9,13 @@
 
 Open-source stock research platform and framework with agent AI and stock/macro workflows.
 
-**Read [Manifesto](MANIFESTO.md)** to understand our vision for democratizing financial research.
+**Read [Manifesto](MANIFESTO.md)** to understand my vision for democratizing financial research.
 
 ## Features
 
 - **Adaptive Presentation**: Results can be tailored to financial literacy level (beginner, intermediate, advanced)
 - **Dual Workflow Support**: Deterministic stock/macro analysis and AI-powered agent workflows
+- **Comprehensive Macro Analysis**: 47+ economic indicators across 9 categories (rates, credit, labor, housing, manufacturing, consumer, global, advanced)
 - **Extensible Framework**: Easy to add new research strategies and data sources
 - **Data Provider Integration**: Built-in yfinance and SEC EDGAR support + easy custom provider integration
 - **Multiple LLM Providers**: Support for Gemini and Ollama (local LLMs) with extensible provider architecture
@@ -129,9 +130,10 @@ python -m copinanceos.cli research create AAPL --profile-id <profile-id>
 python -m copinanceos.cli research run AAPL --workflow stock
 python -m copinanceos.cli research set-context <research-id> --profile-id <profile-id>
 
-# Macro regime analysis
+# Macro regime analysis (comprehensive economic indicators)
 copinance research macro
 copinance research macro --market-index QQQ --lookback-days 180
+copinance research macro --include-labor --include-housing --include-consumer
 copinance research macro --no-include-vix --no-include-market-breadth
 ```
 
@@ -187,7 +189,7 @@ pre-commit run --all-files
 
 ## Documentation
 
-- **[Manifesto](MANIFESTO.md)** - Our vision and philosophy
+- **[Manifesto](MANIFESTO.md)** - My vision and philosophy
 - **[Documentation](https://copinance.github.io/copinance-os/)** - Complete documentation (hosted on GitHub Pages)
   - [Getting Started](https://copinance.github.io/copinance-os/getting-started/installation/) - Installation and quick start
   - [User Guide](https://copinance.github.io/copinance-os/user-guide/cli/) - CLI reference and workflows
@@ -260,7 +262,7 @@ See [Configuration Guide](https://copinance.github.io/copinance-os/user-guide/co
 
 ## Contributing
 
-We welcome contributions! Read our [Manifesto](MANIFESTO.md) to understand our philosophy, then see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Read my [Manifesto](MANIFESTO.md) to understand my philosophy, then see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 **Ways to Contribute:**
 - 🐛 Report bugs and issues
@@ -272,7 +274,7 @@ We welcome contributions! Read our [Manifesto](MANIFESTO.md) to understand our p
 
 **Community Guidelines:**
 - [Contributing](CONTRIBUTING.md) - How to contribute
-- [Code of Conduct](CODE_OF_CONDUCT.md) - Our standards for community behavior
+- [Code of Conduct](CODE_OF_CONDUCT.md) - My standards for community behavior
 - [Governance](GOVERNANCE.md) - How we make decisions
 
 ## License

@@ -79,7 +79,7 @@ copinance profile create --literacy intermediate --name "My Profile"
 ### Use Profile in Research
 
 ```bash
-copinance research run AAPL --workflow stock --profile-id <profile-id>
+copinance research run AAPL --workflow stock --profile-id \<profile-id\>
 ```
 
 Or simply use your current profile (set with `profile set-current`).
@@ -121,20 +121,29 @@ copinance research macro
 # Custom index and lookback period
 copinance research macro --market-index QQQ --lookback-days 180
 
-# Only macro indicators (rates, credit, commodities)
+# Only macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
 copinance research macro \
   --no-include-vix \
   --no-include-market-breadth \
   --no-include-sector-rotation
+
+# Advanced macro analysis (include all economic indicators)
+copinance research macro \
+  --include-labor \
+  --include-housing \
+  --include-manufacturing \
+  --include-consumer \
+  --include-global \
+  --include-advanced
 ```
 
 See [Workflows](../user-guide/workflows#macro-regime-workflow) for all customization options.
 
 # Execute existing research
-copinance research execute <research-id>
+copinance research execute \<research-id\>
 
 # View research results
-copinance research get <research-id>
+copinance research get \<research-id\>
 ```
 
 **Why separate commands?** `create` lets you prepare research tasks in advance or batch process multiple stocks. `execute` allows re-running the same research with different contexts or questions. `run` is a convenience for quick analysis. See [CLI Reference](../user-guide/cli) for details.
