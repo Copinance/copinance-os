@@ -14,7 +14,6 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 from copinanceos.domain.ports.data_providers import FundamentalDataProvider
 from copinanceos.domain.ports.repositories import (
     ResearchProfileRepository,
-    ResearchRepository,
     StockRepository,
 )
 from copinanceos.domain.ports.storage import Storage
@@ -23,7 +22,6 @@ from copinanceos.infrastructure.data_providers.yfinance import (
 )
 from copinanceos.infrastructure.repositories import (
     ResearchProfileRepositoryImpl,
-    ResearchRepositoryImpl,
     StockRepositoryImpl,
 )
 from copinanceos.infrastructure.repositories.storage.factory import create_storage
@@ -48,12 +46,6 @@ def profile_repository(isolated_storage: Storage) -> ResearchProfileRepository:
 def stock_repository(isolated_storage: Storage) -> StockRepository:
     """Provide a clean stock repository for testing."""
     return StockRepositoryImpl(storage=isolated_storage)
-
-
-@pytest.fixture
-def research_repository(isolated_storage: Storage) -> ResearchRepository:
-    """Provide a clean research repository for testing."""
-    return ResearchRepositoryImpl(storage=isolated_storage)
 
 
 @pytest.fixture

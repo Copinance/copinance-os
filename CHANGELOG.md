@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING**: Refactored LLM configuration to use `LLMConfig` dataclass instead of reading from environment variables. Library integrators must now provide `LLMConfig` directly when creating containers. CLI usage remains backward compatible via environment variables.
+- CLI now exposes `analyze` and `ask` commands instead of `research`; profile and workflow execution wired through workflow use case and job model.
+- Updated developer guide, user guide, and tools documentation to describe workflow-based analysis and current CLI usage.
 - Enhanced CONTRIBUTING.md with commit message template reference, pull request template guidance, and comprehensive "Adding New Tools" section
 - Rewrote MANIFESTO.md for improved clarity, structure, and messaging around the project's mission and vision
 - Updated README.md section headers to remove emoji formatting for consistency
@@ -21,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `analyze` CLI command for running predefined analysis workflows (e.g. fundamentals, macro regime).
+- `ask` CLI command for agentic analysis with custom questions and dynamic tool use.
+- Workflow use case and `Job` domain model for tracking workflow execution (e.g. pending, in_progress, completed, failed).
+- Profile context support for passing the current research profile into workflow execution.
 - `LLMConfig` dataclass for programmatic LLM configuration (provider, API keys, model, temperature, etc.)
 - `load_llm_config_from_env()` helper function for backward compatibility with CLI environment variable configuration
 - Hexagonal architecture with 21+ extension interfaces for data providers, analyzers, strategies, and workflows
@@ -36,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Market data tools for quotes and historical prices
 - Fundamental data tools for financial statements, metrics, and SEC filings
 - Intelligent caching system with local file backend to reduce API calls
-- CLI interface with research, profile, stock, and cache management commands
+- CLI interface with analyze, ask, profile, stock, and cache management commands
 - Interactive profile creation prompts for personalized analysis
 - Comprehensive test suite with unit and integration tests
 - Complete documentation with Nextra deployed to GitHub Pages
@@ -56,3 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Global Indicators**: EUR/USD, USD/JPY, GBP/USD, USD/CHF, AUD/USD, USD/CAD FX rates, emerging market ETFs with USD strength analysis
   - **Advanced Indicators**: Federal Reserve balance sheet, CDS spread proxies, Leading Economic Index (LEI) with trend analysis
   - **Smart Fallbacks**: FRED primary data with yfinance proxies for global/advanced indicators when FRED unavailable
+
+### Removed
+
+- `research` CLI command and research subcommands (replaced by `analyze` and `ask`).
+- Research use case, domain models, and research repository (superseded by workflow use case and job model).

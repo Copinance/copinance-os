@@ -2,7 +2,7 @@
 
 Get started with Copinance OS in 5 minutes.
 
-## Your First Research
+## Your First Analysis
 
 ### 1. Search for a Stock
 
@@ -15,7 +15,7 @@ This will show you matching stocks with their symbols.
 ### 2. Run a Static Workflow
 
 ```bash
-copinance research run AAPL --workflow stock
+copinance analyze stock AAPL --timeframe mid_term
 ```
 
 This performs a comprehensive stock workflow with:
@@ -53,18 +53,18 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 ### 3. Ask a Question
 
 ```bash
-copinance research ask AAPL "What is the current price and P/E ratio?"
+copinance ask "What is the current price and P/E ratio?" --symbol AAPL
 ```
 
 The AI will analyze the stock and answer your question using available data.
 
 ## Working with Profiles
 
-Profiles let you customize research output based on your financial literacy level.
+Profiles let you customize analysis output based on your financial literacy level.
 
 ### Automatic Profile Prompting
 
-When you run research commands without a profile, the system will automatically prompt you to set your financial literacy level for more personalized analysis results. You can:
+When you run `analyze` or `ask` without a profile, the system will automatically prompt you to set your financial literacy level for more personalized results. You can:
 - Choose to create a profile with your literacy level (beginner, intermediate, or advanced)
 - Decline and continue with default settings
 
@@ -76,10 +76,10 @@ You can also create a profile manually:
 copinance profile create --literacy intermediate --name "My Profile"
 ```
 
-### Use Profile in Research
+### Use Profile in Analysis
 
 ```bash
-copinance research run AAPL --workflow stock --profile-id \<profile-id\>
+copinance analyze stock AAPL --profile-id <profile-id>
 ```
 
 Or simply use your current profile (set with `profile set-current`).
@@ -89,26 +89,15 @@ Or simply use your current profile (set with `profile set-current`).
 ### Quick Analysis
 ```bash
 # Static workflow (no API key needed)
-copinance research run AAPL --workflow stock
+copinance analyze stock AAPL --timeframe mid_term
 
 # Agentic workflow (requires API key)
-copinance research ask AAPL "Analyze this stock for me"
+copinance ask "Analyze this stock for me" --symbol AAPL
 ```
 
-### Research Management
+### Data and Cache
 
-Copinance OS provides three commands for research:
-
-- **`run`** - Quick one-off analysis (creates and executes in one command)
-- **`create`** - Create research task for later execution
-- **`execute`** - Execute existing research (can be run multiple times)
-
-```bash
-# Quick analysis (creates and executes)
-copinance research run AAPL --workflow stock
-
-# Create research for later
-copinance research create AAPL --workflow stock
+All CLI data (profiles, cache, stock search, and workflow results in `.copinance/results/`) is stored under the `.copinance` folder. Use `copinance cache info` to see cache location and `copinance cache clear` to clear cached data.
 
 ## Macro Regime Dashboard
 
@@ -116,37 +105,21 @@ Get a comprehensive view of market conditions and macroeconomic indicators:
 
 ```bash
 # Full analysis with defaults (SPY, 252 days, all indicators)
-copinance research macro
+copinance analyze macro
 
 # Custom index and lookback period
-copinance research macro --market-index QQQ --lookback-days 180
+copinance analyze macro --market-index QQQ --lookback-days 180
 
-# Only macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
-copinance research macro \
+# Macro-only: exclude market/volatility/sector (VIX, breadth, sector rotation) to focus on economic indicators
+copinance analyze macro \
   --no-include-vix \
   --no-include-market-breadth \
   --no-include-sector-rotation
 
-# Advanced macro analysis (include all economic indicators)
-copinance research macro \
-  --include-labor \
-  --include-housing \
-  --include-manufacturing \
-  --include-consumer \
-  --include-global \
-  --include-advanced
+# All indicator groups are on by default. Use --no-include-<name> to exclude any (e.g. --no-include-vix). See Workflows for the full list.
 ```
 
 See [Workflows](../user-guide/workflows#macro-regime-workflow) for all customization options.
-
-# Execute existing research
-copinance research execute \<research-id\>
-
-# View research results
-copinance research get \<research-id\>
-```
-
-**Why separate commands?** `create` lets you prepare research tasks in advance or batch process multiple stocks. `execute` allows re-running the same research with different contexts or questions. `run` is a convenience for quick analysis. See [CLI Reference](../user-guide/cli) for details.
 
 ## Next Steps
 

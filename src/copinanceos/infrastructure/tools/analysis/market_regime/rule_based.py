@@ -1017,7 +1017,3 @@ def create_rule_based_regime_tools(
         MarketRegimeDetectVolatilityTool(market_data_provider),
         MarketRegimeDetectCyclesTool(market_data_provider),
     ]
-
-
-# Backward compatibility alias
-create_market_regime_tools = create_rule_based_regime_tools

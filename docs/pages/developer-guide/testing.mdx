@@ -42,15 +42,16 @@ Test individual components in isolation:
 
 ```python
 import pytest
-from copinanceos.domain.models.research import Research, ResearchStatus
+from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
 
-def test_research_creation():
-    research = Research(
+def test_job_creation():
+    job = Job(
+        scope=JobScope.STOCK,
         stock_symbol="AAPL",
-        timeframe=ResearchTimeframe.MID_TERM,
-        workflow_type="stock"
+        timeframe=JobTimeframe.MID_TERM,
+        workflow_type="stock",
     )
-    assert research.status == ResearchStatus.PENDING
+    assert job.status == JobStatus.PENDING
 ```
 
 ### Integration Tests
@@ -59,18 +60,23 @@ Test component interactions:
 
 ```python
 import pytest
-from copinanceos.infrastructure.repositories import ResearchRepositoryImpl
+from copinanceos.infrastructure.repositories import StockRepositoryImpl
+from copinanceos.domain.models.stock import Stock
 
 @pytest.mark.integration
-async def test_research_repository_save_and_get(isolated_storage):
-    repo = ResearchRepositoryImpl(storage=isolated_storage)
-    research = Research(stock_symbol="AAPL", ...)
+async def test_stock_repository_save_and_get(isolated_storage):
+    repo = StockRepositoryImpl(storage=isolated_storage)
+    stock = Stock(
+        symbol="AAPL",
+        name="Apple Inc.",
+        exchange="NASDAQ",
+    )
 
-    saved = await repo.save(research)
-    retrieved = await repo.get_by_id(saved.id)
+    saved = await repo.save(stock)
+    retrieved = await repo.get_by_symbol(saved.symbol)
 
     assert retrieved is not None
-    assert retrieved.id == saved.id
+    assert retrieved.symbol == saved.symbol
 ```
 
 ## Test Fixtures
@@ -79,7 +85,6 @@ Common fixtures are available in `tests/conftest.py`:
 
 - `isolated_storage`: Isolated storage for each test
 - `profile_repository`: Profile repository with isolated storage
-- `research_repository`: Research repository with isolated storage
 
 ## Test Markers
 

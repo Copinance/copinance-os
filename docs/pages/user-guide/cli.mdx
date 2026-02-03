@@ -31,9 +31,9 @@ copinance stock search "AAPL" --limit 5
 
 ## Profile Commands
 
-Profiles customize research output based on your financial literacy level.
+Profiles customize analysis output based on your financial literacy level.
 
-**Note:** When you run research commands (`create`, `run`, `execute`, `ask`) without a profile, the system will automatically prompt you to set your financial literacy level for more personalized analysis results.
+**Note:** When you run `analyze` or `ask` without a profile, the system will prompt you to set your financial literacy level for more personalized results.
 
 ### Create Profile
 
@@ -77,132 +77,57 @@ Set a profile as the current default. Omit the profile ID to clear the current p
 copinance profile delete <profile-id> --force
 ```
 
-## Research Commands
+## Analyze Commands
 
-Copinance OS provides three separate commands for research management: `create`, `execute`, and `run`. Understanding when to use each helps you work more efficiently.
+Run one-off analysis. Results are saved under `.copinance/results/`; profiles and cache live under `.copinance`.
 
-### Why Three Separate Commands?
-
-**`create`** - Creates a research task without executing it
-- **Use when**: You want to prepare research tasks in advance, schedule them, or set up multiple research tasks before running them
-- **Returns**: A research ID that you can use later
-- **Example**: Create research tasks for multiple stocks, then execute them in batch
-
-**`execute`** - Executes an existing research (by ID)
-- **Use when**: You want to re-run existing research, execute research created earlier, or run the same research with different contexts/questions
-- **Allows**: Multiple executions of the same research with different parameters
-- **Example**: Re-analyze a stock with a new question or updated context
-
-**`run`** - Convenience command that creates AND executes in one step
-- **Use when**: You want quick one-off analyses without managing research lifecycle
-- **Best for**: Quick testing, exploratory analysis, or when you don't need to save/reuse the research
-- **Example**: Quick analysis during market hours
-
-### Create Research
-
-Create a new research task without executing it.
+### Analyze a Stock
 
 ```bash
-copinance research create AAPL --workflow stock --timeframe mid_term
+copinance analyze stock AAPL --timeframe mid_term
 ```
 
 **Options:**
-- `--workflow <type>`: `stock`, `macro`, or `agent` (default: `stock`)
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--profile-id <id>`: Profile ID for context (optional)
 
-**Note:** If no profile is provided and you don't have a current profile, you'll be prompted to set your financial literacy level for personalized analysis.
+### Macro + Market Regime
 
-**Use Cases:**
-- Prepare research tasks in advance
-- Create multiple research tasks for batch processing
-- Set up research with specific configurations before execution
-- Schedule research for later execution
-
-### Execute Research
-
-Execute an existing research by ID. Can be called multiple times with different contexts.
+Run the combined macro + market regime workflow to get a comprehensive view of market conditions.
 
 ```bash
-copinance research execute <research-id>
-copinance research execute <research-id> --question "What is the P/E ratio?"
+copinance analyze macro
+copinance analyze macro --market-index QQQ --lookback-days 90
 ```
 
 **Options:**
-- `--question <question>`: Custom question for agent workflows (optional)
+- `--market-index <symbol>`: Anchor market index (`SPY`, `QQQ`, `DIA`, `IWM`) (default: `SPY`)
+- `--lookback-days <days>`: Lookback window (default: `252`)
+- `--include-*` / `--no-include-*`: Toggle indicator groups (VIX, breadth, sectors, rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
 
-**Note:** If the research doesn't have a profile associated, you'll be prompted to set your financial literacy level for personalized analysis.
+## Ask (Agentic)
 
-**Use Cases:**
-- Re-run research with updated data
-- Execute research created earlier
-- Run the same research with different questions/contexts
-- Re-analyze stocks as new data becomes available
+Ask questions using the agent workflow.
 
-### Run Research (Quick)
-
-Create and execute a research workflow in one command. Convenience method for quick analysis.
-
+**Stock-specific:**
 ```bash
-copinance research run AAPL --workflow stock
-copinance research run AAPL --workflow agent --question "Analyze this stock"
+copinance ask "What are the key risks for this stock?" --symbol AAPL
+```
+
+**Market-wide (no symbol):**
+```bash
+copinance ask "What is the current market sentiment and which sectors are leading?"
+copinance ask "What is the current VIX level and market fear sentiment?" --market-index SPY
 ```
 
 **Options:**
-- `--workflow <type>`: `stock`, `macro`, or `agent` (default: `stock`)
-- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
-- `--profile-id <id>`: Profile ID for context (optional)
-- `--question <question>`: Custom question for agent workflows (optional)
-
-**Note:** If no profile is provided and you don't have a current profile, you'll be prompted to set your financial literacy level for personalized analysis.
-
-**Use Cases:**
-- Quick one-off analysis
-- Exploratory research
-- Testing workflows
-- When you don't need to manage research lifecycle
-
-### Get Research
-
-View research details and results.
-
-```bash
-copinance research get <research-id>
-```
-
-### Ask Question (Agentic)
-
-Quick Q&A using agent workflow. Can ask questions about specific stocks or market-wide questions.
-
-**Stock-specific questions:**
-```bash
-copinance research ask "What is the current price and P/E ratio?" --symbol AAPL
-copinance research ask "What are the key risks for this stock?" --symbol TSLA
-```
-
-**Market-wide questions (no symbol needed):**
-```bash
-copinance research ask "What is the current market sentiment and which sectors are leading?"
-copinance research ask "What is the current VIX level and market fear sentiment?"
-```
-
-**Options:**
-- `--symbol <symbol>` or `-s <symbol>`: Stock symbol (optional for market-wide questions)
+- `--symbol <symbol>` / `-s <symbol>`: Stock symbol (omit for market-wide)
+- `--market-index <symbol>` / `-m <symbol>`: Anchor index for market-wide questions (default: `SPY`)
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--profile-id <id>`: Profile ID for context (optional)
 
 **Note:**
 - Requires LLM provider configuration (Gemini API key or Ollama setup) - see [Configuration](configuration)
-- If no profile is provided and you don't have a current profile, you'll be prompted to set your financial literacy level for personalized analysis
-- For market-wide questions, omit the `--symbol` option
-
-### Set Research Context
-
-Associate a profile with research.
-
-```bash
-copinance research set-context <research-id> --profile-id <profile-id>
-```
 
 ## Examples
 
@@ -215,155 +140,9 @@ copinance stock search "Apple"
 # 2. Create a profile
 copinance profile create --literacy intermediate --name "Trader"
 
-# 3. Run research
-copinance research run AAPL --workflow stock --timeframe mid_term
+# 3. Run a stock analysis (one-off)
+copinance analyze stock AAPL --timeframe mid_term
 ```
-
-### Agentic Workflow
-
-```bash
-# Ask a stock-specific question (requires LLM provider configuration)
-copinance research ask "What are the key risks for this stock?" --symbol AAPL
-
-# Market regime analysis for a stock
-copinance research ask "What is the current market trend and volatility regime?" --symbol AAPL
-
-# Market-wide questions (no symbol needed)
-copinance research ask "What is the current market sentiment and which sectors are leading?"
-copinance research ask "What is the current VIX level and market fear sentiment?"
-
-# Combined stock and market analysis
-copinance research ask "Analyze this stock's regime and compare it to broader market conditions" --symbol AAPL
-```
-
-### Research Management
-
-```bash
-# Create research
-copinance research create MSFT --workflow stock
-
-## Macro Regime (Dedicated Command)
-
-Run the combined macro + market regime workflow to get a comprehensive view of market conditions.
-
-### Basic Usage
-
-```bash
-# Full analysis with default settings
-copinance research macro
-```
-
-This runs with:
-- Market index: `SPY` (S&P 500)
-- Lookback period: 252 days (1 trading year)
-- All indicators enabled
-
-### Customization Options
-
-**Market Index:**
-```bash
-# Analyze different market indices
-copinance research macro --market-index QQQ    # Nasdaq 100
-copinance research macro --market-index DIA     # Dow Jones
-copinance research macro --market-index IWM    # Russell 2000
-copinance research macro -m SPY                 # Short form
-```
-
-**Lookback Period:**
-```bash
-# Shorter lookback (3 months)
-copinance research macro --lookback-days 90
-
-# Longer lookback (2 years)
-copinance research macro --lookback-days 504
-
-# Short form
-copinance research macro -d 180
-```
-
-**Indicator Selection:**
-
-You can enable/disable specific indicators:
-
-```bash
-# Only macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
-copinance research macro \
-  --no-include-vix \
-  --no-include-market-breadth \
-  --no-include-sector-rotation
-
-# Advanced economic analysis (include all categories)
-copinance research macro \
-  --include-labor \
-  --include-housing \
-  --include-manufacturing \
-  --include-consumer \
-  --include-global \
-  --include-advanced
-
-# Only market regime indicators (VIX, breadth, sectors)
-copinance research macro \
-  --no-include-rates \
-  --no-include-credit \
-  --no-include-commodities
-
-# Minimal analysis (just rates and credit)
-copinance research macro \
-  --no-include-vix \
-  --no-include-market-breadth \
-  --no-include-sector-rotation \
-  --no-include-commodities
-```
-
-### Available Indicators
-
-**Market Regime Indicators:**
-- `--include-vix` / `--no-include-vix`: VIX (volatility index) - measures market fear/volatility
-- `--include-market-breadth` / `--no-include-market-breadth`: Equity market breadth (advancing/declining stocks)
-- `--include-sector-rotation` / `--no-include-sector-rotation`: Sector rotation analysis
-
-**Macro Indicators:**
-- `--include-rates` / `--no-include-rates`: Interest rates (10Y Treasury, yield curve)
-  - Uses FRED API if `COPINANCEOS_FRED_API_KEY` is configured, otherwise falls back to yfinance
-- `--include-credit` / `--no-include-credit`: Credit spreads (HYG, LQD)
-  - Uses FRED API if `COPINANCEOS_FRED_API_KEY` is configured, otherwise falls back to yfinance
-- `--include-commodities` / `--no-include-commodities`: Commodities/energy (oil, natural gas)
-  - Uses FRED API if `COPINANCEOS_FRED_API_KEY` is configured, otherwise falls back to yfinance
-
-### Complete Examples
-
-```bash
-# Quick 3-month analysis on Nasdaq
-copinance research macro --market-index QQQ --lookback-days 90
-
-# Full 2-year analysis on S&P 500
-copinance research macro --market-index SPY --lookback-days 504
-
-# Focus on macro conditions only
-copinance research macro \
-  --market-index SPY \
-  --lookback-days 180 \
-  --no-include-vix \
-  --no-include-market-breadth \
-  --no-include-sector-rotation
-
-# Focus on market regime only
-copinance research macro \
-  --market-index QQQ \
-  --lookback-days 252 \
-  --no-include-rates \
-  --no-include-credit \
-  --no-include-commodities
-```
-
-### Output
-
-The command creates a research entry, executes the workflow, and displays:
-- Market regime indicators (VIX, breadth, sector rotation)
-- Macro indicators (rates, credit spreads, commodities)
-- Combined analysis results
-
-**Note:** For best results with comprehensive macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced), configure `COPINANCEOS_FRED_API_KEY` in your `.env` file. The workflow automatically uses FRED for high-quality economic data and falls back to yfinance proxies when FRED is unavailable. See [Configuration](configuration#fred-api-setup) for setup instructions.
 
 ## Cache Commands
 
@@ -403,13 +182,16 @@ copinance cache info
 
 This shows:
 - Cache backend type
-- Cache directory location
+- Cache directory location (under `.copinance/cache`)
+
+All CLI data (profiles, cache, stock search cache, and workflow results in `.copinance/results/`) is stored under the `.copinance` folder in the current directory (or path set by `COPINANCEOS_STORAGE_PATH`).
 
 ## Getting Help
 
 ```bash
 copinance --help
-copinance research --help
+copinance analyze --help
+copinance ask --help
 copinance profile --help
 copinance cache --help
 ```

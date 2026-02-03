@@ -10,7 +10,7 @@ from copinanceos.application.use_cases.fundamentals import (
     ResearchStockFundamentalsUseCase,
 )
 from copinanceos.application.use_cases.stock import GetStockRequest, GetStockUseCase
-from copinanceos.domain.models.research import Research, ResearchTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
@@ -28,7 +28,7 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
     5. Calculate key metrics and trends
     6. Generate analysis summary
 
-    The workflow adapts to the research timeframe:
+    The workflow adapts to the job timeframe:
     - Short-term: Focus on recent price movements and technical indicators
     - Mid-term: Focus on quarterly fundamentals and price trends
     - Long-term: Focus on annual fundamentals and long-term trends
@@ -45,27 +45,27 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
         Args:
             get_stock_use_case: Use case for getting stock information
             market_data_provider: Provider for market data (quotes, historical)
-            fundamentals_use_case: Use case for researching stock fundamentals
+            fundamentals_use_case: Use case for stock fundamentals
         """
         self._get_stock_use_case = get_stock_use_case
         self._market_data_provider = market_data_provider
         self._fundamentals_use_case = fundamentals_use_case
 
-    async def _execute_workflow(
-        self, research: Research, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _execute_workflow(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """
         Execute a static workflow with predefined analysis steps.
 
         Args:
-            research: The research entity to execute
+            job: The job to execute
             context: Execution context and parameters
 
         Returns:
             Results dictionary containing comprehensive analysis
         """
-        symbol = research.stock_symbol.upper()
-        timeframe = research.timeframe
+        if not job.stock_symbol:
+            raise ValueError("stock_symbol is required for stock workflow execution")
+        symbol = job.stock_symbol.upper()
+        timeframe = job.timeframe
 
         results: dict[str, Any] = {
             "analysis_type": "comprehensive_static",
@@ -151,9 +151,7 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
             logger.warning("Failed to get market quote", symbol=symbol, error=str(e))
             return {"symbol": symbol, "error": str(e)}
 
-    async def _get_historical_data(
-        self, symbol: str, timeframe: ResearchTimeframe
-    ) -> dict[str, Any]:
+    async def _get_historical_data(self, symbol: str, timeframe: JobTimeframe) -> dict[str, Any]:
         """Get historical price data based on timeframe."""
         if not self._market_data_provider:
             logger.warning("MarketDataProvider not available, skipping historical data")
@@ -162,10 +160,10 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
         try:
             # Determine date range based on timeframe
             end_date = datetime.now(UTC)
-            if timeframe == ResearchTimeframe.SHORT_TERM:
+            if timeframe == JobTimeframe.SHORT_TERM:
                 start_date = end_date - timedelta(days=30)  # 30 days
                 interval = "1d"
-            elif timeframe == ResearchTimeframe.MID_TERM:
+            elif timeframe == JobTimeframe.MID_TERM:
                 start_date = end_date - timedelta(days=180)  # 6 months
                 interval = "1d"
             else:  # LONG_TERM
@@ -217,7 +215,7 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
             logger.warning("Failed to get historical data", symbol=symbol, error=str(e))
             return {"symbol": symbol, "error": str(e)}
 
-    async def _get_fundamentals(self, symbol: str, timeframe: ResearchTimeframe) -> dict[str, Any]:
+    async def _get_fundamentals(self, symbol: str, timeframe: JobTimeframe) -> dict[str, Any]:
         """Get fundamental data based on timeframe."""
         if not self._fundamentals_use_case:
             logger.warning("FundamentalsUseCase not available, skipping fundamentals")
@@ -225,10 +223,10 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
 
         try:
             # Determine periods and period type based on timeframe
-            if timeframe == ResearchTimeframe.SHORT_TERM:
+            if timeframe == JobTimeframe.SHORT_TERM:
                 periods = 4  # Last 4 quarters
                 period_type = "quarterly"
-            elif timeframe == ResearchTimeframe.MID_TERM:
+            elif timeframe == JobTimeframe.MID_TERM:
                 periods = 8  # Last 8 quarters (2 years)
                 period_type = "quarterly"
             else:  # LONG_TERM
@@ -525,7 +523,7 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
         quote: dict[str, Any],
         historical_data: dict[str, Any],
         fundamentals: dict[str, Any],
-        timeframe: ResearchTimeframe,
+        timeframe: JobTimeframe,
     ) -> dict[str, Any]:
         """Calculate key metrics and trends."""
         analysis: dict[str, Any] = {
@@ -617,7 +615,7 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
         quote: dict[str, Any],
         fundamentals: dict[str, Any],
         analysis: dict[str, Any],
-        timeframe: ResearchTimeframe,
+        timeframe: JobTimeframe,
     ) -> dict[str, Any]:
         """Generate analysis summary."""
         summary_parts = []
@@ -712,13 +710,15 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
             "analysis_date": datetime.now(UTC).isoformat(),
         }
 
-    async def validate(self, research: Research) -> bool:
-        """Validate if this executor can handle the given research.
+    async def validate(self, job: Job) -> bool:
+        """Validate if this executor can handle the given job.
 
         Supports "stock" workflow type, which includes comprehensive
         fundamentals data along with market data and analysis.
         """
-        return research.workflow_type == "stock"
+        return (
+            job.workflow_type == "stock" and job.scope == JobScope.STOCK and bool(job.stock_symbol)
+        )
 
     def get_workflow_type(self) -> str:
         """Get the workflow type identifier."""

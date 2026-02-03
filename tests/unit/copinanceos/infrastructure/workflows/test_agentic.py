@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from copinanceos.domain.models.research import Research, ResearchTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.infrastructure.workflows import AgenticWorkflowExecutor
 
@@ -32,36 +32,39 @@ class TestAgenticWorkflowExecutor:
     async def test_validate_returns_true_for_agentic_workflow(self) -> None:
         """Test that validate returns True for agent workflow type."""
         executor = AgenticWorkflowExecutor()
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.LONG_TERM,
+            timeframe=JobTimeframe.LONG_TERM,
             workflow_type="agent",
         )
-        result = await executor.validate(research)
+        result = await executor.validate(job)
         assert result is True
 
     async def test_validate_returns_false_for_non_agentic_workflow(self) -> None:
         """Test that validate returns False for non-agent workflow types."""
         executor = AgenticWorkflowExecutor()
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.LONG_TERM,
+            timeframe=JobTimeframe.LONG_TERM,
             workflow_type="stock",
         )
-        result = await executor.validate(research)
+        result = await executor.validate(job)
         assert result is False
 
     async def test_execute_without_llm_analyzer(self) -> None:
         """Test execute when LLM analyzer is not configured."""
         executor = AgenticWorkflowExecutor()
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="agent",
         )
         context = {"context_key": "context_value"}
 
-        results = await executor.execute(research, context)
+        results = await executor.execute(job, context)
 
         assert results["status"] == "failed"
         assert results["error"] == "LLM analyzer not configured"
@@ -91,14 +94,15 @@ class TestAgenticWorkflowExecutor:
             llm_analyzer=mock_llm,
             market_data_provider=mock_market_provider,
         )
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="TSLA",
-            timeframe=ResearchTimeframe.LONG_TERM,
+            timeframe=JobTimeframe.LONG_TERM,
             workflow_type="agent",
         )
         context = {"question": "What is the current price of TSLA?"}
 
-        results = await executor.execute(research, context)
+        results = await executor.execute(job, context)
 
         assert results["workflow_type"] == "agent"
         assert results["stock_symbol"] == "TSLA"
@@ -113,12 +117,13 @@ class TestAgenticWorkflowExecutor:
         """Test execute with different timeframes."""
         executor = AgenticWorkflowExecutor()
 
-        for timeframe in ResearchTimeframe:
-            research = Research(
+        for timeframe in JobTimeframe:
+            job = Job(
+                scope=JobScope.STOCK,
                 stock_symbol="GOOGL",
                 timeframe=timeframe,
                 workflow_type="agent",
             )
-            results = await executor.execute(research, {})
+            results = await executor.execute(job, {})
             assert results["timeframe"] == timeframe.value
             assert results["stock_symbol"] == "GOOGL"

@@ -8,8 +8,8 @@ from copinanceos.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
+from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
 from copinanceos.domain.models.macro import MacroDataPoint
-from copinanceos.domain.models.research import Research, ResearchStatus, ResearchTimeframe
 from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
 from copinanceos.domain.models.stock import Stock, StockData
 from copinanceos.domain.models.tool_results import (
@@ -39,9 +39,10 @@ from copinanceos.domain.models.workflows import (
 )
 
 __all__ = [
-    "Research",
-    "ResearchStatus",
-    "ResearchTimeframe",
+    "Job",
+    "JobScope",
+    "JobStatus",
+    "JobTimeframe",
     "ResearchProfile",
     "FinancialLiteracy",
     "Stock",

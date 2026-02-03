@@ -46,7 +46,8 @@ class WorkflowExecutorFactory:
             fundamental_data_provider: Provider for fundamental data
             sec_filings_provider: Provider for SEC filings
             cache_manager: Cache manager for tool caching
-            llm_config: LLM configuration. If None, agent workflows will not be available.
+            llm_config: LLM configuration. If None, agent executor is still registered but
+                returns "LLM analyzer not configured" when run (so CLI/tests get a clear message).
 
         Returns:
             List of workflow executors
@@ -63,7 +64,8 @@ class WorkflowExecutorFactory:
             ),
         ]
 
-        # Add agent executor if LLM config is provided
+        # Add agent executor (with LLM when config provided, else fallback that returns "not configured")
+        agent_added = False
         if llm_config:
             try:
                 # Get LLM analyzer for agent workflow
@@ -93,6 +95,7 @@ class WorkflowExecutorFactory:
                                 cache_manager=cache_manager,
                             )
                         )
+                        agent_added = True
                 except Exception as e:
                     logger.warning(
                         "Failed to initialize LLM analyzer for agent workflow",
@@ -106,6 +109,18 @@ class WorkflowExecutorFactory:
                     hint="Check LLM configuration",
                 )
         else:
-            logger.debug("LLM config not provided, skipping agent workflow executor")
+            logger.debug("LLM config not provided, using fallback agent executor")
+
+        if not agent_added:
+            executors.append(
+                AgenticWorkflowExecutor(
+                    llm_analyzer=None,
+                    market_data_provider=market_data_provider,
+                    macro_data_provider=macro_data_provider,
+                    fundamental_data_provider=fundamental_data_provider,
+                    sec_filings_provider=sec_filings_provider,
+                    cache_manager=cache_manager,
+                )
+            )
 
         return executors

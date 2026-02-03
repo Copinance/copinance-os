@@ -32,13 +32,13 @@ Copinance OS is a **pure Python library** following clean hexagonal architecture
 ```
 copinanceos/
 ├── domain/              # Core business logic (no dependencies)
-│   ├── models/          # Entities: ResearchProfile, Stock, Research
+│   ├── models/          # Entities: ResearchProfile, Stock; Job (workflow context only)
 │   └── ports/           # 21 interfaces for extensibility
 ├── application/         # Use cases and services
 │   └── use_cases/       # Business operations
 ├── infrastructure/      # Implementations
 │   ├── repositories/    # Data persistence (in-memory included)
-│   ├── workflows/       # Research executors
+│   ├── workflows/       # Workflow executors
 │   ├── containers/      # Dependency injection containers
 │   └── config.py        # Configuration
 └── cli/                 # CLI implementation (modular)
@@ -102,7 +102,7 @@ python -m copinanceos.cli version
 **Without installation (from project root):**
 ```bash
 # Run directly as a module
-python -m copinanceos.cli research create AAPL --workflow stock
+python -m copinanceos.cli analyze stock AAPL --timeframe mid_term
 python -m copinanceos.cli profile list
 python -m copinanceos.cli stock search "Apple"
 ```
@@ -110,9 +110,9 @@ python -m copinanceos.cli stock search "Apple"
 **After installation:**
 ```bash
 pip install -e .
-copinance research create AAPL --timeframe mid_term --workflow stock
-copinance research execute <research-id>
-copinance research get <research-id>
+copinance analyze stock AAPL --timeframe mid_term
+copinance profile list
+copinance cache info
 ```
 
 **Examples:**
@@ -125,16 +125,15 @@ python -m copinanceos.cli profile get <profile-id>
 # Stock search
 python -m copinanceos.cli stock search "Apple"
 
-# Research with context
-python -m copinanceos.cli research create AAPL --profile-id <profile-id>
-python -m copinanceos.cli research run AAPL --workflow stock
-python -m copinanceos.cli research set-context <research-id> --profile-id <profile-id>
+# One-off analysis (results saved to .copinance/results/)
+python -m copinanceos.cli analyze stock AAPL --timeframe mid_term
+python -m copinanceos.cli ask "What are the key risks?" --symbol AAPL
 
 # Macro regime analysis (comprehensive economic indicators)
-copinance research macro
-copinance research macro --market-index QQQ --lookback-days 180
-copinance research macro --include-labor --include-housing --include-consumer
-copinance research macro --no-include-vix --no-include-market-breadth
+copinance analyze macro
+copinance analyze macro --market-index QQQ --lookback-days 180
+copinance analyze macro --include-labor --include-housing --include-consumer
+copinance analyze macro --no-include-vix --no-include-market-breadth
 ```
 
 ## Testing

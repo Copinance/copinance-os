@@ -165,15 +165,15 @@ Example:
 
 ```python
 from copinanceos.domain.ports.workflows import WorkflowExecutor
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job
 
 class MyWorkflowExecutor(WorkflowExecutor):
-    async def execute(self, research: Research, context: dict) -> dict:
+    async def execute(self, job: Job, context: dict) -> dict:
         # Implementation
         pass
 
-    async def validate(self, research: Research) -> bool:
-        return research.workflow_type == "my_workflow"
+    async def validate(self, job: Job) -> bool:
+        return job.workflow_type == "my_workflow"
 
     def get_workflow_type(self) -> str:
         return "my_workflow"

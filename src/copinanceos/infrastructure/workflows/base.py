@@ -6,7 +6,7 @@ from typing import Any
 
 import structlog
 
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job, JobScope
 from copinanceos.domain.ports.workflows import WorkflowExecutor
 
 logger = structlog.get_logger(__name__)
@@ -30,20 +30,18 @@ class BaseWorkflowExecutor(WorkflowExecutor):
         pass
 
     @abstractmethod
-    async def validate(self, research: Research) -> bool:
-        """Validate if this executor can handle the given research."""
+    async def validate(self, job: Job) -> bool:
+        """Validate if this executor can handle the given job."""
         pass
 
     @abstractmethod
-    async def _execute_workflow(
-        self, research: Research, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _execute_workflow(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """Execute the specific workflow logic.
 
         Subclasses implement this method to provide their specific workflow execution.
 
         Args:
-            research: The research entity to execute
+            job: The job to execute
             context: Execution context and parameters
 
         Returns:
@@ -51,7 +49,7 @@ class BaseWorkflowExecutor(WorkflowExecutor):
         """
         pass
 
-    async def execute(self, research: Research, context: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """Execute a workflow with common setup, error handling, and logging.
 
         This method provides the template for workflow execution:
@@ -62,29 +60,32 @@ class BaseWorkflowExecutor(WorkflowExecutor):
         5. Log execution completion
 
         Args:
-            research: The research entity to execute
+            job: The job to execute
             context: Execution context and parameters
 
         Returns:
             Results dictionary containing workflow outputs
         """
-        symbol = research.stock_symbol.upper()
-        timeframe = research.timeframe.value
+        target_symbol = (
+            job.market_index if job.scope == JobScope.MARKET else (job.stock_symbol or None)
+        )
+        target_symbol = target_symbol.upper() if isinstance(target_symbol, str) else "N/A"
+        timeframe = job.timeframe.value
         workflow_type = self.get_workflow_type()
 
         # Initialize common result structure
-        results = self._initialize_results(research, workflow_type)
+        results = self._initialize_results(job, workflow_type)
 
         # Log execution start
         logger.info(
             f"Starting {workflow_type} workflow execution",
-            symbol=symbol,
+            symbol=target_symbol,
             timeframe=timeframe,
         )
 
         try:
             # Execute workflow-specific logic
-            workflow_results = await self._execute_workflow(research, context)
+            workflow_results = await self._execute_workflow(job, context)
 
             # Handle both dictionary and Pydantic model returns
             if hasattr(workflow_results, "model_dump"):
@@ -118,7 +119,7 @@ class BaseWorkflowExecutor(WorkflowExecutor):
             # Log successful completion
             logger.info(
                 f"{workflow_type.capitalize()} workflow execution completed",
-                symbol=symbol,
+                symbol=target_symbol,
                 timeframe=timeframe,
             )
 
@@ -126,7 +127,7 @@ class BaseWorkflowExecutor(WorkflowExecutor):
             # Handle errors consistently
             logger.error(
                 f"{workflow_type.capitalize()} workflow execution failed",
-                symbol=symbol,
+                symbol=target_symbol,
                 error=str(e),
                 exc_info=True,
             )
@@ -136,11 +137,11 @@ class BaseWorkflowExecutor(WorkflowExecutor):
 
         return results
 
-    def _initialize_results(self, research: Research, workflow_type: str) -> dict[str, Any]:
+    def _initialize_results(self, job: Job, workflow_type: str) -> dict[str, Any]:
         """Initialize common result structure.
 
         Args:
-            research: The research entity
+            job: The job entity
             workflow_type: Type of workflow
 
         Returns:
@@ -148,8 +149,10 @@ class BaseWorkflowExecutor(WorkflowExecutor):
         """
         return {
             "workflow_type": workflow_type,
-            "stock_symbol": research.stock_symbol.upper(),
-            "timeframe": research.timeframe.value,
+            "scope": job.scope.value,
+            "stock_symbol": job.stock_symbol,
+            "market_index": job.market_index,
+            "timeframe": job.timeframe.value,
             "analysis_type": workflow_type,
             "execution_timestamp": datetime.now(UTC).isoformat(),
         }

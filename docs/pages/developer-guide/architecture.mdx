@@ -38,13 +38,13 @@ Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear 
 
 ### Domain Layer
 - **Core business logic** with zero external dependencies
-- **Entities**: Research, Stock, ResearchProfile
+- **Entities**: Job, Stock, ResearchProfile
 - **Ports**: Interfaces for data providers, repositories, workflows
 - **Services**: Complex business logic
 - **Validation**: Domain validation rules
 
 ### Application Layer
-- **Use cases**: Business operations (CreateResearch, ExecuteResearch, etc.)
+- **Use cases**: Business operations (RunWorkflow, CreateProfile, etc.)
 - **Orchestration**: Coordinates domain objects and infrastructure
 - **Request/Response models**: Type-safe input/output
 
@@ -52,7 +52,7 @@ Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear 
 - **Implementations**: Concrete implementations of domain ports
 - **Repositories**: Data persistence (memory, file, database)
 - **Data Providers**: External data sources (yfinance, EDGAR, etc.)
-- **Workflows**: Research execution engines
+- **Workflows**: Workflow execution engines
 - **Container**: Dependency injection configuration
 
 ### CLI Layer
@@ -66,20 +66,20 @@ Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear 
 Abstracts data access:
 ```python
 # Port (Domain)
-class ResearchRepository(ABC):
-    async def get_by_id(self, research_id: UUID) -> Research | None
+class StockRepository(ABC):
+    async def get_by_symbol(self, symbol: str) -> Stock | None
 
 # Implementation (Infrastructure)
-class ResearchRepositoryImpl(ResearchRepository):
-    async def get_by_id(self, research_id: UUID) -> Research | None:
+class StockRepositoryImpl(StockRepository):
+    async def get_by_symbol(self, symbol: str) -> Stock | None:
         # Implementation using storage backend
 ```
 
 ### Use Case Pattern
 Encapsulates business operations:
 ```python
-class ExecuteResearchUseCase(UseCase[ExecuteResearchRequest, ExecuteResearchResponse]):
-    async def execute(self, request: ExecuteResearchRequest) -> ExecuteResearchResponse:
+class RunWorkflowUseCase(UseCase[RunWorkflowRequest, RunWorkflowResponse]):
+    async def execute(self, request: RunWorkflowRequest) -> RunWorkflowResponse:
         # Business logic here
 ```
 
@@ -88,7 +88,7 @@ Manages dependencies through container:
 ```python
 # Container configuration
 container = Container()
-use_case = container.execute_research_use_case()
+use_case = container.run_workflow_use_case()
 ```
 
 ## Extension Points
@@ -99,7 +99,7 @@ The architecture provides 22 port interfaces for extension:
 - **1 Analyzer interface**: LLM
 - **6 Strategy interfaces**: Screening, Due Diligence, Valuation, Risk, Thematic, Monitoring
 - **4 Tool interfaces**: Tool, ToolParameter, ToolSchema, ToolResult
-- **3 Repository interfaces**: Research, Stock, ResearchProfile
+- **2 Repository interfaces**: Stock, ResearchProfile
 - **1 Workflow interface**: WorkflowExecutor
 - **2 Storage interfaces**: CacheBackend, Storage
 

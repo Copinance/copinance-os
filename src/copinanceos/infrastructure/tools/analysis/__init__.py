@@ -11,7 +11,7 @@ from copinanceos.infrastructure.tools.analysis.market_regime import (
     MarketRegimeDetectVolatilityTool,
     MarketRegimeIndicatorsTool,
     create_macro_regime_indicators_tool,
-    create_market_regime_tools,
+    create_rule_based_regime_tools,
 )
 from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
     create_all_regime_tools,
@@ -26,7 +26,7 @@ __all__ = [
     "MarketRegimeIndicatorsTool",
     "MacroRegimeIndicatorsTool",
     "create_macro_regime_indicators_tool",
-    "create_market_regime_tools",  # Backward compatibility
+    "create_rule_based_regime_tools",
     # Registry functions
     "create_all_regime_tools",
     "create_regime_tools_by_type",

@@ -1,8 +1,7 @@
-"""Helper functions to load LLM configuration from environment variables.
+"""Load LLM configuration from environment variables.
 
-This module provides backward compatibility for CLI and other entry points
-that may want to read LLM configuration from environment variables.
-Integrators should provide LLMConfig directly instead of using this module.
+Convenience for CLI and other entry points that read config from the environment.
+Library integrators should pass LLMConfig directly when creating the container.
 """
 
 import os
@@ -14,8 +13,7 @@ from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 def load_llm_config_from_env() -> LLMConfig | None:
     """Load LLM configuration from environment variables.
 
-    This is a convenience function for CLI and backward compatibility.
-    Integrators should provide LLMConfig directly instead of using this.
+    Intended for CLI; integrators should pass LLMConfig directly to the container.
 
     Environment variables:
         COPINANCEOS_LLM_PROVIDER: Provider name (e.g., "gemini", "ollama")

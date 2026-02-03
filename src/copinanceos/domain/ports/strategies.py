@@ -1,10 +1,10 @@
-"""Advanced research strategy interfaces."""
+"""Advanced analysis strategy interfaces."""
 
 from abc import ABC, abstractmethod
 from typing import Any
 from uuid import UUID
 
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job
 
 
 class ScreeningStrategy(ABC):
@@ -233,7 +233,7 @@ class MonitoringStrategy(ABC):
     @abstractmethod
     async def setup_alerts(
         self,
-        research_id: UUID,
+        job_id: UUID,
         alert_config: dict[str, Any],
     ) -> None:
         """
@@ -251,19 +251,19 @@ class MonitoringStrategy(ABC):
     @abstractmethod
     async def check_alerts(
         self,
-        research_id: UUID,
+        job_id: UUID,
     ) -> list[dict[str, Any]]:
-        """Check active alerts for a research."""
+        """Check active alerts for a job."""
         pass
 
     @abstractmethod
     async def generate_report(
         self,
-        research: Research,
+        job: Job,
         format: str = "natural_language",
     ) -> str:
         """
-        Generate automated research report.
+        Generate automated report.
 
         Natural language summaries adapted to user's literacy level.
         """

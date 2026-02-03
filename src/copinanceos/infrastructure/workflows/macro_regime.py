@@ -12,7 +12,7 @@ from typing import Any
 
 import structlog
 
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job, JobScope
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.models.workflows import (
     AdvancedData,
@@ -39,7 +39,7 @@ from copinanceos.domain.models.workflows import (
 from copinanceos.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
 from copinanceos.infrastructure.tools.analysis.market_regime import (
     create_market_regime_indicators_tool,
-    create_market_regime_tools,
+    create_rule_based_regime_tools,
 )
 from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
     create_macro_regime_indicators_tool,
@@ -60,7 +60,7 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         self._market_data_provider = market_data_provider
         self._macro_data_provider = macro_data_provider
 
-    async def _execute_workflow(self, research: Research, context: dict[str, Any]) -> Any:
+    async def _execute_workflow(self, job: Job, context: dict[str, Any]) -> Any:
         if not self._market_data_provider:
             raise RuntimeError("MarketDataProvider not configured - required for macro workflow")
         if not self._macro_data_provider:
@@ -69,12 +69,9 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
             )
 
         # Inputs
-        # Research requires a symbol; users may pass MARKET as placeholder.
         market_index = str(context.get("market_index") or "").upper().strip()
         if not market_index:
-            market_index = research.stock_symbol.upper().strip()
-        if market_index in {"", "MARKET"}:
-            market_index = "SPY"
+            market_index = (job.market_index or "SPY").upper().strip()
 
         lookback_days = int(context.get("lookback_days", 252))
         include_vix = bool(context.get("include_vix", True))
@@ -137,7 +134,7 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
                 error=str(e),
             )
 
-        regime_tools = create_market_regime_tools(self._market_data_provider)
+        regime_tools = create_rule_based_regime_tools(self._market_data_provider)
         regime_detection_data: dict[str, ToolResult] = {}
 
         for tool in regime_tools:
@@ -339,8 +336,8 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
             error=None,
         )
 
-    async def validate(self, research: Research) -> bool:
-        return research.workflow_type == "macro"
+    async def validate(self, job: Job) -> bool:
+        return job.workflow_type == "macro" and job.scope == JobScope.MARKET
 
     def get_workflow_type(self) -> str:
         return "macro"

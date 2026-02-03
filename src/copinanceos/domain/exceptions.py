@@ -30,7 +30,7 @@ class EntityNotFoundError(DomainError):
         """Initialize entity not found error.
 
         Args:
-            entity_type: Type of entity (e.g., "Stock", "Research")
+            entity_type: Type of entity (e.g., "Stock", "Job")
             identifier: Identifier that was searched for
             details: Optional additional details
         """
@@ -52,20 +52,6 @@ class StockNotFoundError(EntityNotFoundError):
         """
         super().__init__("Stock", symbol, details)
         self.symbol = symbol
-
-
-class ResearchNotFoundError(EntityNotFoundError):
-    """Raised when a research is not found."""
-
-    def __init__(self, research_id: str, details: dict[str, str] | None = None) -> None:
-        """Initialize research not found error.
-
-        Args:
-            research_id: Research ID that was not found
-            details: Optional additional details
-        """
-        super().__init__("Research", research_id, details)
-        self.research_id = research_id
 
 
 class ProfileNotFoundError(EntityNotFoundError):
@@ -125,7 +111,7 @@ class WorkflowExecutionError(DomainError):
         self,
         workflow_type: str,
         message: str,
-        research_id: str | None = None,
+        job_id: str | None = None,
         details: dict[str, str] | None = None,
     ) -> None:
         """Initialize workflow execution error.
@@ -133,12 +119,12 @@ class WorkflowExecutionError(DomainError):
         Args:
             workflow_type: Type of workflow that failed
             message: Error message
-            research_id: Optional research ID associated with the workflow
+            job_id: Optional job ID associated with the workflow
             details: Optional additional details
         """
         super().__init__(f"Workflow '{workflow_type}' execution failed: {message}", details)
         self.workflow_type = workflow_type
-        self.research_id = research_id
+        self.job_id = job_id
 
 
 class WorkflowNotFoundError(DomainError):

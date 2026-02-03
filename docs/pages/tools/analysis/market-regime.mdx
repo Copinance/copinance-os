@@ -37,8 +37,8 @@ Statistical methods will use probabilistic models like Hidden Markov Models (HMM
 **Usage:**
 ```python
 # Rule-based tools (default, current)
-from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
-tools = create_market_regime_tools(provider)
+from copinanceos.infrastructure.tools.analysis import create_rule_based_regime_tools
+tools = create_rule_based_regime_tools(provider)
 
 # Or explicitly specify rule-based
 from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
@@ -438,34 +438,34 @@ Tools are automatically available in agent workflows when a market data provider
 **Individual Stock Analysis:**
 ```bash
 # Analyze trend and volatility for a specific stock
-copinance research ask AAPL "What is the current market trend and volatility regime?"
+copinance ask "What is the current market trend and volatility regime?" --symbol AAPL
 
 # Analyze market cycles
-copinance research ask TSLA "What market cycle phase is this stock in?"
+copinance ask "What market cycle phase is this stock in?" --symbol TSLA
 
 # Comprehensive regime analysis
-copinance research ask MSFT "Analyze the market regime for this stock including trend, volatility, and cycle phases"
+copinance ask "Analyze the market regime for this stock including trend, volatility, and cycle phases" --symbol MSFT
 ```
 
 **Market-Wide Indicators:**
 ```bash
 # Get market-wide context with VIX and sector analysis
-copinance research ask SPY "What is the current market sentiment and which sectors are leading?"
+copinance ask "What is the current market sentiment and which sectors are leading?" --market-index SPY
 
 # Analyze market breadth
-copinance research ask "What is the current market breadth and sector rotation?"
+copinance ask "What is the current market breadth and sector rotation?"
 
 # VIX and volatility analysis
-copinance research ask "What is the current VIX level and market fear sentiment?"
+copinance ask "What is the current VIX level and market fear sentiment?"
 
 # Sector rotation analysis
-copinance research ask "Which sectors are currently outperforming and what rotation theme is active?"
+copinance ask "Which sectors are currently outperforming and what rotation theme is active?"
 ```
 
 **Combined Analysis:**
 ```bash
 # Combine individual stock and market-wide analysis
-copinance research ask AAPL "Analyze this stock's regime and compare it to the broader market conditions including VIX and sector rotation"
+copinance ask "Analyze this stock's regime and compare it to the broader market conditions including VIX and sector rotation" --symbol AAPL
 ```
 
 The LLM will automatically use the appropriate tools (`detect_market_trend`, `detect_volatility_regime`, `detect_market_cycles`, or `get_market_regime_indicators`) based on your question.
@@ -474,14 +474,14 @@ The LLM will automatically use the appropriate tools (`detect_market_trend`, `de
 
 ```python
 from copinanceos.infrastructure.tools.analysis import (
-    create_market_regime_tools,
+    create_rule_based_regime_tools,
     MarketRegimeIndicatorsTool,
 )
 from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
 
 # Create rule-based detection tools
 provider = YFinanceMarketProvider()
-tools = create_market_regime_tools(provider)
+tools = create_rule_based_regime_tools(provider)
 
 # Use individual detection tools
 trend_tool = tools[0]
@@ -498,10 +498,10 @@ Tools can also be registered in a tool registry for centralized management:
 
 ```python
 from copinanceos.infrastructure.tools import ToolRegistry
-from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+from copinanceos.infrastructure.tools.analysis import create_rule_based_regime_tools
 
 registry = ToolRegistry()
-tools = create_market_regime_tools(provider)
+tools = create_rule_based_regime_tools(provider)
 registry.register_many(tools)
 
 # Get a tool by name
@@ -558,7 +558,7 @@ The market regime detection tools are organized in a modular structure to suppor
 
 ```
 infrastructure/tools/analysis/market_regime/
-├── __init__.py          # Public API exports (backward compatible)
+├── __init__.py          # Public API exports
 ├── base.py              # Common interfaces and base classes
 ├── rule_based.py        # Rule-based detection (current implementation)
 ├── indicators.py        # Market regime indicators (VIX, breadth, rotation)
@@ -571,7 +571,7 @@ infrastructure/tools/analysis/market_regime/
 1. **Separation of Concerns**: Each detection method is in its own module
 2. **Common Interface**: All tools implement the `Tool` interface via `BaseRegimeDetectionTool`
 3. **Extensibility**: Easy to add new methods without breaking existing code
-4. **Backward Compatibility**: Existing code continues to work with default imports
+4. **Consistent API**: All tools are available via the package's public exports
 
 ### Adding New Detection Methods
 
@@ -611,10 +611,10 @@ def create_ml_regime_tools(provider: MarketDataProvider) -> list[Tool]:
 ```python
 # Rule-based tools (default, current)
 from copinanceos.infrastructure.tools.analysis import (
-    create_market_regime_tools,
+    create_rule_based_regime_tools,
     MarketRegimeIndicatorsTool,
 )
-tools = create_market_regime_tools(provider)
+tools = create_rule_based_regime_tools(provider)
 
 # Market regime indicators tool (separate from detection tools)
 indicators_tool = MarketRegimeIndicatorsTool(provider)

@@ -1,94 +1,60 @@
-"""Integration tests for core workflows."""
+"""Integration tests for core workflows (one-off run via RunWorkflowUseCase)."""
 
 import pytest
 
-from copinanceos.application.use_cases.research import (
-    CreateResearchRequest,
-    CreateResearchUseCase,
-    ExecuteResearchRequest,
-    ExecuteResearchUseCase,
-)
-from copinanceos.domain.models.research import ResearchStatus, ResearchTimeframe
+from copinanceos.application.use_cases.workflow import RunWorkflowRequest
+from copinanceos.domain.models.job import JobScope, JobTimeframe
 from copinanceos.domain.ports.data_providers import FundamentalDataProvider
 from copinanceos.infrastructure.containers import get_container
-from copinanceos.infrastructure.repositories import ResearchRepositoryImpl
-from copinanceos.infrastructure.workflows import (
-    AgenticWorkflowExecutor,
-    StaticWorkflowExecutor,
-)
 
 
 @pytest.mark.integration
 class TestEndToEndWorkflow:
-    """Test complete end-to-end workflows."""
+    """Test complete end-to-end workflows via run_workflow_use_case (no persistence)."""
 
     @pytest.mark.asyncio
-    async def test_complete_research_workflow(self) -> None:
-        """Test complete research workflow from creation to execution."""
-        research_repo = ResearchRepositoryImpl()
-        executors = [StaticWorkflowExecutor(), AgenticWorkflowExecutor()]
+    async def test_complete_stock_workflow(self) -> None:
+        """Test stock workflow execution (one-off)."""
+        container = get_container()
+        use_case = container.run_workflow_use_case()
 
-        # Create research
-        create_research_uc = CreateResearchUseCase(research_repo)
-        research_response = await create_research_uc.execute(
-            CreateResearchRequest(
+        response = await use_case.execute(
+            RunWorkflowRequest(
+                scope=JobScope.STOCK,
                 stock_symbol="AAPL",
-                timeframe=ResearchTimeframe.MID_TERM,
+                timeframe=JobTimeframe.MID_TERM,
                 workflow_type="stock",
             )
         )
 
-        assert research_response.research.stock_symbol == "AAPL"
-        assert research_response.research.status == ResearchStatus.PENDING
-
-        # Execute research
-        execute_research_uc = ExecuteResearchUseCase(research_repo, None, executors)
-        execute_response = await execute_research_uc.execute(
-            ExecuteResearchRequest(research_id=research_response.research.id)
-        )
-
-        assert execute_response.success is True
-        assert execute_response.research.status == ResearchStatus.COMPLETED
-        assert len(execute_response.research.results) > 0
+        assert response.success is True
+        assert response.results is not None
+        assert len(response.results) > 0
 
     @pytest.mark.asyncio
     async def test_agentic_workflow_execution(self) -> None:
-        """Test agent workflow execution."""
-        research_repo = ResearchRepositoryImpl()
-        executors = [StaticWorkflowExecutor(), AgenticWorkflowExecutor()]
+        """Test agent workflow execution (one-off)."""
+        container = get_container()
+        use_case = container.run_workflow_use_case()
 
-        # Create agent research
-        create_research_uc = CreateResearchUseCase(research_repo)
-        research_response = await create_research_uc.execute(
-            CreateResearchRequest(
+        response = await use_case.execute(
+            RunWorkflowRequest(
+                scope=JobScope.STOCK,
                 stock_symbol="MSFT",
-                timeframe=ResearchTimeframe.SHORT_TERM,
+                timeframe=JobTimeframe.SHORT_TERM,
                 workflow_type="agent",
             )
         )
 
-        # Execute agent research
-        execute_research_uc = ExecuteResearchUseCase(research_repo, None, executors)
-        execute_response = await execute_research_uc.execute(
-            ExecuteResearchRequest(research_id=research_response.research.id)
-        )
-
-        # Note: Agentic workflow may fail if LLM analyzer is not configured
-        # In that case, it will still complete but with an error in results
-        assert execute_response.success is True
-        # Check the results status, not the research entity status
-        # The research entity status may be COMPLETED even if workflow results indicate failure
-        results_status = execute_response.research.results.get("status")
-        if results_status == "completed":
-            # LLM analyzer is configured and workflow completed successfully
-            assert "agents_used" in execute_response.research.results
-        else:
-            # LLM analyzer not configured - workflow failed gracefully
-            assert results_status == "failed"
-            assert "error" in execute_response.research.results
-            assert "LLM analyzer not configured" in str(
-                execute_response.research.results.get("error", "")
-            )
+        assert response.success is True
+        if response.results:
+            results_status = response.results.get("status")
+            if results_status == "completed":
+                assert "agents_used" in response.results or "analysis" in response.results
+            else:
+                assert results_status == "failed"
+                assert "error" in response.results
+                assert "LLM analyzer not configured" in str(response.results.get("error", ""))
 
     @pytest.mark.asyncio
     async def test_static_workflow_with_fundamentals(
@@ -96,41 +62,22 @@ class TestEndToEndWorkflow:
     ) -> None:
         """Test stock workflow execution includes full fundamentals data."""
         container = get_container()
-        research_repo = ResearchRepositoryImpl()
-        executors = [
-            StaticWorkflowExecutor(
-                get_stock_use_case=container.get_stock_use_case(),
-                market_data_provider=container.market_data_provider(),
-                fundamentals_use_case=container.research_stock_fundamentals_use_case(),
-            ),
-            AgenticWorkflowExecutor(),
-        ]
+        use_case = container.run_workflow_use_case()
 
-        # Create stock research (which now includes full fundamentals)
-        create_research_uc = CreateResearchUseCase(research_repo)
-        research_response = await create_research_uc.execute(
-            CreateResearchRequest(
+        response = await use_case.execute(
+            RunWorkflowRequest(
+                scope=JobScope.STOCK,
                 stock_symbol="AAPL",
-                timeframe=ResearchTimeframe.MID_TERM,
+                timeframe=JobTimeframe.MID_TERM,
                 workflow_type="stock",
             )
         )
 
-        assert research_response.research.stock_symbol == "AAPL"
-        assert research_response.research.status == ResearchStatus.PENDING
+        assert response.success is True
+        assert response.results is not None
+        assert len(response.results) > 0
 
-        # Execute stock research
-        execute_research_uc = ExecuteResearchUseCase(research_repo, None, executors)
-        execute_response = await execute_research_uc.execute(
-            ExecuteResearchRequest(research_id=research_response.research.id)
-        )
-
-        assert execute_response.success is True
-        assert execute_response.research.status == ResearchStatus.COMPLETED
-        assert len(execute_response.research.results) > 0
-
-        # Verify stock workflow includes fundamentals data
-        results = execute_response.research.results
+        results = response.results
         assert results["workflow_type"] == "stock"
         assert results["stock_symbol"] == "AAPL"
         assert "fundamentals" in results

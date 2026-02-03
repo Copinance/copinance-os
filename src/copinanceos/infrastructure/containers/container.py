@@ -59,7 +59,6 @@ class Container(containers.DeclarativeContainer):
     # So we'll call configure_repositories and assign individually
     _repositories_config = configure_repositories(storage_backend)
     stock_repository = _repositories_config["stock_repository"]
-    research_repository = _repositories_config["research_repository"]
     research_profile_repository = _repositories_config["research_profile_repository"]
     current_profile = _repositories_config["current_profile"]
 
@@ -110,7 +109,6 @@ class Container(containers.DeclarativeContainer):
     _use_cases_config = providers.Callable(
         configure_use_cases,
         stock_repository=stock_repository,
-        research_repository=research_repository,
         research_profile_repository=research_profile_repository,
         current_profile=current_profile,
         market_data_provider=market_data_provider,
@@ -131,18 +129,6 @@ class Container(containers.DeclarativeContainer):
     )
     get_stock_data_use_case = providers.Callable(
         lambda config: config["get_stock_data_use_case"](),
-        config=_use_cases_config,
-    )
-    create_research_use_case = providers.Callable(
-        lambda config: config["create_research_use_case"](),
-        config=_use_cases_config,
-    )
-    get_research_use_case = providers.Callable(
-        lambda config: config["get_research_use_case"](),
-        config=_use_cases_config,
-    )
-    set_research_context_use_case = providers.Callable(
-        lambda config: config["set_research_context_use_case"](),
         config=_use_cases_config,
     )
     create_profile_use_case = providers.Callable(
@@ -177,8 +163,8 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["workflow_executors"](),
         config=_use_cases_config,
     )
-    execute_research_use_case = providers.Callable(
-        lambda config: config["execute_research_use_case"](),
+    run_workflow_use_case = providers.Callable(
+        lambda config: config["run_workflow_use_case"](),
         config=_use_cases_config,
     )
 
@@ -201,7 +187,7 @@ def get_container(
                      settings (for CLI users). Library integrators should pass their own
                      API key here.
         load_from_env: If True and llm_config is None, attempt to load LLM config
-                      from environment variables (for CLI backward compatibility).
+                      from environment variables (CLI convenience).
 
     Returns:
         Container instance

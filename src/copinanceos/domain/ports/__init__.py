@@ -11,7 +11,6 @@ from copinanceos.domain.ports.data_providers import (
 )
 from copinanceos.domain.ports.repositories import (
     ResearchProfileRepository,
-    ResearchRepository,
     StockRepository,
 )
 from copinanceos.domain.ports.storage import Storage
@@ -33,7 +32,6 @@ from copinanceos.domain.ports.workflows import WorkflowExecutor
 __all__ = [
     # Repositories
     "ResearchProfileRepository",
-    "ResearchRepository",
     "StockRepository",
     # Storage
     "Storage",

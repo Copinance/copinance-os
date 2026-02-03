@@ -82,7 +82,7 @@ export COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 ### 3. Verify
 
 ```bash
-copinance research ask "What is the current price?" --symbol AAPL
+copinance ask "What is the current price?" --symbol AAPL
 ```
 
 If configured correctly, you'll see AI analysis. If not, check:
@@ -133,7 +133,7 @@ export COPINANCEOS_FRED_API_KEY=your-fred-api-key-here
 ### 3. Verify
 
 ```bash
-copinance research macro
+copinance analyze macro
 ```
 
 If configured correctly, you'll see `"source": "fred"` in the results. If not, check:
@@ -263,7 +263,7 @@ export COPINANCEOS_OLLAMA_MODEL=llama2
 ### 3. Verify
 
 ```bash
-copinance research ask "What is the current price?" --symbol AAPL
+copinance ask "What is the current price?" --symbol AAPL
 ```
 
 ### Per-Workflow Provider Configuration

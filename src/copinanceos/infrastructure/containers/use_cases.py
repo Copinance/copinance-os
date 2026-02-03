@@ -13,24 +13,18 @@ from copinanceos.application.use_cases.profile import (
     ListProfilesUseCase,
     SetCurrentProfileUseCase,
 )
-from copinanceos.application.use_cases.research import (
-    CreateResearchUseCase,
-    ExecuteResearchUseCase,
-    GetResearchUseCase,
-    SetResearchContextUseCase,
-)
 from copinanceos.application.use_cases.stock import (
     GetStockDataUseCase,
     GetStockUseCase,
     SearchStocksUseCase,
 )
+from copinanceos.application.use_cases.workflow import RunWorkflowUseCase
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.factories import WorkflowExecutorFactory
 
 
 def configure_use_cases(
     stock_repository: providers.Provider,
-    research_repository: providers.Provider,
     research_profile_repository: providers.Provider,
     current_profile: providers.Provider,
     market_data_provider: providers.Provider,
@@ -45,7 +39,6 @@ def configure_use_cases(
 
     Args:
         stock_repository: Stock repository provider
-        research_repository: Research repository provider
         research_profile_repository: Research profile repository provider
         current_profile: Current profile provider
         market_data_provider: Market data provider
@@ -73,23 +66,6 @@ def configure_use_cases(
     get_stock_data_use_case = providers.Factory(
         GetStockDataUseCase,
         stock_repository=stock_repository,
-    )
-
-    # Research use cases
-    create_research_use_case = providers.Factory(
-        CreateResearchUseCase,
-        research_repository=research_repository,
-    )
-
-    get_research_use_case = providers.Factory(
-        GetResearchUseCase,
-        research_repository=research_repository,
-    )
-
-    set_research_context_use_case = providers.Factory(
-        SetResearchContextUseCase,
-        research_repository=research_repository,
-        profile_repository=research_profile_repository,
     )
 
     # Profile use cases
@@ -149,10 +125,9 @@ def configure_use_cases(
         llm_config=llm_config,
     )
 
-    # Execute research use case (defined after workflow_executors)
-    execute_research_use_case = providers.Factory(
-        ExecuteResearchUseCase,
-        research_repository=research_repository,
+    # One-off workflow run (no persistence) for analyze/ask
+    run_workflow_use_case = providers.Factory(
+        RunWorkflowUseCase,
         profile_repository=research_profile_repository,
         workflow_executors=workflow_executors,
     )
@@ -161,9 +136,6 @@ def configure_use_cases(
         "get_stock_use_case": get_stock_use_case,
         "search_stocks_use_case": search_stocks_use_case,
         "get_stock_data_use_case": get_stock_data_use_case,
-        "create_research_use_case": create_research_use_case,
-        "get_research_use_case": get_research_use_case,
-        "set_research_context_use_case": set_research_context_use_case,
         "create_profile_use_case": create_profile_use_case,
         "get_current_profile_use_case": get_current_profile_use_case,
         "set_current_profile_use_case": set_current_profile_use_case,
@@ -172,5 +144,5 @@ def configure_use_cases(
         "list_profiles_use_case": list_profiles_use_case,
         "research_stock_fundamentals_use_case": research_stock_fundamentals_use_case,
         "workflow_executors": workflow_executors,
-        "execute_research_use_case": execute_research_use_case,
+        "run_workflow_use_case": run_workflow_use_case,
     }

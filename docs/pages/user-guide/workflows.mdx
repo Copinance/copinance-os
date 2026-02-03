@@ -25,7 +25,7 @@ Static workflows follow a predefined analysis pipeline with consistent steps.
 ### Example
 
 ```bash
-copinance research run AAPL --workflow stock --timeframe mid_term
+copinance analyze stock AAPL --timeframe mid_term
 ```
 
 ## Agentic Workflows
@@ -51,7 +51,7 @@ Agentic workflows use AI to dynamically analyze stocks based on your questions.
 ### Example
 
 ```bash
-copinance research ask AAPL "What are the key financial risks?"
+copinance ask "What are the key financial risks?" --symbol AAPL
 ```
 
 ### Setup Required
@@ -60,7 +60,7 @@ See [Configuration](configuration) for setting up Gemini API key.
 
 ## Timeframes
 
-Both workflow types adapt to the research timeframe:
+Both workflow types adapt to the timeframe:
 
 ### Short-term
 - **Focus**: Recent price movements, technical indicators
@@ -98,7 +98,7 @@ Fundamentals workflows focus specifically on fundamental analysis and financial 
 ### Example
 
 ```bash
-copinance research run AAPL --workflow stock --timeframe long_term
+copinance analyze stock AAPL --timeframe long_term
 ```
 
 ## Choosing a Workflow
@@ -118,76 +118,22 @@ copinance research run AAPL --workflow stock --timeframe long_term
 - You want to focus on financial statements and ratios
 - You don't need AI-powered insights
 
-## Research Lifecycle: Create, Execute, and Run
+## One-off Execution
 
-Copinance OS provides three commands for managing research: `create`, `execute`, and `run`. Each serves a different purpose in the research lifecycle.
-
-### The Three Commands
-
-1. **`create`** - Creates a research task without executing it
-   - Prepares research with specific configuration
-   - Returns a research ID for later use
-   - Useful for batch processing and scheduling
-
-2. **`execute`** - Executes an existing research by ID
-   - Can be called multiple times on the same research
-   - Allows re-running with different contexts or questions
-   - Useful for iterative analysis
-
-3. **`run`** - Creates and executes in one command
-   - Convenience method for quick analysis
-   - Best for one-off research tasks
-   - No need to manage research IDs
-
-### When to Use Each
-
-**Use `create` when:**
-- You want to prepare research tasks in advance
-- You're setting up multiple research tasks for batch processing
-- You need to schedule research for later execution
-- You want to configure research before running it
-
-**Use `execute` when:**
-- You have an existing research ID from a previous `create` command
-- You want to re-run research with updated data
-- You need to run the same research with different questions/contexts
-- You're doing iterative analysis on the same stock
-
-**Use `run` when:**
-- You want quick one-off analysis
-- You don't need to save or reuse the research
-- You're doing exploratory research
-- You're testing workflows
+All workflow runs are one-off: `copinance analyze` and `copinance ask` run workflows without persisting jobs. Each run saves results to `.copinance/results/` as JSON. Profiles and cached tool data also live under `.copinance`. Use `copinance cache clear` to clear cached tool data.
 
 ### Example Workflows
 
-**Batch Processing:**
 ```bash
-# Create multiple research tasks
-copinance research create AAPL --workflow stock
-copinance research create MSFT --workflow stock
-copinance research create GOOGL --workflow stock
+# Stock analysis (one-off)
+copinance analyze stock AAPL --timeframe mid_term
 
-# Execute them later (or in parallel)
-copinance research execute <research-id-1>
-copinance research execute <research-id-2>
-copinance research execute <research-id-3>
+# Macro regime (one-off)
+copinance analyze macro --market-index SPY
+
+# Agentic Q&A (one-off)
+copinance ask "What are the key risks?" --symbol AAPL
 ```
-
-**Iterative Analysis:**
-```bash
-# Create research once
-copinance research create AAPL --workflow agent
-
-# Execute with different questions
-copinance research execute <research-id> --question "What are the key risks?"
-copinance research execute <research-id> --question "What is the growth outlook?"
-```
-
-**Quick Analysis:**
-```bash
-# One command for quick results
-copinance research run AAPL --workflow stock
 
 ## Macro Regime Workflow
 
@@ -197,7 +143,7 @@ The macro regime workflow combines market regime indicators with macroeconomic d
 
 ```bash
 # Full analysis with defaults
-copinance research macro
+copinance analyze macro
 ```
 
 ### Customization
@@ -205,41 +151,32 @@ copinance research macro
 **Market Index:**
 Choose which market index to analyze:
 ```bash
-copinance research macro --market-index SPY    # S&P 500 (default)
-copinance research macro --market-index QQQ    # Nasdaq 100
-copinance research macro --market-index DIA     # Dow Jones
-copinance research macro --market-index IWM    # Russell 2000
+copinance analyze macro --market-index SPY    # S&P 500 (default)
+copinance analyze macro --market-index QQQ    # Nasdaq 100
+copinance analyze macro --market-index DIA    # Dow Jones
+copinance analyze macro --market-index IWM    # Russell 2000
 ```
 
 **Lookback Period:**
 Adjust the analysis window:
 ```bash
-copinance research macro --lookback-days 90    # 3 months
-copinance research macro --lookback-days 252    # 1 year (default)
-copinance research macro --lookback-days 504   # 2 years
+copinance analyze macro --lookback-days 90    # 3 months
+copinance analyze macro --lookback-days 252   # 1 year (default)
+copinance analyze macro --lookback-days 504   # 2 years
 ```
 
 **Indicator Selection:**
-Enable or disable specific indicators:
+All indicator groups are on by default. Use `--no-include-<name>` to exclude any category. Available: `vix`, `market-breadth`, `sector-rotation`, `rates`, `credit`, `commodities`, `labor`, `housing`, `manufacturing`, `consumer`, `global`, `advanced`.
 
 ```bash
-# Only macro indicators (rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
-copinance research macro \
+# Macro-only: exclude market/volatility/sector to focus on economic indicators
+copinance analyze macro \
   --no-include-vix \
   --no-include-market-breadth \
   --no-include-sector-rotation
 
-# Advanced economic analysis (include all categories)
-copinance research macro \
-  --include-labor \
-  --include-housing \
-  --include-manufacturing \
-  --include-consumer \
-  --include-global \
-  --include-advanced
-
-# Only market regime indicators
-copinance research macro \
+# Only market regime indicators (exclude macro categories)
+copinance analyze macro \
   --no-include-rates \
   --no-include-credit \
   --no-include-commodities
@@ -256,6 +193,8 @@ copinance research macro \
 - **Rates**: 10Y Treasury yields, yield curve analysis
 - **Credit**: Credit spreads (HYG, LQD)
 - **Commodities**: Energy prices (oil, natural gas)
+- **Labor, Housing, Manufacturing, Consumer, Global**: Employment, housing, PMI, consumer sentiment, and global indicators (when enabled)
+- **Advanced**: Leading Economic Index (LEI), Federal Reserve balance sheet, and CDS proxies (HYG, LQD) for credit risk—uses FRED when available, else yfinance
 
 **Data Sources:**
 - Macro indicators prefer FRED API (if `COPINANCEOS_FRED_API_KEY` configured) for true yields/spreads
@@ -273,13 +212,13 @@ copinance research macro \
 
 ```bash
 # Quick market check
-copinance research macro --lookback-days 90
+copinance analyze macro --lookback-days 90
 
 # Deep dive on Nasdaq
-copinance research macro --market-index QQQ --lookback-days 504
+copinance analyze macro --market-index QQQ --lookback-days 504
 
 # Focus on macro conditions
-copinance research macro \
+copinance analyze macro \
   --no-include-vix \
   --no-include-market-breadth \
   --no-include-sector-rotation

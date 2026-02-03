@@ -5,7 +5,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import copinanceos.cli.__main__  # noqa: PLC0415 - Testing module import behavior
-from copinanceos.cli import app, profile_app, research_app, stock_app, version
+from copinanceos.cli import (
+    analyze_app,
+    app,
+    ask_app,
+    cache_app,
+    profile_app,
+    stock_app,
+    version,
+)
 
 
 @pytest.mark.unit
@@ -43,7 +51,7 @@ class TestMainCLI:
         # Verify app is a Typer instance
         assert app is not None
         # Verify sub-commands are registered
-        # The app should have stock, profile, and research sub-commands
+        # The app should have stock, profile, analyze, ask, cache sub-commands
         assert hasattr(app, "registered_commands") or hasattr(app, "commands")
 
 
@@ -67,9 +75,20 @@ class TestCLIIntegration:
         assert profile_app is not None
         assert app is not None
 
-    def test_research_app_registered(self) -> None:
-        """Test that research app is registered."""
+    def test_cache_app_registered(self) -> None:
+        """Test that cache app is registered."""
 
-        # Verify research_app exists
-        assert research_app is not None
+        assert cache_app is not None
+        assert app is not None
+
+    def test_analyze_app_registered(self) -> None:
+        """Test that analyze app is registered."""
+
+        assert analyze_app is not None
+        assert app is not None
+
+    def test_ask_app_registered(self) -> None:
+        """Test that ask app is registered."""
+
+        assert ask_app is not None
         assert app is not None

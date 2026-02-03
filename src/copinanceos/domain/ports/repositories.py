@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from copinanceos.domain.models.research import Research
 from copinanceos.domain.models.research_profile import ResearchProfile
 from copinanceos.domain.models.stock import Stock, StockData
 
@@ -53,28 +52,4 @@ class StockRepository(ABC):
     @abstractmethod
     async def get_stock_data(self, symbol: str, limit: int = 100) -> list[StockData]:
         """Get historical stock data."""
-        pass
-
-
-class ResearchRepository(ABC):
-    """Abstract repository for Research entities."""
-
-    @abstractmethod
-    async def get_by_id(self, research_id: UUID) -> Research | None:
-        """Get research by ID."""
-        pass
-
-    @abstractmethod
-    async def list_all(self, limit: int = 100, offset: int = 0) -> list[Research]:
-        """List all research with pagination."""
-        pass
-
-    @abstractmethod
-    async def save(self, research: Research) -> Research:
-        """Save or update research."""
-        pass
-
-    @abstractmethod
-    async def delete(self, research_id: UUID) -> bool:
-        """Delete research by ID."""
         pass

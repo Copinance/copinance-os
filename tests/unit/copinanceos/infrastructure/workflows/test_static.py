@@ -19,7 +19,7 @@ from copinanceos.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
-from copinanceos.domain.models.research import Research, ResearchTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
 from copinanceos.domain.models.stock import Stock
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.infrastructure.workflows import StaticWorkflowExecutor
@@ -37,23 +37,25 @@ class TestStaticWorkflowExecutor:
     async def test_validate_returns_true_for_static_workflow(self) -> None:
         """Test that validate returns True for stock workflow type."""
         executor = StaticWorkflowExecutor()
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.LONG_TERM,
+            timeframe=JobTimeframe.LONG_TERM,
             workflow_type="stock",
         )
-        result = await executor.validate(research)
+        result = await executor.validate(job)
         assert result is True
 
     async def test_validate_returns_false_for_non_static_workflow(self) -> None:
         """Test that validate returns False for non-stock workflow types."""
         executor = StaticWorkflowExecutor()
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.LONG_TERM,
+            timeframe=JobTimeframe.LONG_TERM,
             workflow_type="agent",
         )
-        result = await executor.validate(research)
+        result = await executor.validate(job)
         assert result is False
 
     async def test_execute_returns_correct_results_structure(self) -> None:
@@ -107,15 +109,16 @@ class TestStaticWorkflowExecutor:
             fundamentals_use_case=mock_fundamentals_use_case,
         )
 
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.SHORT_TERM,
+            timeframe=JobTimeframe.SHORT_TERM,
             workflow_type="stock",
             parameters={"key": "value"},
         )
         context = {"context_key": "context_value"}
 
-        results = await executor.execute(research, context)
+        results = await executor.execute(job, context)
 
         assert results["workflow_type"] == "stock"
         assert results["stock_symbol"] == "AAPL"
@@ -160,13 +163,14 @@ class TestStaticWorkflowExecutor:
             fundamentals_use_case=mock_fundamentals_use_case,
         )
 
-        for timeframe in ResearchTimeframe:
-            research = Research(
+        for timeframe in JobTimeframe:
+            job = Job(
+                scope=JobScope.STOCK,
                 stock_symbol="MSFT",
                 timeframe=timeframe,
                 workflow_type="stock",
             )
-            results = await executor.execute(research, {})
+            results = await executor.execute(job, {})
             assert results["timeframe"] == timeframe.value
             assert results["stock_symbol"] == "MSFT"
 
@@ -174,13 +178,14 @@ class TestStaticWorkflowExecutor:
         """Test that execute handles missing dependencies gracefully."""
         executor = StaticWorkflowExecutor()  # No dependencies provided
 
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="stock",
         )
 
-        results = await executor.execute(research, {})
+        results = await executor.execute(job, {})
 
         assert results["workflow_type"] == "stock"
         assert results["stock_symbol"] == "AAPL"
@@ -198,13 +203,14 @@ class TestStaticWorkflowExecutor:
 
         executor = StaticWorkflowExecutor(market_data_provider=mock_market_provider)
 
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="INVALID",
-            timeframe=ResearchTimeframe.SHORT_TERM,
+            timeframe=JobTimeframe.SHORT_TERM,
             workflow_type="stock",
         )
 
-        results = await executor.execute(research, {})
+        results = await executor.execute(job, {})
 
         assert results["workflow_type"] == "stock"
         # Workflow continues even when individual steps fail
@@ -344,14 +350,15 @@ class TestStaticWorkflowFundamentals:
             fundamentals_use_case=mock_fundamentals_use_case,
         )
 
-        research = Research(
+        job = Job(
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.LONG_TERM,
+            timeframe=JobTimeframe.LONG_TERM,
             workflow_type="stock",
         )
         context = {}
 
-        results = await executor.execute(research, context)
+        results = await executor.execute(job, context)
 
         # Verify fundamentals section includes full financial statements
         assert "fundamentals" in results

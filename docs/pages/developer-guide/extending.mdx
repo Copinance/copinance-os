@@ -138,7 +138,7 @@ container.llm_analyzer.override(
 
 ```python
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job
 from typing import Any
 
 class MyCustomWorkflow(BaseWorkflowExecutor):
@@ -147,11 +147,11 @@ class MyCustomWorkflow(BaseWorkflowExecutor):
     def get_workflow_type(self) -> str:
         return "custom"
 
-    async def validate(self, research: Research) -> bool:
-        return research.workflow_type == "custom"
+    async def validate(self, job: Job) -> bool:
+        return job.workflow_type == "custom"
 
     async def _execute_workflow(
-        self, research: Research, context: dict[str, Any]
+        self, job: Job, context: dict[str, Any]
     ) -> dict[str, Any]:
         """Execute custom workflow logic."""
         # Your implementation

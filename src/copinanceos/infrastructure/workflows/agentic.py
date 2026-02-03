@@ -5,7 +5,7 @@ from typing import Any
 
 import structlog
 
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job, JobScope
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.domain.ports.data_providers import (
     FundamentalDataProvider,
@@ -19,7 +19,7 @@ from copinanceos.infrastructure.tools import (
     create_fundamental_data_tools_with_providers,
     create_macro_regime_indicators_tool,
     create_market_data_tools,
-    create_market_regime_tools,
+    create_rule_based_regime_tools,
 )
 from copinanceos.infrastructure.tools.analysis.market_regime.indicators import (
     create_market_regime_indicators_tool,
@@ -66,9 +66,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         self._prompt_manager = prompt_manager or PromptManager()
         self._cache_manager = cache_manager
 
-    async def _execute_workflow(
-        self, research: Research, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _execute_workflow(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """
         Execute an agent workflow using LLM with tools.
 
@@ -77,7 +75,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         provide comprehensive answers to questions about stocks.
 
         Args:
-            research: The research entity to execute
+            job: The job to execute
             context: Execution context and parameters. Can include:
                 - "question": Specific question to answer (optional)
                 - "financial_literacy": User's financial literacy level (optional)
@@ -88,7 +86,16 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
                 - tool_calls: Tools that were used
                 - iterations: Number of LLM iterations
         """
-        symbol = research.stock_symbol.upper()
+        is_market_wide = job.scope == JobScope.MARKET
+        # Use a sensible default symbol for tool examples and prompt context.
+        # For market-wide questions, we anchor to a market index (default: SPY).
+        symbol = (
+            (job.market_index or "SPY").upper()
+            if is_market_wide
+            else (job.stock_symbol or "").upper()
+        )
+        if not is_market_wide and not symbol:
+            raise ValueError("stock_symbol is required for agent workflow when scope=stock")
 
         results: dict[str, Any] = {}
 
@@ -134,7 +141,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
             )
 
             # Add market regime detection tools
-            regime_tools = create_market_regime_tools(self._market_data_provider)
+            regime_tools = create_rule_based_regime_tools(self._market_data_provider)
             tools.extend(regime_tools)
 
             # Add market regime indicators tool
@@ -199,13 +206,16 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
             logger.warning("Agentic workflow executed without question", symbol=symbol)
             return results
 
-        # Enhance question to include symbol if not explicitly mentioned
-        # This helps the LLM know which stock symbol to use in tool calls
-        # Skip enhancement for market-wide questions (symbol == "MARKET")
+        # Enhance question to include symbol/index context when helpful.
         enhanced_question = question
-        is_market_wide = symbol == "MARKET"
-        if not is_market_wide and symbol.upper() not in question.upper():
-            enhanced_question = f"About {symbol}: {question}"
+        if is_market_wide:
+            # Avoid forcing a fake "symbol" into the question. Just provide anchor context.
+            if symbol and symbol.upper() not in question.upper():
+                enhanced_question = f"Market-wide (anchor index: {symbol}): {question}"
+        else:
+            # This helps the LLM know which stock symbol to use in tool calls.
+            if symbol.upper() not in question.upper():
+                enhanced_question = f"About {symbol}: {question}"
 
         # Build tool descriptions and examples
         tools_description, tool_examples = self._build_tool_descriptions(tools, symbol)
@@ -255,9 +265,9 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
 
         return results
 
-    async def validate(self, research: Research) -> bool:
-        """Validate if this executor can handle the given research."""
-        return research.workflow_type == "agent"
+    async def validate(self, job: Job) -> bool:
+        """Validate if this executor can handle the given job."""
+        return job.workflow_type == "agent"
 
     def get_workflow_type(self) -> str:
         """Get the workflow type identifier."""

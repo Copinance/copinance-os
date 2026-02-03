@@ -23,22 +23,13 @@ from copinanceos.infrastructure.tools.analysis.market_regime.rule_based import (
     create_rule_based_regime_tools,
 )
 
-# Re-export for backward compatibility
 __all__ = [
-    # Rule-based tools (current implementation)
     "MarketRegimeDetectTrendTool",
     "MarketRegimeDetectVolatilityTool",
     "MarketRegimeDetectCyclesTool",
     "create_rule_based_regime_tools",
-    # Market regime indicators tool
     "MarketRegimeIndicatorsTool",
     "create_market_regime_indicators_tool",
-    # Macro regime indicators tool (rates/credit/commodities)
     "MacroRegimeIndicatorsTool",
     "create_macro_regime_indicators_tool",
-    # Factory function (backward compatible)
-    "create_market_regime_tools",
 ]
-
-# Backward compatibility: default to rule-based tools
-create_market_regime_tools = create_rule_based_regime_tools

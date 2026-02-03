@@ -96,10 +96,11 @@ class TestWorkflowExecutorFactory:
 
         result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
-        # Should only return static executor when API key is missing
-        assert len(result) == 2
+        # Static + macro + fallback agent executor (no-LLM agent returns "not configured")
+        assert len(result) == 3
         assert mock_static_executor in result
-        mock_agentic.assert_not_called()
+        mock_agentic.assert_called_once()
+        assert mock_agentic.call_args.kwargs.get("llm_analyzer") is None
 
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMProviderFactory")
     @patch("copinanceos.infrastructure.factories.workflow_executor.LLMAnalyzerFactory")
@@ -120,6 +121,6 @@ class TestWorkflowExecutorFactory:
 
         result = WorkflowExecutorFactory.create_all(**mock_dependencies, llm_config=llm_config)
 
-        # Should still return static executor even if LLM creation fails
-        assert len(result) == 2
+        # Static + macro + fallback agent executor when LLM creation fails
+        assert len(result) == 3
         assert mock_static_executor in result

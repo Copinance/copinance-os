@@ -3,19 +3,19 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from copinanceos.domain.models.research import Research
+from copinanceos.domain.models.job import Job
 
 
 class WorkflowExecutor(ABC):
     """Abstract interface for workflow execution (stock, macro, or agent)."""
 
     @abstractmethod
-    async def execute(self, research: Research, context: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """
-        Execute a workflow for the given research.
+        Execute a workflow for the given job.
 
         Args:
-            research: The research entity to execute
+            job: The job to execute
             context: Execution context and parameters
 
         Returns:
@@ -24,15 +24,15 @@ class WorkflowExecutor(ABC):
         pass
 
     @abstractmethod
-    async def validate(self, research: Research) -> bool:
+    async def validate(self, job: Job) -> bool:
         """
-        Validate if this executor can handle the given research.
+        Validate if this executor can handle the given job.
 
         Args:
-            research: The research entity to validate
+            job: The job to validate
 
         Returns:
-            True if executor can handle this research
+            True if executor can handle this job
         """
         pass
 

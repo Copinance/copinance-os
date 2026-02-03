@@ -4,9 +4,10 @@ import typer
 from rich.console import Console
 
 from copinanceos import __version__
+from copinanceos.cli.analyze import analyze_app
+from copinanceos.cli.ask import ask_app
 from copinanceos.cli.cache import cache_app
 from copinanceos.cli.profile import profile_app
-from copinanceos.cli.research import research_app
 from copinanceos.cli.stock import stock_app
 
 app = typer.Typer(
@@ -15,10 +16,11 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-# Register sub-commands
+# Register sub-commands (all use .copinance for cache/storage)
 app.add_typer(stock_app, name="stock")
 app.add_typer(profile_app, name="profile")
-app.add_typer(research_app, name="research")
+app.add_typer(analyze_app, name="analyze")
+app.add_typer(ask_app, name="ask")
 app.add_typer(cache_app, name="cache")
 
 

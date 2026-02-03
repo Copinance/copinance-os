@@ -6,7 +6,7 @@ from copinanceos.infrastructure.tools.analysis import (
     MarketRegimeDetectTrendTool,
     MarketRegimeDetectVolatilityTool,
     create_macro_regime_indicators_tool,
-    create_market_regime_tools,
+    create_rule_based_regime_tools,
 )
 from copinanceos.infrastructure.tools.data_provider import (
     DataProviderToolRegistry,
@@ -27,7 +27,7 @@ __all__ = [
     "MarketRegimeDetectTrendTool",
     "MarketRegimeDetectVolatilityTool",
     "MarketRegimeDetectCyclesTool",
-    "create_market_regime_tools",
+    "create_rule_based_regime_tools",
     "MacroRegimeIndicatorsTool",
     "create_macro_regime_indicators_tool",
 ]

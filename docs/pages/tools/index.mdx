@@ -25,7 +25,7 @@ Tools that wrap data provider methods, making them accessible to AI agents and w
 Tools are automatically available when using agent workflows:
 
 ```bash
-copinance research ask AAPL "What is the current market trend?"
+copinance ask "What is the current market trend?" --symbol AAPL
 ```
 
 The AI agent will automatically select and use the appropriate tools to answer your question.
@@ -33,14 +33,14 @@ The AI agent will automatically select and use the appropriate tools to answer y
 ### Programmatic Usage
 
 ```python
-from copinanceos.infrastructure.tools.analysis import create_market_regime_tools
+from copinanceos.infrastructure.tools.analysis import create_rule_based_regime_tools
 from copinanceos.infrastructure.tools.data_provider import create_market_data_tools
 from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
 
 provider = YFinanceMarketProvider()
 
 # Create tools
-regime_tools = create_market_regime_tools(provider)
+regime_tools = create_rule_based_regime_tools(provider)
 data_tools = create_market_data_tools(provider)
 
 # Use tools

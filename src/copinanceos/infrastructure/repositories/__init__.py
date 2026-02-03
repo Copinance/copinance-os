@@ -6,7 +6,6 @@ underlying storage implementation. The storage technology is not exposed to cons
 
 Structure:
 - storage/ - Storage backend implementations and factory (must implement domain.ports.storage.Storage)
-- research/ - Research repository implementation
 - stock/ - Stock repository implementation
 - profile/ - Research profile repository implementation
 
@@ -17,13 +16,9 @@ The storage factory ensures implementation details are hidden.
 from copinanceos.infrastructure.repositories.profile import (
     ResearchProfileRepositoryImpl,
 )
-from copinanceos.infrastructure.repositories.research import (
-    ResearchRepositoryImpl,
-)
 from copinanceos.infrastructure.repositories.stock import StockRepositoryImpl
 
 __all__ = [
-    "ResearchRepositoryImpl",
     "StockRepositoryImpl",
     "ResearchProfileRepositoryImpl",
 ]

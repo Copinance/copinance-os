@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from copinanceos.domain.models.research import Research, ResearchTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
 
@@ -19,17 +19,17 @@ class ConcreteWorkflowExecutor(BaseWorkflowExecutor):
         """Get workflow type."""
         return "test_workflow"
 
-    async def validate(self, research: Research) -> bool:
-        """Validate research."""
-        return research.workflow_type == "test_workflow"
+    async def validate(self, job: Job) -> bool:
+        """Validate job."""
+        return job.workflow_type == "test_workflow"
 
-    async def _execute_workflow(self, research: Research, context: dict) -> dict:
+    async def _execute_workflow(self, job: Job, context: dict) -> dict:
         """Execute workflow."""
         if self.should_fail:
             raise ValueError("Test error")
         return {
             "result": "success",
-            "data": {"symbol": research.stock_symbol},
+            "data": {"symbol": job.stock_symbol},
         }
 
 
@@ -45,31 +45,33 @@ class TestBaseWorkflowExecutor:
     async def test_validate(self) -> None:
         """Test validate method."""
         executor = ConcreteWorkflowExecutor()
-        research = Research(
+        job = Job(
             id=uuid4(),
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
 
-        result = await executor.validate(research)
+        result = await executor.validate(job)
         assert result is True
 
-        research.workflow_type = "other_workflow"
-        result = await executor.validate(research)
+        job.workflow_type = "other_workflow"
+        result = await executor.validate(job)
         assert result is False
 
     def test_initialize_results(self) -> None:
         """Test _initialize_results method."""
         executor = ConcreteWorkflowExecutor()
-        research = Research(
+        job = Job(
             id=uuid4(),
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
 
-        results = executor._initialize_results(research, "test_workflow")
+        results = executor._initialize_results(job, "test_workflow")
 
         assert results["workflow_type"] == "test_workflow"
         assert results["stock_symbol"] == "AAPL"
@@ -80,15 +82,16 @@ class TestBaseWorkflowExecutor:
     async def test_execute_success(self) -> None:
         """Test execute method with successful workflow."""
         executor = ConcreteWorkflowExecutor(should_fail=False)
-        research = Research(
+        job = Job(
             id=uuid4(),
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
         context = {"key": "value"}
 
-        results = await executor.execute(research, context)
+        results = await executor.execute(job, context)
 
         assert results["workflow_type"] == "test_workflow"
         assert results["stock_symbol"] == "AAPL"
@@ -101,19 +104,20 @@ class TestBaseWorkflowExecutor:
     async def test_execute_with_custom_status(self) -> None:
         """Test execute method when workflow sets custom status."""
         executor = ConcreteWorkflowExecutor(should_fail=False)
-        research = Research(
+        job = Job(
             id=uuid4(),
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
 
         # Override _execute_workflow to return custom status
-        async def custom_execute(research: Research, context: dict) -> dict:
+        async def custom_execute(job: Job, context: dict) -> dict:
             return {"status": "custom_status", "message": "Custom message"}
 
         executor._execute_workflow = custom_execute
-        results = await executor.execute(research, {})
+        results = await executor.execute(job, {})
 
         assert results["status"] == "custom_status"
         assert results["message"] == "Custom message"
@@ -121,15 +125,16 @@ class TestBaseWorkflowExecutor:
     async def test_execute_failure(self) -> None:
         """Test execute method with failed workflow."""
         executor = ConcreteWorkflowExecutor(should_fail=True)
-        research = Research(
+        job = Job(
             id=uuid4(),
+            scope=JobScope.STOCK,
             stock_symbol="AAPL",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
         context = {"key": "value"}
 
-        results = await executor.execute(research, context)
+        results = await executor.execute(job, context)
 
         assert results["workflow_type"] == "test_workflow"
         assert results["stock_symbol"] == "AAPL"
@@ -141,14 +146,15 @@ class TestBaseWorkflowExecutor:
     async def test_execute_uppercase_symbol(self) -> None:
         """Test that execute converts symbol to uppercase."""
         executor = ConcreteWorkflowExecutor(should_fail=False)
-        research = Research(
+        job = Job(
             id=uuid4(),
+            scope=JobScope.STOCK,
             stock_symbol="aapl",
-            timeframe=ResearchTimeframe.MID_TERM,
+            timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
 
-        results = await executor.execute(research, {})
+        results = await executor.execute(job, {})
 
         assert results["stock_symbol"] == "AAPL"
 
@@ -156,15 +162,16 @@ class TestBaseWorkflowExecutor:
         """Test execute with different timeframes."""
         executor = ConcreteWorkflowExecutor(should_fail=False)
 
-        for timeframe in ResearchTimeframe:
-            research = Research(
+        for timeframe in JobTimeframe:
+            job = Job(
                 id=uuid4(),
+                scope=JobScope.STOCK,
                 stock_symbol="AAPL",
                 timeframe=timeframe,
                 workflow_type="test_workflow",
             )
 
-            results = await executor.execute(research, {})
+            results = await executor.execute(job, {})
 
             assert results["timeframe"] == timeframe.value
             assert results["status"] == "completed"
