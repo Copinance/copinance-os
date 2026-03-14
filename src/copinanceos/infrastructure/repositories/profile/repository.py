@@ -1,15 +1,15 @@
-"""Research profile repository implementation."""
+"""Analysis profile repository implementation."""
 
 from uuid import UUID
 
-from copinanceos.domain.models.research_profile import ResearchProfile
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
+from copinanceos.domain.models.profile import AnalysisProfile
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 from copinanceos.domain.ports.storage import Storage
 from copinanceos.infrastructure.repositories.storage.factory import create_storage
 
 
-class ResearchProfileRepositoryImpl(ResearchProfileRepository):
-    """Implementation of ResearchProfileRepository.
+class AnalysisProfileRepositoryImpl(AnalysisProfileRepository):
+    """Implementation of AnalysisProfileRepository.
 
     This repository uses the Storage interface, hiding the underlying
     storage implementation. The storage technology is not exposed
@@ -26,27 +26,27 @@ class ResearchProfileRepositoryImpl(ResearchProfileRepository):
         if storage is None:
             storage = create_storage()
         self._storage = storage
-        self._collection = self._storage.get_collection("research/profiles", ResearchProfile)
+        self._collection = self._storage.get_collection("analysis/profiles", AnalysisProfile)
 
-    async def get_by_id(self, profile_id: UUID) -> ResearchProfile | None:
-        """Get research profile by ID."""
+    async def get_by_id(self, profile_id: UUID) -> AnalysisProfile | None:
+        """Get analysis profile by ID."""
         return self._collection.get(profile_id)
 
-    async def save(self, profile: ResearchProfile) -> ResearchProfile:
-        """Save or update research profile."""
+    async def save(self, profile: AnalysisProfile) -> AnalysisProfile:
+        """Save or update analysis profile."""
         self._collection[profile.id] = profile
-        self._storage.save("research/profiles")
+        self._storage.save("analysis/profiles")
         return profile
 
     async def delete(self, profile_id: UUID) -> bool:
-        """Delete research profile by ID."""
+        """Delete analysis profile by ID."""
         if profile_id in self._collection:
             del self._collection[profile_id]
-            self._storage.save("research/profiles")
+            self._storage.save("analysis/profiles")
             return True
         return False
 
-    async def list_all(self, limit: int = 100, offset: int = 0) -> list[ResearchProfile]:
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[AnalysisProfile]:
         """List all profiles with pagination."""
         all_profiles = list(self._collection.values())
         return all_profiles[offset : offset + limit]

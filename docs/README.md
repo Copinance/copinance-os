@@ -37,7 +37,7 @@ All documentation files are located in the `docs/` directory:
 docs/
 ├── pages/                 # Documentation pages (MDX format)
 │   ├── index.mdx         # Homepage
-│   ├── _meta.json        # Navigation configuration
+│   ├── _meta.tsx         # Navigation configuration (per-section)
 │   ├── getting-started/  # Getting started guides
 │   ├── user-guide/       # User documentation
 │   ├── developer-guide/  # Developer documentation
@@ -61,5 +61,5 @@ The documentation is configured for GitHub Pages deployment with the base path `
 ## Customization
 
 - **Theme**: Edit `theme.config.tsx` to customize colors, logo, footer, etc.
-- **Navigation**: Edit `_meta.json` files in `pages/` directories to change the sidebar structure
+- **Navigation**: Edit `_meta.tsx` files in `pages/` directories to change the sidebar structure
 - **Styling**: Nextra uses Tailwind CSS - you can add custom styles if needed

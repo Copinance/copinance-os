@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from copinanceos.application.use_cases.fundamentals import (
-    ResearchStockFundamentalsRequest,
-    ResearchStockFundamentalsUseCase,
+    GetStockFundamentalsRequest,
+    GetStockFundamentalsUseCase,
 )
 from copinanceos.domain.exceptions import InvalidStockSymbolError, ValidationError
 from copinanceos.domain.models.fundamentals import StockFundamentals
@@ -24,8 +24,8 @@ class TestFundamentalsUseCases:
         fundamental_data_provider: FundamentalDataProvider,
     ) -> None:
         """Test that empty symbol is rejected."""
-        use_case = ResearchStockFundamentalsUseCase(fundamental_data_provider)
-        request = ResearchStockFundamentalsRequest(
+        use_case = GetStockFundamentalsUseCase(fundamental_data_provider)
+        request = GetStockFundamentalsRequest(
             symbol="",
             periods=1,
             period_type="annual",
@@ -40,8 +40,8 @@ class TestFundamentalsUseCases:
         fundamental_data_provider: FundamentalDataProvider,
     ) -> None:
         """Test that invalid period type is rejected."""
-        use_case = ResearchStockFundamentalsUseCase(fundamental_data_provider)
-        request = ResearchStockFundamentalsRequest(
+        use_case = GetStockFundamentalsUseCase(fundamental_data_provider)
+        request = GetStockFundamentalsRequest(
             symbol="AAPL",
             periods=1,
             period_type="invalid",
@@ -56,8 +56,8 @@ class TestFundamentalsUseCases:
         fundamental_data_provider: FundamentalDataProvider,
     ) -> None:
         """Test that invalid periods count is rejected."""
-        use_case = ResearchStockFundamentalsUseCase(fundamental_data_provider)
-        request = ResearchStockFundamentalsRequest(
+        use_case = GetStockFundamentalsUseCase(fundamental_data_provider)
+        request = GetStockFundamentalsRequest(
             symbol="AAPL",
             periods=0,
             period_type="annual",
@@ -83,8 +83,8 @@ class TestFundamentalsUseCases:
             return_value=mock_fundamentals
         )
 
-        use_case = ResearchStockFundamentalsUseCase(fundamental_data_provider)
-        request = ResearchStockFundamentalsRequest(
+        use_case = GetStockFundamentalsUseCase(fundamental_data_provider)
+        request = GetStockFundamentalsRequest(
             symbol="aapl",
             periods=1,
             period_type="annual",

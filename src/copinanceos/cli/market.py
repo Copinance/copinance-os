@@ -9,14 +9,21 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from copinanceos.application.use_cases.fundamentals import GetStockFundamentalsRequest
 from copinanceos.application.use_cases.market import (
+    GetHistoricalDataRequest,
+    GetOptionsChainRequest,
+    GetQuoteRequest,
     InstrumentSearchMode,
     SearchInstrumentsRequest,
 )
 from copinanceos.cli.error_handler import handle_cli_error
+from copinanceos.cli.formatting import format_compact_number, format_price, format_volume
 from copinanceos.cli.utils import async_command
 from copinanceos.domain.models.market import MarketDataPoint, OptionsChain, OptionSide
+from copinanceos.infrastructure.config import get_storage_path_safe
 from copinanceos.infrastructure.containers import container
+from copinanceos.infrastructure.persistence import get_cache_dir
 
 market_app = typer.Typer(help="Market data commands")
 console = Console()
@@ -64,14 +71,9 @@ async def get_market_quote(
         help="Bypass cache and fetch fresh data",
     ),
 ) -> None:
-    """Fetch the latest market quote for an instrument.
-
-    Uses the same cache as agent tools; repeated requests for the same
-    symbol are served from cache until expiry or cache clear.
-    """
+    """Fetch the latest market quote for an instrument."""
     symbol_upper = symbol.upper()
     cache_manager = container.cache_manager()
-    provider = container.market_data_provider()
     quote: dict[str, Any] | None = None
 
     if not no_cache:
@@ -84,7 +86,9 @@ async def get_market_quote(
 
     if quote is None:
         try:
-            quote = await provider.get_quote(symbol_upper)
+            use_case = container.get_quote_use_case()
+            response = await use_case.execute(GetQuoteRequest(symbol=symbol_upper))
+            quote = response.quote
         except Exception as e:
             handle_cli_error(e, context={"symbol": symbol, "feature": "quote"})
             return
@@ -163,7 +167,7 @@ async def get_market_history(
 ) -> None:
     """Fetch historical market data for an instrument.
 
-    Uses the same cache as agent tools; repeated requests for the same
+    Uses the same cache as in question-driven analysis; repeated requests for the same
     symbol/range/interval are served from cache until expiry or cache clear.
     """
     if interval not in SUPPORTED_HISTORY_INTERVALS:
@@ -186,9 +190,9 @@ async def get_market_history(
     end_str = parsed_end_date.strftime("%Y-%m-%d")
     symbol_upper = symbol.upper()
     cache_manager = container.cache_manager()
-    provider = container.market_data_provider()
 
     rows: list[dict[str, Any]] = []
+    cache_file_path: str | None = None
 
     if not no_cache:
         try:
@@ -201,17 +205,22 @@ async def get_market_history(
             )
             if entry and entry.data:
                 rows = list(entry.data)
+                cache_file_path = entry.metadata.get("cache_file_path") if entry.metadata else None
         except Exception:
             pass
 
     if not rows:
         try:
-            history = await provider.get_historical_data(
-                symbol=symbol_upper,
-                start_date=parsed_start_date,
-                end_date=parsed_end_date,
-                interval=interval,
+            use_case = container.get_historical_data_use_case()
+            response = await use_case.execute(
+                GetHistoricalDataRequest(
+                    symbol=symbol_upper,
+                    start_date=parsed_start_date,
+                    end_date=parsed_end_date,
+                    interval=interval,
+                )
             )
+            history = response.data
         except Exception as e:
             handle_cli_error(e, context={"symbol": symbol, "feature": "history"})
             return
@@ -234,6 +243,10 @@ async def get_market_history(
         except Exception:
             pass
 
+    cache_dir = get_cache_dir(get_storage_path_safe())
+    cache_location = cache_file_path if cache_file_path else str(cache_dir)
+    console.print(f"[dim]Cache: {cache_location}[/dim]\n")
+
     to_show = rows[:limit] if limit else rows
     table = Table(title=f"Historical Data for {symbol_upper} ({interval})")
     table.add_column("Timestamp", style="cyan")
@@ -246,11 +259,11 @@ async def get_market_history(
     for row in to_show:
         table.add_row(
             row.get("timestamp", ""),
-            row.get("open_price", ""),
-            row.get("close_price", ""),
-            row.get("high_price", ""),
-            row.get("low_price", ""),
-            str(row.get("volume", "")),
+            format_price(row.get("open_price")),
+            format_price(row.get("close_price")),
+            format_price(row.get("high_price")),
+            format_price(row.get("low_price")),
+            format_volume(row.get("volume")),
         )
 
     console.print(table)
@@ -358,12 +371,11 @@ async def get_options_chain(
 ) -> None:
     """Fetch an options chain snapshot for an underlying symbol.
 
-    Uses the same cache as agent tools; repeated requests for the same
+    Uses the same cache as in question-driven analysis; repeated requests for the same
     underlying/expiration are served from cache until expiry or cache clear.
     """
     symbol_upper = underlying_symbol.upper()
     cache_manager = container.cache_manager()
-    provider = container.market_data_provider()
     options_data: OptionsChain | dict[str, Any] | None = None
 
     if not no_cache:
@@ -380,18 +392,22 @@ async def get_options_chain(
 
     if options_data is None:
         try:
-            chain = await provider.get_options_chain(
-                underlying_symbol=symbol_upper,
-                expiration_date=expiration_date,
+            use_case = container.get_options_chain_use_case()
+            response = await use_case.execute(
+                GetOptionsChainRequest(
+                    underlying_symbol=symbol_upper,
+                    expiration_date=expiration_date,
+                )
             )
+            options_data = response.chain
         except Exception as e:
             handle_cli_error(
                 e, context={"underlying_symbol": underlying_symbol, "feature": "options"}
             )
             return
 
-        options_data = chain
-        if not no_cache:
+        chain = options_data
+        if not no_cache and isinstance(chain, OptionsChain):
             try:
                 # JSON-serializable dict for cache (matches tool format)
                 payload = chain.model_dump(mode="json")
@@ -449,3 +465,239 @@ async def get_options_chain(
         console.print(
             f"[dim](showing {limit} of {len(contracts)} contracts; use --limit 0 to show all)[/dim]"
         )
+
+
+def _format_fundamentals_value(value: Any) -> str:
+    """Format a value for fundamentals display."""
+    if value is None:
+        return "N/A"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return str(value)
+
+
+def _income_trend_table(income_statements: list[dict[str, Any]], period_type: str) -> Table | None:
+    """Build a compact income trend table (revenue, net income, EPS) for the last 5 periods."""
+    if not income_statements:
+        return None
+    # Use up to 5 periods, skip rows with no revenue
+    rows = []
+    for st in income_statements[:5]:
+        period = st.get("period") or {}
+        fy = period.get("fiscal_year") or "—"
+        rev = st.get("total_revenue")
+        ni = st.get("net_income")
+        eps = st.get("diluted_eps") or st.get("earnings_per_share")
+        if rev is None and ni is None:
+            continue
+        rev_str = format_compact_number(rev) if rev is not None else "—"
+        ni_str = format_compact_number(ni) if ni is not None else "—"
+        eps_str = f"{float(eps):.2f}" if eps is not None else "—"
+        rows.append((str(fy), rev_str, ni_str, eps_str))
+    if not rows:
+        return None
+    table = Table(title=f"Income trend ({period_type})")
+    table.add_column("Fiscal year", style="cyan")
+    table.add_column("Revenue", justify="right", style="green")
+    table.add_column("Net income", justify="right", style="green")
+    table.add_column("EPS", justify="right", style="magenta")
+    for r in rows:
+        table.add_row(*r)
+    return table
+
+
+@market_app.command("fundamentals")
+@async_command
+async def get_market_fundamentals(
+    symbol: str = typer.Argument(..., help="Equity symbol"),
+    periods: int = typer.Option(
+        5,
+        "--periods",
+        "-n",
+        help="Number of periods (e.g. 5 years or 5 quarters)",
+    ),
+    period_type: str = typer.Option(
+        "annual",
+        "--period-type",
+        help="Period type: annual or quarterly",
+    ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass cache and fetch fresh data",
+    ),
+) -> None:
+    """Fetch fundamental data for an equity (financials, ratios, metrics).
+
+    Uses the same cache as in question-driven analysis. Data includes income statement,
+    balance sheet, cash flow, and key ratios.
+    """
+    symbol_upper = symbol.upper()
+    cache_manager = container.cache_manager()
+    fundamentals_data: dict[str, Any] | None = None
+
+    if not no_cache:
+        try:
+            entry = await cache_manager.get(
+                "get_market_fundamentals",
+                symbol=symbol_upper,
+                periods=periods,
+                period_type=period_type,
+            )
+            if entry and entry.data:
+                fundamentals_data = dict(entry.data)
+        except Exception:
+            pass
+
+    if fundamentals_data is None:
+        try:
+            use_case = container.get_stock_fundamentals_use_case()
+            response = await use_case.execute(
+                GetStockFundamentalsRequest(
+                    symbol=symbol_upper,
+                    periods=periods,
+                    period_type=period_type,
+                )
+            )
+            fundamentals_data = response.fundamentals.model_dump(mode="json")
+        except Exception as e:
+            handle_cli_error(e, context={"symbol": symbol, "feature": "fundamentals"})
+            return
+
+        if not no_cache:
+            try:
+                await cache_manager.set(
+                    "get_market_fundamentals",
+                    data=fundamentals_data,
+                    metadata={
+                        "symbol": symbol_upper,
+                        "periods": periods,
+                        "period_type": period_type,
+                    },
+                    symbol=symbol_upper,
+                    periods=periods,
+                    period_type=period_type,
+                )
+            except Exception:
+                pass
+
+    # Title and data-availability note
+    console.print(f"[bold]Fundamentals for {fundamentals_data.get('symbol', symbol_upper)}[/bold]")
+    num_income = len(fundamentals_data.get("income_statements") or [])
+    num_balance = len(fundamentals_data.get("balance_sheets") or [])
+    num_cashflow = len(fundamentals_data.get("cash_flow_statements") or [])
+    ratios = fundamentals_data.get("ratios") or {}
+    num_ratios = (
+        len([k for k in ratios if k != "metadata" and ratios.get(k) is not None])
+        if isinstance(ratios, dict)
+        else 0
+    )
+    console.print(
+        f"[dim]Full dataset: {num_income} income, {num_balance} balance sheet, {num_cashflow} cash flow periods, "
+        f'plus {num_ratios} ratios (cached). Use [italic]copinance analyze equity {symbol_upper} --question "..."[/italic] '
+        "to ask questions about this data.[/dim]\n"
+    )
+
+    # Overview table (market cap / EV in B/T)
+    overview = Table(title="Overview")
+    overview.add_column("Field", style="cyan")
+    overview.add_column("Value", style="green")
+    overview.add_row(
+        "Company",
+        _format_fundamentals_value(fundamentals_data.get("company_name")),
+    )
+    overview.add_row(
+        "Sector",
+        _format_fundamentals_value(fundamentals_data.get("sector")),
+    )
+    overview.add_row(
+        "Industry",
+        _format_fundamentals_value(fundamentals_data.get("industry")),
+    )
+    overview.add_row(
+        "Market cap",
+        format_compact_number(fundamentals_data.get("market_cap")),
+    )
+    overview.add_row(
+        "Enterprise value",
+        format_compact_number(fundamentals_data.get("enterprise_value")),
+    )
+    overview.add_row(
+        "Current price",
+        _format_fundamentals_value(fundamentals_data.get("current_price")),
+    )
+    overview.add_row(
+        "Currency",
+        _format_fundamentals_value(fundamentals_data.get("currency")),
+    )
+    overview.add_row(
+        "Fiscal year end",
+        _format_fundamentals_value(fundamentals_data.get("fiscal_year_end")),
+    )
+    overview.add_row(
+        "Provider",
+        _format_fundamentals_value(fundamentals_data.get("provider")),
+    )
+    overview.add_row(
+        "Data as of",
+        _format_fundamentals_value(fundamentals_data.get("data_as_of")),
+    )
+    console.print(overview)
+
+    # Income trend (revenue, net income, EPS over periods)
+    trend = _income_trend_table(
+        fundamentals_data.get("income_statements") or [],
+        period_type,
+    )
+    if trend:
+        console.print(trend)
+
+    # Growth metrics from full ratio set when present
+    if ratios and isinstance(ratios, dict):
+        growth_keys = ("revenue_growth", "earnings_growth", "free_cash_flow_growth")
+        growth_parts = []
+        for k in growth_keys:
+            v = ratios.get(k)
+            if v is not None:
+                try:
+                    pct = float(v)
+                    growth_parts.append(f"{k.replace('_', ' ').title()}: {pct:+.1f}%")
+                except (TypeError, ValueError):
+                    pass
+        if growth_parts:
+            console.print("[bold]Growth (YoY)[/bold]  [dim]from full dataset[/dim]")
+            console.print("  " + "  |  ".join(growth_parts))
+
+    # Key ratios if present
+    if ratios and isinstance(ratios, dict):
+        ratio_keys = [
+            "price_to_earnings",
+            "price_to_book",
+            "return_on_equity",
+            "debt_to_equity",
+            "current_ratio",
+            "operating_margin",
+            "net_margin",
+        ]
+
+        def _ratio_display(v: Any) -> str:
+            if v is None:
+                return "N/A"
+            try:
+                f = float(v)
+                return f"{f:.2f}" if abs(f) < 1e6 else f"{f:.1f}"
+            except (TypeError, ValueError):
+                return str(v)
+
+        ratio_rows = [
+            (key.replace("_", " ").title(), _ratio_display(ratios.get(key)))
+            for key in ratio_keys
+            if ratios.get(key) is not None
+        ]
+        if ratio_rows:
+            ratios_table = Table(title="Key ratios (most recent period)")
+            ratios_table.add_column("Ratio", style="cyan")
+            ratios_table.add_column("Value", justify="right", style="magenta")
+            for label, val in ratio_rows:
+                ratios_table.add_row(label, val)
+            console.print(ratios_table)

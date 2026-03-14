@@ -1,21 +1,25 @@
-"""Unit tests for market instrument use cases."""
+"""Unit tests for market use cases."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from copinanceos.application.use_cases.market import (
+    GetHistoricalDataRequest,
+    GetHistoricalDataUseCase,
     GetInstrumentRequest,
     GetInstrumentUseCase,
-    GetMarketDataRequest,
-    GetMarketDataUseCase,
+    GetOptionsChainRequest,
+    GetOptionsChainUseCase,
+    GetQuoteRequest,
+    GetQuoteUseCase,
     InstrumentSearchMode,
     SearchInstrumentsRequest,
     SearchInstrumentsUseCase,
 )
-from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.domain.models.market import MarketDataPoint, OptionsChain
 from copinanceos.domain.models.stock import Stock
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.repositories import StockRepository
@@ -69,8 +73,8 @@ class TestSearchInstrumentsUseCase:
             market_data_provider=mock_provider,
         )
 
-        with patch.object(use_case, "_fetch_instrument_from_provider") as mock_fetch:
-            mock_fetch.return_value = Stock(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ")
+        with patch.object(use_case, "_resolve_instrument_from_provider") as mock_resolve:
+            mock_resolve.return_value = Stock(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ")
             response = await use_case.execute(
                 SearchInstrumentsRequest(
                     query="apple",
@@ -84,10 +88,36 @@ class TestSearchInstrumentsUseCase:
 
 
 @pytest.mark.unit
-class TestGetMarketDataUseCase:
+class TestGetQuoteUseCase:
+    def test_initialization(self) -> None:
+        mock_provider = MagicMock(spec=MarketDataProvider)
+        use_case = GetQuoteUseCase(market_data_provider=mock_provider)
+        assert use_case._market_data_provider is mock_provider
+
     @pytest.mark.asyncio
-    async def test_execute(self) -> None:
-        mock_repository = AsyncMock(spec=StockRepository)
+    async def test_execute_returns_quote(self) -> None:
+        mock_provider = AsyncMock(spec=MarketDataProvider)
+        mock_provider.get_quote = AsyncMock(
+            return_value={
+                "symbol": "AAPL",
+                "current_price": Decimal("175.50"),
+                "volume": 50_000_000,
+            }
+        )
+        use_case = GetQuoteUseCase(market_data_provider=mock_provider)
+        response = await use_case.execute(GetQuoteRequest(symbol="AAPL"))
+
+        assert response.symbol == "AAPL"
+        assert response.quote["symbol"] == "AAPL"
+        assert response.quote["current_price"] == Decimal("175.50")
+        mock_provider.get_quote.assert_called_once_with("AAPL")
+
+
+@pytest.mark.unit
+class TestGetHistoricalDataUseCase:
+    @pytest.mark.asyncio
+    async def test_execute_returns_data(self) -> None:
+        mock_provider = AsyncMock(spec=MarketDataProvider)
         data = [
             MarketDataPoint(
                 symbol="AAPL",
@@ -99,10 +129,45 @@ class TestGetMarketDataUseCase:
                 volume=1000000,
             )
         ]
-        mock_repository.get_market_data = AsyncMock(return_value=data)
+        mock_provider.get_historical_data = AsyncMock(return_value=data)
+        use_case = GetHistoricalDataUseCase(market_data_provider=mock_provider)
+        response = await use_case.execute(
+            GetHistoricalDataRequest(
+                symbol="AAPL",
+                start_date=datetime(2024, 1, 1),
+                end_date=datetime(2024, 1, 31),
+                interval="1d",
+            )
+        )
 
-        use_case = GetMarketDataUseCase(instrument_repository=mock_repository)
-        response = await use_case.execute(GetMarketDataRequest(symbol="AAPL", limit=100))
-
+        assert response.symbol == "AAPL"
         assert len(response.data) == 1
         assert response.data[0].symbol == "AAPL"
+        assert response.data[0].close_price == Decimal("151")
+
+
+@pytest.mark.unit
+class TestGetOptionsChainUseCase:
+    @pytest.mark.asyncio
+    async def test_execute_returns_chain(self) -> None:
+        mock_provider = AsyncMock(spec=MarketDataProvider)
+        chain = OptionsChain(
+            underlying_symbol="AAPL",
+            expiration_date=date(2025, 1, 17),
+            underlying_price=Decimal("175.00"),
+            calls=[],
+            puts=[],
+        )
+        mock_provider.get_options_chain = AsyncMock(return_value=chain)
+        use_case = GetOptionsChainUseCase(market_data_provider=mock_provider)
+        response = await use_case.execute(
+            GetOptionsChainRequest(underlying_symbol="AAPL", expiration_date=None)
+        )
+
+        assert response.underlying_symbol == "AAPL"
+        assert response.chain.underlying_symbol == "AAPL"
+        assert response.chain.underlying_price == Decimal("175.00")
+        mock_provider.get_options_chain.assert_called_once_with(
+            underlying_symbol="AAPL",
+            expiration_date=None,
+        )

@@ -52,7 +52,7 @@ def test_job_creation():
         instrument_symbol="AAPL",
         market_index=None,
         timeframe=JobTimeframe.MID_TERM,
-        workflow_type="equity",
+        execution_type="deterministic_instrument_analysis",
     )
     assert job.status == JobStatus.PENDING
 ```

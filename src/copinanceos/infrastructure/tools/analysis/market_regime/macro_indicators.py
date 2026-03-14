@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -16,8 +16,12 @@ from copinanceos.domain.models.macro import MacroDataPoint
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
 from copinanceos.domain.ports.tools import Tool, ToolSchema
+from copinanceos.infrastructure.cache import CacheManager
 
 logger = structlog.get_logger(__name__)
+
+# Cache key used for FRED/macro block results (per block + date range)
+MACRO_BLOCK_CACHE_TOOL_NAME = "get_macro_regime_indicators_block"
 
 
 def _last_n(points: list[MacroDataPoint], n: int) -> list[MacroDataPoint]:
@@ -89,9 +93,61 @@ class MacroRegimeIndicatorsTool(Tool):
         self,
         macro_data_provider: MacroeconomicDataProvider,
         market_data_provider: MarketDataProvider,
+        cache_manager: CacheManager | None = None,
     ) -> None:
         self._macro_provider = macro_data_provider
         self._market_provider = market_data_provider
+        self._cache_manager = cache_manager
+
+    async def _get_block_cached(
+        self, block_name: str, start_date: datetime, end_date: datetime
+    ) -> dict[str, Any] | None:
+        """Return cached block data if available to avoid redundant FRED requests."""
+        if not self._cache_manager:
+            return None
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+        try:
+            entry = await self._cache_manager.get(
+                MACRO_BLOCK_CACHE_TOOL_NAME,
+                block=block_name,
+                start_date=start_str,
+                end_date=end_str,
+            )
+            if entry and entry.data and isinstance(entry.data, dict):
+                logger.debug(
+                    "Returning cached FRED macro block",
+                    block=block_name,
+                    cached_at=entry.cached_at.isoformat(),
+                )
+                return cast(dict[str, Any], entry.data)
+        except Exception as e:
+            logger.debug(
+                "Cache lookup failed for macro block, fetching",
+                block=block_name,
+                error=str(e),
+            )
+        return None
+
+    async def _set_block_cached(
+        self, block_name: str, start_date: datetime, end_date: datetime, data: dict[str, Any]
+    ) -> None:
+        """Store block result in cache."""
+        if not self._cache_manager:
+            return
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+        try:
+            await self._cache_manager.set(
+                MACRO_BLOCK_CACHE_TOOL_NAME,
+                data=data,
+                metadata={"block": block_name},
+                block=block_name,
+                start_date=start_str,
+                end_date=end_str,
+            )
+        except Exception:
+            pass
 
     def get_name(self) -> str:
         return "get_macro_regime_indicators"
@@ -229,6 +285,9 @@ class MacroRegimeIndicatorsTool(Tool):
             )
 
     async def _get_rates_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
+        cached = await self._get_block_cached("rates", start_date, end_date)
+        if cached is not None:
+            return cached
         # Check if FRED is available first
         fred_available = await self._macro_provider.is_available()
         provider_name = self._macro_provider.get_provider_name()
@@ -325,6 +384,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 if interpretation:
                     out["interpretation"] = interpretation
                 logger.info("Successfully fetched rates from FRED", series_count=len(fred_series))
+                await self._set_block_cached("rates", start_date, end_date, out)
                 return out
             except Exception as e:
                 logger.warning("FRED rates block failed; falling back to proxies", error=str(e))
@@ -349,11 +409,17 @@ class MacroRegimeIndicatorsTool(Tool):
                 },
                 "data_points": len(vals),
             }
+            await self._set_block_cached("rates", start_date, end_date, out)
             return out
         except Exception as e:
-            return {"available": False, "source": "yfinance", "error": str(e)}
+            out = {"available": False, "source": "yfinance", "error": str(e)}
+            await self._set_block_cached("rates", start_date, end_date, out)
+            return out
 
     async def _get_credit_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
+        cached = await self._get_block_cached("credit", start_date, end_date)
+        if cached is not None:
+            return cached
         # Check if FRED is available first
         fred_available = await self._macro_provider.is_available()
         provider_name = self._macro_provider.get_provider_name()
@@ -461,6 +527,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 if interpretation:
                     out["interpretation"] = interpretation
                 logger.info("Successfully fetched credit spreads from FRED")
+                await self._set_block_cached("credit", start_date, end_date, out)
                 return out
             except Exception as e:
                 logger.warning("FRED credit block failed; falling back to proxies", error=str(e))
@@ -484,13 +551,19 @@ class MacroRegimeIndicatorsTool(Tool):
                 "latest_ratio": round(ratio, 4),
                 "data_points": min(len(hyg_prices), len(lqd_prices)),
             }
+            await self._set_block_cached("credit", start_date, end_date, out)
             return out
         except Exception as e:
-            return {"available": False, "source": "yfinance", "error": str(e)}
+            out = {"available": False, "source": "yfinance", "error": str(e)}
+            await self._set_block_cached("credit", start_date, end_date, out)
+            return out
 
     async def _get_commodities_block(
         self, start_date: datetime, end_date: datetime
     ) -> dict[str, Any]:
+        cached = await self._get_block_cached("commodities", start_date, end_date)
+        if cached is not None:
+            return cached
         # Check if FRED is available first
         fred_available = await self._macro_provider.is_available()
         provider_name = self._macro_provider.get_provider_name()
@@ -539,6 +612,7 @@ class MacroRegimeIndicatorsTool(Tool):
                             "wti_change_20d_pct": round(pct, 2),
                         }
                 logger.info("Successfully fetched commodities from FRED")
+                await self._set_block_cached("commodities", start_date, end_date, out)
                 return out
             except Exception as e:
                 logger.warning(
@@ -552,32 +626,43 @@ class MacroRegimeIndicatorsTool(Tool):
             )
             vals = [float(d.close_price) for d in uso if d.close_price is not None]
             if len(vals) < 2:
-                return {"available": False, "source": "yfinance", "error": "No USO data"}
+                out = {"available": False, "source": "yfinance", "error": "No USO data"}
+                await self._set_block_cached("commodities", start_date, end_date, out)
+                return out
             out["series"]["uso_proxy"] = {
                 "available": True,
                 "latest": {"timestamp": uso[-1].timestamp.isoformat(), "value": round(vals[-1], 4)},
                 "data_points": len(vals),
             }
+            await self._set_block_cached("commodities", start_date, end_date, out)
             return out
         except Exception as e:
-            return {"available": False, "source": "yfinance", "error": str(e)}
+            out = {"available": False, "source": "yfinance", "error": str(e)}
+            await self._set_block_cached("commodities", start_date, end_date, out)
+            return out
 
     async def _get_labor_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         """Labor market indicators: unemployment, payrolls, JOLTS."""
+        cached = await self._get_block_cached("labor", start_date, end_date)
+        if cached is not None:
+            return cached
         fred_available = await self._macro_provider.is_available()
 
         has_api_key = (
             hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
         )
 
+        out: dict[str, Any]
         if not fred_available:
             if not has_api_key:
                 logger.info("FRED API key not configured; skipping labor market indicators")
             else:
                 logger.warning("FRED availability check failed; skipping labor market indicators")
-            return {"available": False, "source": "fred", "error": "FRED not available"}
+            out = {"available": False, "source": "fred", "error": "FRED not available"}
+            await self._set_block_cached("labor", start_date, end_date, out)
+            return out
 
-        out: dict[str, Any] = {"available": True, "source": "fred", "series": {}}
+        out = {"available": True, "source": "fred", "series": {}}
         try:
             # Labor market indicators
             fred_series = {
@@ -625,27 +710,36 @@ class MacroRegimeIndicatorsTool(Tool):
                 out["interpretation"] = interpretation
 
             logger.info("Successfully fetched labor market indicators from FRED")
+            await self._set_block_cached("labor", start_date, end_date, out)
             return out
         except Exception as e:
             logger.warning("FRED labor block failed", error=str(e))
-            return {"available": False, "source": "fred", "error": str(e)}
+            out = {"available": False, "source": "fred", "error": str(e)}
+            await self._set_block_cached("labor", start_date, end_date, out)
+            return out
 
     async def _get_housing_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         """Housing market indicators: new/existing sales, Case-Shiller."""
+        cached = await self._get_block_cached("housing", start_date, end_date)
+        if cached is not None:
+            return cached
         fred_available = await self._macro_provider.is_available()
 
         has_api_key = (
             hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
         )
 
+        out: dict[str, Any]
         if not fred_available:
             if not has_api_key:
                 logger.info("FRED API key not configured; skipping housing indicators")
             else:
                 logger.warning("FRED availability check failed; skipping housing indicators")
-            return {"available": False, "source": "fred", "error": "FRED not available"}
+            out = {"available": False, "source": "fred", "error": "FRED not available"}
+            await self._set_block_cached("housing", start_date, end_date, out)
+            return out
 
-        out: dict[str, Any] = {"available": True, "source": "fred", "series": {}}
+        out = {"available": True, "source": "fred", "series": {}}
         try:
             # Housing market indicators
             fred_series = {
@@ -693,29 +787,38 @@ class MacroRegimeIndicatorsTool(Tool):
                 out["interpretation"] = interpretation
 
             logger.info("Successfully fetched housing indicators from FRED")
+            await self._set_block_cached("housing", start_date, end_date, out)
             return out
         except Exception as e:
             logger.warning("FRED housing block failed", error=str(e))
-            return {"available": False, "source": "fred", "error": str(e)}
+            out = {"available": False, "source": "fred", "error": str(e)}
+            await self._set_block_cached("housing", start_date, end_date, out)
+            return out
 
     async def _get_manufacturing_block(
         self, start_date: datetime, end_date: datetime
     ) -> dict[str, Any]:
         """Manufacturing indicators: ISM, industrial production, capacity utilization."""
+        cached = await self._get_block_cached("manufacturing", start_date, end_date)
+        if cached is not None:
+            return cached
         fred_available = await self._macro_provider.is_available()
 
         has_api_key = (
             hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
         )
 
+        out: dict[str, Any]
         if not fred_available:
             if not has_api_key:
                 logger.info("FRED API key not configured; skipping manufacturing indicators")
             else:
                 logger.warning("FRED availability check failed; skipping manufacturing indicators")
-            return {"available": False, "source": "fred", "error": "FRED not available"}
+            out = {"available": False, "source": "fred", "error": "FRED not available"}
+            await self._set_block_cached("manufacturing", start_date, end_date, out)
+            return out
 
-        out: dict[str, Any] = {"available": True, "source": "fred", "series": {}}
+        out = {"available": True, "source": "fred", "series": {}}
         try:
             # Manufacturing indicators
             fred_series = {
@@ -769,27 +872,36 @@ class MacroRegimeIndicatorsTool(Tool):
                 out["interpretation"] = interpretation
 
             logger.info("Successfully fetched manufacturing indicators from FRED")
+            await self._set_block_cached("manufacturing", start_date, end_date, out)
             return out
         except Exception as e:
             logger.warning("FRED manufacturing block failed", error=str(e))
-            return {"available": False, "source": "fred", "error": str(e)}
+            out = {"available": False, "source": "fred", "error": str(e)}
+            await self._set_block_cached("manufacturing", start_date, end_date, out)
+            return out
 
     async def _get_consumer_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         """Consumer indicators: retail sales, confidence, spending."""
+        cached = await self._get_block_cached("consumer", start_date, end_date)
+        if cached is not None:
+            return cached
         fred_available = await self._macro_provider.is_available()
 
         has_api_key = (
             hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
         )
 
+        out: dict[str, Any]
         if not fred_available:
             if not has_api_key:
                 logger.info("FRED API key not configured; skipping consumer indicators")
             else:
                 logger.warning("FRED availability check failed; skipping consumer indicators")
-            return {"available": False, "source": "fred", "error": "FRED not available"}
+            out = {"available": False, "source": "fred", "error": "FRED not available"}
+            await self._set_block_cached("consumer", start_date, end_date, out)
+            return out
 
-        out: dict[str, Any] = {"available": True, "source": "fred", "series": {}}
+        out = {"available": True, "source": "fred", "series": {}}
         try:
             # Consumer indicators
             fred_series = {
@@ -874,13 +986,19 @@ class MacroRegimeIndicatorsTool(Tool):
                 out["interpretation"] = interpretation
 
             logger.info("Successfully fetched consumer indicators from FRED")
+            await self._set_block_cached("consumer", start_date, end_date, out)
             return out
         except Exception as e:
             logger.warning("FRED consumer block failed", error=str(e))
-            return {"available": False, "source": "fred", "error": str(e)}
+            out = {"available": False, "source": "fred", "error": str(e)}
+            await self._set_block_cached("consumer", start_date, end_date, out)
+            return out
 
     async def _get_global_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         """Global indicators: FX rates, emerging market flows."""
+        cached = await self._get_block_cached("global", start_date, end_date)
+        if cached is not None:
+            return cached
         # Use market data provider for FX rates
         out: dict[str, Any] = {"available": True, "source": "yfinance", "series": {}}
         try:
@@ -968,13 +1086,19 @@ class MacroRegimeIndicatorsTool(Tool):
                 out["interpretation"] = interpretation
 
             logger.info("Successfully fetched global indicators")
+            await self._set_block_cached("global", start_date, end_date, out)
             return out
         except Exception as e:
             logger.warning("Global indicators block failed", error=str(e))
-            return {"available": False, "source": "yfinance", "error": str(e)}
+            out = {"available": False, "source": "yfinance", "error": str(e)}
+            await self._set_block_cached("global", start_date, end_date, out)
+            return out
 
     async def _get_advanced_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         """Advanced indicators: LEI, CDS spreads, Fed balance sheet."""
+        cached = await self._get_block_cached("advanced", start_date, end_date)
+        if cached is not None:
+            return cached
         fred_available = await self._macro_provider.is_available()
 
         out: dict[str, Any] = {"available": True, "source": "mixed", "series": {}}
@@ -1051,17 +1175,20 @@ class MacroRegimeIndicatorsTool(Tool):
             logger.warning("Advanced market indicators failed", error=str(e))
 
         if not out["series"]:
-            return {
+            out = {
                 "available": False,
                 "source": "mixed",
                 "error": "No advanced indicators available",
             }
-
+        await self._set_block_cached("advanced", start_date, end_date, out)
         return out
 
 
 def create_macro_regime_indicators_tool(
     macro_data_provider: MacroeconomicDataProvider,
     market_data_provider: MarketDataProvider,
+    cache_manager: CacheManager | None = None,
 ) -> MacroRegimeIndicatorsTool:
-    return MacroRegimeIndicatorsTool(macro_data_provider, market_data_provider)
+    return MacroRegimeIndicatorsTool(
+        macro_data_provider, market_data_provider, cache_manager=cache_manager
+    )

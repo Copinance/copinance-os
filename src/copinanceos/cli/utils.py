@@ -19,17 +19,12 @@ from copinanceos.infrastructure.persistence import PERSISTENCE_SCHEMA_VERSION, g
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def save_workflow_results(results: dict[str, Any], storage_path: str = ".copinance") -> Path | None:
-    """Save workflow results to the versioned results directory as JSON.
+def save_analysis_results(results: dict[str, Any], storage_path: str = ".copinance") -> Path | None:
+    """Save analysis results to the versioned results directory as JSON.
 
-    The results dict should contain workflow_type, scope, market_type, and
-    instrument_symbol or market_index (as set by BaseWorkflowExecutor) so the
-    saved file is self-describing. Nested Pydantic models are serialized via
-    _to_json_compatible.
-
-    Args:
-        results: The results dict from RunJobResult (JSON-serializable after normalization).
-        storage_path: Base path for storage (default .copinance).
+    The results dict should contain execution_type, scope, market_type, and
+    instrument_symbol or market_index (as set by executors) so the saved file
+    is self-describing. Nested Pydantic models are serialized via _to_json_compatible.
 
     Returns:
         Path to the saved file, or None if results empty or save failed.
@@ -38,7 +33,7 @@ def save_workflow_results(results: dict[str, Any], storage_path: str = ".copinan
         return None
     results_dir = get_results_dir(storage_path)
 
-    workflow_type = results.get("workflow_type") or "workflow"
+    execution_type = results.get("execution_type") or "analysis"
     instrument_symbol = results.get("instrument_symbol")
     market_index = results.get("market_index")
     market_type = results.get("market_type") or ("market" if market_index else "instrument")
@@ -56,18 +51,18 @@ def save_workflow_results(results: dict[str, Any], storage_path: str = ".copinan
 
     symbol = instrument_symbol or market_index
     if symbol:
-        slug = f"{workflow_type}_{symbol}_{ts_str}"
+        slug = f"{execution_type}_{symbol}_{ts_str}"
     else:
-        slug = f"{workflow_type}_{ts_str}"
+        slug = f"{execution_type}_{ts_str}"
     slug = re.sub(r"[^\w\-.]", "_", slug)
-    target_dir = results_dir / workflow_type / str(market_type)
+    target_dir = results_dir / execution_type / str(market_type)
     target_dir.mkdir(parents=True, exist_ok=True)
     path = target_dir / f"{slug}.json"
 
     envelope = {
         "schema_version": PERSISTENCE_SCHEMA_VERSION,
         "saved_at": datetime.now(UTC).isoformat(),
-        "workflow_type": workflow_type,
+        "execution_type": execution_type,
         "market_type": results.get("market_type"),
         "scope": scope if scope is not None else results.get("scope"),
         "target": {
@@ -83,7 +78,7 @@ def save_workflow_results(results: dict[str, Any], storage_path: str = ".copinan
         return path
     except (OSError, TypeError) as e:
         structlog.get_logger(__name__).warning(
-            "Failed to save workflow results", path=str(path), error=str(e)
+            "Failed to save analysis results", path=str(path), error=str(e)
         )
         return None
 
@@ -92,7 +87,7 @@ def _to_json_compatible(value: Any) -> Any:
     """Recursively normalize values for JSON persistence.
 
     Handles datetime, Decimal, Path, dict, list, and Pydantic BaseModel
-    so workflow results (including nested models) are never lost on save.
+    so analysis results (including nested models) are never lost on save.
     """
     if isinstance(value, datetime):
         return value.isoformat()

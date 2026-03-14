@@ -1,0 +1,137 @@
+# Analysis Modes
+
+Copinance OS supports multiple analysis modes for market analysis.
+
+## Deterministic Instrument Analysis
+
+Deterministic analysis follows a predefined pipeline with consistent steps.
+
+### Equity Analysis
+
+What it does:
+1. Fetches instrument information
+2. Gets the current quote
+3. Retrieves historical price data
+4. Gets equity fundamentals
+5. Calculates key metrics and trends
+6. Generates a summary
+
+Example:
+
+```bash
+# Run deterministic equity analysis (quote, history, fundamentals, summary)
+copinance analyze equity AAPL --timeframe mid_term
+```
+
+### Options Analysis
+
+What it does:
+1. Fetches the current underlying quote
+2. Loads the options chain for the selected expiration
+3. Summarizes open interest, volume, and implied volatility
+4. Highlights the at-the-money contract
+
+Example:
+
+```bash
+# Run deterministic options analysis for a given expiration
+copinance analyze options AAPL --expiration 2026-06-19
+```
+
+## Question-Driven Analysis
+
+Question-driven analysis uses AI to dynamically analyze market instruments or the market based on your question. The AI can use tools (quotes, historical data, options chain, fundamentals, macro indicators) to answer.
+
+**Equity:**
+```bash
+# Question-driven equity analysis; AI uses tools to answer the question
+copinance analyze equity AAPL --question "What are the key financial risks?"
+```
+
+**Options:** Ask about specific stock options data; use `analyze options` and optionally `--expiration` and `--side` so the AI gets options context and can fetch the options chain.
+```bash
+# Question-driven options analysis (positioning, open interest, active calls)
+copinance analyze options AAPL --question "How is the options chain positioned?"
+copinance analyze options AAPL --question "What's the put/call open interest for AAPL?" --expiration 2026-06-19
+copinance analyze options AAPL --question "What are the most active calls?" --side call
+```
+
+**Market-wide:**
+```bash
+# Question-driven macro analysis; AI uses macro and market tools
+copinance analyze macro --question "What is the current market sentiment?" --market-index SPY
+```
+
+See [CLI Reference - Analyze](cli#analyze-commands) for all options. Use `--include-prompt` to include the rendered prompts in saved results for question-driven runs.
+
+## Timeframes
+
+Both deterministic and question-driven analysis adapt to the timeframe:
+
+### Short-term
+- **Focus**: Recent price movements, short-dated options context, technical indicators
+- **Data**: Last 30 days
+
+### Mid-term
+- **Focus**: Quarterly fundamentals, price trends
+- **Data**: Last 6 months
+
+### Long-term
+- **Focus**: Annual fundamentals, long-term trends
+- **Data**: Last 2 years
+
+## One-off Execution
+
+All analysis runs are one-off: `copinance analyze` runs analysis without persisting jobs. Each run saves results to `.copinance/results/v2/` as versioned JSON envelopes. Profiles and cached tool data also live under versioned subdirectories in `.copinance`.
+
+### Example Analyses
+
+```bash
+# Deterministic equity analysis
+copinance analyze equity AAPL --timeframe mid_term
+
+# Deterministic options analysis
+copinance analyze options AAPL --expiration 2026-06-19
+
+# Deterministic macro regime (custom index)
+copinance analyze macro --market-index SPY
+
+# Question-driven equity: AI answers using tools
+copinance analyze equity AAPL --question "What are the key risks?"
+
+# Question-driven options: AI summarizes options for date
+copinance analyze options AAPL --question "Summarize AAPL options for June 2026" --expiration 2026-06-19
+```
+
+## Macro Regime Analysis
+
+The macro regime analysis combines market regime indicators with macroeconomic data to provide a comprehensive view of market conditions.
+
+### Quick Start
+
+```bash
+# Run full macro/market regime analysis with defaults (SPY, 252-day lookback)
+copinance analyze macro
+```
+
+### Customization
+
+```bash
+# Custom index and lookback; exclude specific indicator groups
+copinance analyze macro --market-index QQQ --lookback-days 90
+copinance analyze macro --no-include-vix --no-include-market-breadth --no-include-sector-rotation
+```
+
+### Data Sources
+
+- **Macro indicators** prefer FRED API when configured; fallback proxies use yfinance where needed.
+- **Market regime indicators** use yfinance. What gets fetched:
+  - **Reference index** (`--market-index`, e.g. SPY, QQQ, DIA): used for trend/volatility detection and as the “market” benchmark in sector comparison. Only this symbol changes when you change `--market-index`.
+  - **VIX** (^VIX) and the **11 S&P sector ETFs** (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE): always fetched when VIX, market breadth, or sector rotation are enabled. They are the same for any `--market-index`.
+
+Example: `copinance analyze macro --market-index QQQ` fetches QQQ (reference), all 11 sector ETFs, and VIX. See [CLI Reference — Macro + Market Regime](cli#macro--market-regime) for more examples.
+
+## Next Steps
+
+- [CLI Reference](cli) - Command details
+- [Configuration](configuration) - Setting up API keys

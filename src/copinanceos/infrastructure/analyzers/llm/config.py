@@ -18,8 +18,8 @@ class LLMConfig:
         base_url: Base URL for the provider (optional, for custom endpoints or local providers like Ollama)
         temperature: Default temperature for generation (0.0 to 1.0)
         max_tokens: Default maximum tokens for generation
-        workflow_providers: Optional mapping of workflow types to provider names
-                          (e.g., {"agent": "gemini"})
+        execution_type_providers: Optional mapping of execution types to provider names
+                                  (e.g., {"question_driven_analysis": "gemini"})
         provider_config: Additional provider-specific configuration
     """
 
@@ -29,16 +29,9 @@ class LLMConfig:
     base_url: str | None = None
     temperature: float = 0.7
     max_tokens: int | None = None
-    workflow_providers: dict[str, str] = field(default_factory=dict)
+    execution_type_providers: dict[str, str] = field(default_factory=dict)
     provider_config: dict[str, Any] = field(default_factory=dict)
 
-    def get_provider_for_workflow(self, workflow_type: str) -> str:
-        """Get the provider name for a specific workflow type.
-
-        Args:
-            workflow_type: The workflow type (e.g., "agent")
-
-        Returns:
-            Provider name to use for this workflow
-        """
-        return self.workflow_providers.get(workflow_type, self.provider)
+    def get_provider_for_execution_type(self, execution_type: str) -> str:
+        """Get the provider name for an execution type (e.g. question_driven_analysis)."""
+        return self.execution_type_providers.get(execution_type, self.provider)

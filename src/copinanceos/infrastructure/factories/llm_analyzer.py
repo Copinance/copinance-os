@@ -59,19 +59,12 @@ class LLMAnalyzerFactory:
         return LLMAnalyzerImpl(provider)
 
     @staticmethod
-    def create_for_workflow(workflow_type: str, llm_config: LLMConfig | None = None) -> LLMAnalyzer:
-        """Create LLM analyzer for a specific workflow type.
-
-        Args:
-            workflow_type: Type of workflow (e.g., "agent")
-            llm_config: LLM configuration. If None, defaults will be used.
-
-        Returns:
-            LLM analyzer instance configured for the workflow
-        """
+    def create_for_execution_type(
+        execution_type: str, llm_config: LLMConfig | None = None
+    ) -> LLMAnalyzer:
+        """Create LLM analyzer for an execution type (e.g. question_driven_analysis)."""
         if llm_config:
-            provider_name = llm_config.get_provider_for_workflow(workflow_type)
+            provider_name = llm_config.get_provider_for_execution_type(execution_type)
         else:
-            provider_name = "gemini"  # Default fallback
-
+            provider_name = "gemini"
         return LLMAnalyzerFactory.create(provider_name, llm_config)

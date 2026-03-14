@@ -61,7 +61,7 @@ class GeminiProvider(LLMProvider):
             api_key: Gemini API key. Required for cloud usage.
             model_name: Gemini model to use (default: "gemini-1.5-pro")
                        Options: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
-                       All support function calling for agent workflows
+                       All support function calling for question-driven analysis
             temperature: Default temperature for generation
             max_output_tokens: Default max output tokens
         """
@@ -223,6 +223,32 @@ class GeminiProvider(LLMProvider):
 
         logger.warning("Could not extract text from Gemini response", response_type=type(response))
         return ""
+
+    def _extract_usage(self, response: Any) -> dict[str, int]:
+        """Extract token usage from Gemini API response if available.
+
+        Returns dict with input_tokens, output_tokens, total_tokens (0 if not available).
+        """
+        out: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        if response is None:
+            return out
+        um = getattr(response, "usage_metadata", None)
+        if um is None:
+            return out
+        out["input_tokens"] = (
+            getattr(um, "prompt_token_count", None) or getattr(um, "prompt_tokens", None) or 0
+        )
+        out["output_tokens"] = (
+            getattr(um, "candidates_token_count", None)
+            or getattr(um, "completion_tokens", None)
+            or 0
+        )
+        out["total_tokens"] = (
+            getattr(um, "total_token_count", None)
+            or getattr(um, "total_tokens", None)
+            or (out["input_tokens"] + out["output_tokens"])
+        )
+        return out
 
     def _build_generation_config(
         self,
@@ -474,6 +500,7 @@ class GeminiProvider(LLMProvider):
         tool_calls_made: list[dict[str, Any]] = []
         current_prompt = full_prompt
         response_text = ""
+        usage_total: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
         # Track recent tool calls for loop detection
         recent_tool_calls: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
         max_recent_history = 3  # Check last 3 calls for loops
@@ -489,6 +516,9 @@ class GeminiProvider(LLMProvider):
                 # Generate response with current prompt (caller manages prompt content)
                 response = await self._call_gemini_api(current_prompt, config)
                 response_text = self._extract_response_text(response)
+                u = self._extract_usage(response)
+                for k in usage_total:
+                    usage_total[k] += u.get(k, 0)
 
                 # Parse tool calls from response
                 function_calls = self._parse_tool_calls_from_response(response_text, executor)
@@ -729,8 +759,11 @@ class GeminiProvider(LLMProvider):
                     }
                 break
 
-        return {
+        result: dict[str, Any] = {
             "text": response_text,
             "tool_calls": tool_calls_made,
             "iterations": iteration + 1,
         }
+        if any(usage_total.values()):
+            result["llm_usage"] = dict(usage_total)
+        return result

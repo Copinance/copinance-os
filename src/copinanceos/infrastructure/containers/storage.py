@@ -4,7 +4,7 @@ from typing import Any
 
 from dependency_injector import providers
 
-from copinanceos.infrastructure.config import get_settings
+from copinanceos.infrastructure.config import get_settings, get_storage_path_safe
 from copinanceos.infrastructure.repositories.storage import create_storage
 
 
@@ -20,7 +20,7 @@ def configure_storage() -> providers.Singleton:
         settings = get_settings()
         return create_storage(
             storage_type=settings.storage_type,
-            base_path=settings.storage_path,
+            base_path=get_storage_path_safe(),
         )
 
     return providers.Singleton(_create_storage_backend)

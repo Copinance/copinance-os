@@ -1,4 +1,4 @@
-"""Workflow execution interfaces."""
+"""Job and analysis execution interfaces."""
 
 from abc import ABC, abstractmethod
 from typing import Any
@@ -17,20 +17,20 @@ class JobRunner(ABC):
         pass
 
 
-class WorkflowExecutor(ABC):
-    """Abstract interface for workflow execution (stock, macro, or agent)."""
+class AnalysisExecutor(ABC):
+    """Abstract interface for analysis execution (deterministic or question-driven)."""
 
     @abstractmethod
     async def execute(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """
-        Execute a workflow for the given job.
+        Execute analysis for the given job.
 
         Args:
             job: The job to execute
             context: Execution context and parameters
 
         Returns:
-            Results dictionary containing workflow outputs
+            Results dictionary containing analysis outputs
         """
         pass
 
@@ -48,6 +48,6 @@ class WorkflowExecutor(ABC):
         pass
 
     @abstractmethod
-    def get_workflow_type(self) -> str:
-        """Get the workflow type identifier."""
+    def get_executor_id(self) -> str:
+        """Return the executor identifier used for routing (e.g. deterministic_instrument_analysis)."""
         pass

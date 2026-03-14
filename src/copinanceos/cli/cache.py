@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from copinanceos.infrastructure.config import get_settings
+from copinanceos.infrastructure.config import get_storage_path_safe
 from copinanceos.infrastructure.containers import container
 from copinanceos.infrastructure.persistence import (
     PERSISTENCE_SCHEMA_VERSION,
@@ -22,7 +22,7 @@ console = Console()
 
 def _clear_stored_instruments() -> bool:
     """Remove stored instrument/market data (e.g. equities list). Returns True if removed."""
-    storage_path = Path(get_settings().storage_path)
+    storage_path = Path(get_storage_path_safe())
     market_dir = get_data_dir(storage_path) / "market"
     if market_dir.exists():
         shutil.rmtree(market_dir)
@@ -40,7 +40,7 @@ def clear_cache(
     - Tool result cache (e.g. quotes, historical data) under .copinance/cache/
     - Stored instrument/market data (e.g. equities list) under .copinance/data/
 
-    Does not clear profiles or workflow results.
+    Does not clear profiles or analysis results.
     """
 
     async def _clear() -> None:
@@ -121,7 +121,7 @@ def cache_info() -> None:
 
         table.add_row("Backend", backend.get_backend_name())
         table.add_row("Tool cache directory", str(getattr(backend, "_cache_dir", "N/A")))
-        storage_path = Path(get_settings().storage_path)
+        storage_path = Path(get_storage_path_safe())
         table.add_row(
             "Stored data directory",
             str(get_data_dir(storage_path)) + " (instrument list etc.)",

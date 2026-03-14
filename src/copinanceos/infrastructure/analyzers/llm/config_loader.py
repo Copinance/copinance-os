@@ -28,7 +28,7 @@ def load_llm_config_from_env() -> LLMConfig | None:
         COPINANCEOS_OLLAMA_MODEL: Ollama model name
         COPINANCEOS_LLM_TEMPERATURE: Temperature (default: 0.7)
         COPINANCEOS_LLM_MAX_TOKENS: Max tokens
-        COPINANCEOS_WORKFLOW_LLM_PROVIDERS: Comma-separated workflow:provider mappings
+        COPINANCEOS_LLM_PROVIDERS: Comma-separated execution_type:provider mappings
 
     Returns:
         LLMConfig if any LLM-related environment variables are set, None otherwise
@@ -71,15 +71,15 @@ def load_llm_config_from_env() -> LLMConfig | None:
         base_url = os.getenv("COPINANCEOS_OLLAMA_BASE_URL", "http://localhost:11434")
         model = os.getenv("COPINANCEOS_OLLAMA_MODEL", "llama2")
 
-    # Parse workflow provider mapping
-    workflow_providers: dict[str, str] = {}
-    workflow_mapping_str = os.getenv("COPINANCEOS_WORKFLOW_LLM_PROVIDERS")
-    if workflow_mapping_str:
-        for pair in workflow_mapping_str.split(","):
+    # Parse execution_type:provider mapping
+    execution_type_providers: dict[str, str] = {}
+    mapping_str = os.getenv("COPINANCEOS_LLM_PROVIDERS")
+    if mapping_str:
+        for pair in mapping_str.split(","):
             pair = pair.strip()
             if ":" in pair:
-                workflow_type, provider_name = pair.split(":", 1)
-                workflow_providers[workflow_type.strip()] = provider_name.strip()
+                execution_type, provider_name = pair.split(":", 1)
+                execution_type_providers[execution_type.strip()] = provider_name.strip()
 
     # Get temperature and max_tokens
     temperature_str = os.getenv("COPINANCEOS_LLM_TEMPERATURE", "0.7")
@@ -108,6 +108,6 @@ def load_llm_config_from_env() -> LLMConfig | None:
         base_url=base_url,
         temperature=temperature,
         max_tokens=max_tokens,
-        workflow_providers=workflow_providers,
+        execution_type_providers=execution_type_providers,
         provider_config=provider_config,
     )

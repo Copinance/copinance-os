@@ -6,38 +6,52 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from copinanceos.infrastructure.analyzers.llm.resources.prompt_manager import PromptManager
+from copinanceos.infrastructure.analyzers.llm.resources.prompt_manager import (
+    ANALYZE_QUESTION_DRIVEN_PROMPT_NAME,
+    PromptManager,
+)
 
 
 @pytest.mark.unit
 class TestPromptManager:
     """Test PromptManager."""
 
-    def test_initialization_without_custom_dir(self) -> None:
-        """Test initialization without custom directory."""
-        with (
-            patch(
-                "copinanceos.infrastructure.analyzers.llm.resources.prompt_manager.logger"
-            ) as mock_logger,
-            patch("pathlib.Path.exists") as mock_exists,
-        ):
-            mock_exists.return_value = False
+    def test_initialization_default(self) -> None:
+        """Test initialization with defaults (package prompts only)."""
+        with patch(
+            "copinanceos.infrastructure.analyzers.llm.resources.prompt_manager.logger"
+        ) as mock_logger:
             manager = PromptManager()
 
-            assert manager._custom_resources_dir is None
+            assert manager._resources_dir is None
             assert manager._use_package_data is True
+            assert manager._templates == {}
             assert manager._prompts_cache == {}
             mock_logger.info.assert_called_once()
 
+    def test_initialization_with_templates_overlay(self) -> None:
+        """Test initialization with in-memory templates overlay."""
+        templates = {
+            "analyze_question_driven": {
+                "system_prompt": "Custom system",
+                "user_prompt": "Custom user {question}",
+            },
+        }
+        manager = PromptManager(templates=templates)
+
+        assert manager._templates == templates
+        assert manager._resources_dir is None
+        assert manager._use_package_data is True
+
     def test_initialization_with_custom_dir(self) -> None:
-        """Test initialization with custom directory."""
+        """Test initialization with custom resources directory."""
         custom_dir = Path("/tmp/custom_prompts")
         with patch(
             "copinanceos.infrastructure.analyzers.llm.resources.prompt_manager.logger"
         ) as mock_logger:
             manager = PromptManager(resources_dir=custom_dir)
 
-            assert manager._custom_resources_dir == custom_dir
+            assert manager._resources_dir == custom_dir
             assert manager._use_package_data is True
             assert manager._prompts_cache == {}
             mock_logger.info.assert_called_once()
@@ -47,26 +61,8 @@ class TestPromptManager:
         custom_dir = Path("/tmp/custom_prompts")
         manager = PromptManager(resources_dir=custom_dir, use_package_data=False)
 
-        assert manager._custom_resources_dir == custom_dir
+        assert manager._resources_dir == custom_dir
         assert manager._use_package_data is False
-
-    def test_initialization_uses_user_prompts_dir_if_exists(self) -> None:
-        """Test initialization uses user prompts directory if it exists."""
-        with (
-            patch("pathlib.Path.exists") as mock_exists,
-            patch("pathlib.Path.home") as mock_home,
-            patch(
-                "copinanceos.infrastructure.analyzers.llm.resources.prompt_manager.logger"
-            ) as mock_logger,
-        ):
-            mock_home.return_value = Path("/home/user")
-            mock_exists.return_value = True
-
-            manager = PromptManager()
-
-            expected_dir = Path("/home/user/.copinance/prompts")
-            assert manager._custom_resources_dir == expected_dir
-            mock_logger.info.assert_called()
 
     def test_validate_prompt_data_valid(self) -> None:
         """Test _validate_prompt_data with valid data."""
@@ -82,25 +78,21 @@ class TestPromptManager:
     def test_validate_prompt_data_not_dict(self) -> None:
         """Test _validate_prompt_data with non-dict data."""
         manager = PromptManager()
-        with pytest.raises(ValueError, match="must contain a JSON object"):
+        with pytest.raises(ValueError, match="must be a JSON object"):
             manager._validate_prompt_data("not a dict", "test_prompt")
 
     def test_validate_prompt_data_missing_system_prompt(self) -> None:
         """Test _validate_prompt_data with missing system_prompt."""
         manager = PromptManager()
         prompt_data = {"user_prompt": "Test prompt"}
-        with pytest.raises(
-            ValueError, match="must contain 'system_prompt' and 'user_prompt' fields"
-        ):
+        with pytest.raises(ValueError, match="must contain 'system_prompt' and 'user_prompt'"):
             manager._validate_prompt_data(prompt_data, "test_prompt")
 
     def test_validate_prompt_data_missing_user_prompt(self) -> None:
         """Test _validate_prompt_data with missing user_prompt."""
         manager = PromptManager()
         prompt_data = {"system_prompt": "Test prompt"}
-        with pytest.raises(
-            ValueError, match="must contain 'system_prompt' and 'user_prompt' fields"
-        ):
+        with pytest.raises(ValueError, match="must contain 'system_prompt' and 'user_prompt'"):
             manager._validate_prompt_data(prompt_data, "test_prompt")
 
     def test_load_prompt_file_from_custom_dir(self, tmp_path: Path) -> None:
@@ -223,7 +215,7 @@ class TestPromptManager:
         with patch("importlib.resources.files") as mock_files:
             mock_files.side_effect = FileNotFoundError("Not found")
 
-            with pytest.raises(FileNotFoundError, match="not found in package data"):
+            with pytest.raises(FileNotFoundError, match="not found in package"):
                 manager._load_from_package("nonexistent_prompt")
 
     def test_load_from_package_invalid_json(self) -> None:
@@ -318,9 +310,74 @@ class TestPromptManager:
 
         assert user == "Analyze this: 10-K text"
 
-    def test_get_prompt_custom_dir_takes_precedence(self, tmp_path: Path) -> None:
-        """Test that custom directory prompts take precedence over package data."""
-        # Create custom prompt
+    def test_overlay_takes_precedence_over_resources_dir(self, tmp_path: Path) -> None:
+        """Test that in-memory overlay takes precedence over resources_dir and package."""
+        custom_file = tmp_path / "test_prompt.json"
+        custom_data = {
+            "system_prompt": "From file",
+            "user_prompt": "From file",
+        }
+        custom_file.write_text(json.dumps(custom_data), encoding="utf-8")
+
+        overlay_data = {
+            "system_prompt": "From overlay",
+            "user_prompt": "From overlay",
+        }
+        manager = PromptManager(
+            templates={"test_prompt": overlay_data},
+            resources_dir=tmp_path,
+            use_package_data=True,
+        )
+
+        result = manager._load_prompt_file("test_prompt")
+        assert result == overlay_data
+
+    def test_custom_template_analyze_question_driven_overlay(self) -> None:
+        """Custom templates overlay returns correct content for analyze_question_driven with variable substitution."""
+        custom_templates = {
+            ANALYZE_QUESTION_DRIVEN_PROMPT_NAME: {
+                "system_prompt": "You are a custom analyst. Level: {financial_literacy}.",
+                "user_prompt": "Task: {question}\n\nTools:\n{tools_description}\n\nExamples:\n{tool_examples}",
+            },
+        }
+        manager = PromptManager(templates=custom_templates)
+
+        system, user = manager.get_prompt(
+            ANALYZE_QUESTION_DRIVEN_PROMPT_NAME,
+            question="What is the P/E of AAPL?",
+            tools_description="get_quote, get_fundamentals",
+            tool_examples="get_quote(symbol=AAPL)",
+            financial_literacy="advanced",
+        )
+
+        assert system == "You are a custom analyst. Level: advanced."
+        assert "What is the P/E of AAPL?" in user
+        assert "get_quote, get_fundamentals" in user
+        assert "get_quote(symbol=AAPL)" in user
+
+    def test_custom_template_substitution_all_variables(self) -> None:
+        """All placeholders in a custom template are substituted."""
+        custom_templates = {
+            "my_prompt": {
+                "system_prompt": "Level={financial_literacy}",
+                "user_prompt": "Q={question} T={tools_description} E={tool_examples}",
+            },
+        }
+        manager = PromptManager(templates=custom_templates)
+
+        system, user = manager.get_prompt(
+            "my_prompt",
+            question="Q1",
+            tools_description="T1",
+            tool_examples="E1",
+            financial_literacy="beginner",
+        )
+
+        assert system == "Level=beginner"
+        assert user == "Q=Q1 T=T1 E=E1"
+
+    def test_resources_dir_takes_precedence_over_package(self, tmp_path: Path) -> None:
+        """Test that resources_dir prompts take precedence over package data."""
         custom_file = tmp_path / "test_prompt.json"
         custom_data = {
             "system_prompt": "Custom system",
@@ -334,7 +391,6 @@ class TestPromptManager:
             result = manager._load_prompt_file("test_prompt")
 
             assert result == custom_data
-            # Should not call package loader
             mock_load_package.assert_not_called()
 
     def test_load_prompt_file_handles_module_not_found_error(self, tmp_path: Path) -> None:
@@ -396,7 +452,7 @@ class TestPromptManager:
         with patch("importlib.resources.files") as mock_files:
             mock_files.side_effect = ModuleNotFoundError("Module not found")
 
-            with pytest.raises(FileNotFoundError, match="not found in package data"):
+            with pytest.raises(FileNotFoundError, match="not found in package"):
                 manager._load_from_package("test_prompt")
 
     def test_load_from_package_handles_attribute_error(self) -> None:
@@ -406,7 +462,7 @@ class TestPromptManager:
         with patch("importlib.resources.files") as mock_files:
             mock_files.side_effect = AttributeError("Attribute error")
 
-            with pytest.raises(FileNotFoundError, match="not found in package data"):
+            with pytest.raises(FileNotFoundError, match="not found in package"):
                 manager._load_from_package("test_prompt")
 
     def test_load_from_package_handles_file_not_found(self) -> None:
@@ -425,5 +481,5 @@ class TestPromptManager:
             mock_file_path.__enter__ = Mock(side_effect=FileNotFoundError("File not found"))
             mock_as_file.return_value = mock_file_path
 
-            with pytest.raises(FileNotFoundError, match="not found in package data"):
+            with pytest.raises(FileNotFoundError, match="not found in package"):
                 manager._load_from_package("test_prompt")

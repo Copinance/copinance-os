@@ -47,7 +47,7 @@ mypy src/
 All code must include tests:
 
 - Unit tests for individual components
-- Integration tests for API endpoints
+- Integration tests for external integrations and use cases
 - Mark tests appropriately: `@pytest.mark.unit`, `@pytest.mark.integration`
 
 Run tests:
@@ -58,7 +58,7 @@ pytest
 
 # With coverage
 make coverage
-# or: pytest --cov=copinance --cov-report=html --cov-report=term-missing
+# or: pytest --cov=copinanceos --cov-report=html --cov-report=term-missing
 # Open report: file://<project-root>/htmlcov/index.html
 
 # Specific markers
@@ -71,10 +71,10 @@ pytest -m integration
 Use clear, descriptive commit messages. A commit message template is available in [`.gitmessage`](.gitmessage) to help you follow these conventions:
 
 ```
-feat: add sentiment analysis workflow
+feat: add sentiment analysis
 fix: correct market search case sensitivity
 docs: update API documentation
-test: add tests for research orchestrator
+test: add tests for analyze use case
 refactor: simplify repository interface
 ```
 
@@ -154,31 +154,33 @@ When adding features, follow these steps:
 - [ ] CHANGELOG is updated (for significant changes)
 - [ ] Commit messages follow conventions
 
-## Adding New Workflow Executors
+## Adding New Analysis Executors
 
-To add a new workflow executor:
+The library uses **analysis executors** (implementing the `AnalysisExecutor` port) to run deterministic or question-driven analysis. Use `execution_type_from_scope_and_mode(scope, mode)` when building jobs from requests.
 
-1. Create a class implementing `WorkflowExecutor` interface
-2. Implement `execute()`, `validate()`, and `get_workflow_type()`
+To add a new executor:
+
+1. Create a class implementing `AnalysisExecutor` interface
+2. Implement `execute()`, `validate()`, and `get_executor_id()`
 3. Add tests for the executor
 4. Register in dependency injection container (`infrastructure/containers/use_cases.py`)
 
 Example:
 
 ```python
-from copinanceos.domain.ports.workflows import WorkflowExecutor
+from copinanceos.domain.ports.analysis_execution import AnalysisExecutor
 from copinanceos.domain.models.job import Job
 
-class MyWorkflowExecutor(WorkflowExecutor):
+class MyAnalysisExecutor(AnalysisExecutor):
     async def execute(self, job: Job, context: dict) -> dict:
         # Implementation
         pass
 
     async def validate(self, job: Job) -> bool:
-        return job.workflow_type == "my_workflow"
+        return job.execution_type == "my_executor"
 
-    def get_workflow_type(self) -> str:
-        return "my_workflow"
+    def get_executor_id(self) -> str:
+        return "my_executor"
 ```
 
 ## Adding New Tools

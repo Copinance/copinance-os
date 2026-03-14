@@ -6,16 +6,16 @@ It has no dependencies on other layers and represents the heart of the business 
 """
 
 from copinanceos.domain.exceptions import (
+    AnalysisExecutionError,
     DataProviderError,
     DataProviderUnavailableError,
     DomainError,
     EntityNotFoundError,
+    ExecutorNotFoundError,
     InvalidStockSymbolError,
     ProfileNotFoundError,
     StockNotFoundError,
     ValidationError,
-    WorkflowExecutionError,
-    WorkflowNotFoundError,
 )
 from copinanceos.domain.services import ProfileManagementService
 from copinanceos.domain.validation import StockSymbolValidator
@@ -28,8 +28,8 @@ __all__ = [
     "ProfileNotFoundError",
     "ValidationError",
     "InvalidStockSymbolError",
-    "WorkflowExecutionError",
-    "WorkflowNotFoundError",
+    "AnalysisExecutionError",
+    "ExecutorNotFoundError",
     "DataProviderError",
     "DataProviderUnavailableError",
     # Domain Services

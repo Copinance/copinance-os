@@ -33,11 +33,13 @@ class Settings(BaseSettings):
         description="Log format (json or console). Console uses compact level tags for CLI.",
     )
 
-    # Workflow settings
-    default_workflow_timeout: int = Field(
-        default=300, description="Default workflow timeout in seconds"
+    # Analysis execution settings
+    default_analysis_timeout: int = Field(
+        default=300, description="Default analysis execution timeout in seconds"
     )
-    enable_agent_workflows: bool = Field(default=True, description="Enable agent AI workflows")
+    enable_agent_analysis: bool = Field(
+        default=True, description="Enable question-driven (agent) AI analysis"
+    )
 
     # Storage configuration
     storage_type: str = Field(
@@ -46,7 +48,20 @@ class Settings(BaseSettings):
     )
     storage_path: str = Field(
         default=".copinance",
-        description="Persistence root path. Versioned data/cache/results/state directories are created under this root when storage_type is 'file'.",
+        description="Persistence root path. Versioned data/cache/results/state directories are created under this root when storage_type is 'file'. Empty or '.' is normalized to .copinance.",
+    )
+
+    def get_storage_path(self) -> str:
+        """Return storage path, normalized so data is never written at project root."""
+        p = (self.storage_path or "").strip()
+        if not p or p == ".":
+            return ".copinance"
+        return p
+
+    # Cache (tool results and agent prompt cache)
+    cache_enabled: bool = Field(
+        default=True,
+        description="Enable built-in cache for tool results and agent prompts. Set to false to disable or when using your own cache via get_container(cache_manager=...).",
     )
 
     # Macroeconomic data (e.g., FRED)
@@ -71,3 +86,16 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get application settings singleton."""
     return Settings()
+
+
+def get_storage_path_safe() -> str:
+    """Return storage path, using .mock when get_settings() is mocked in tests."""
+    raw = get_settings().get_storage_path()
+    if not isinstance(raw, str):
+        return ".mock"
+    if "MagicMock" in raw:
+        return ".mock"
+    p = raw.strip()
+    if not p or p == ".":
+        return ".copinance"
+    return p

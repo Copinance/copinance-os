@@ -15,10 +15,10 @@ from copinanceos.application.use_cases.profile import (
     ListProfilesRequest,
     SetCurrentProfileRequest,
 )
-from copinanceos.domain.models.research_profile import FinancialLiteracy
+from copinanceos.domain.models.profile import FinancialLiteracy
 from copinanceos.infrastructure.containers import container
 
-profile_app = typer.Typer(help="Research profile management commands")
+profile_app = typer.Typer(help="Analysis profile management commands")
 console = Console()
 
 
@@ -29,7 +29,7 @@ def create_profile(
     ),
     name: str | None = typer.Option(None, help="Display name for the profile"),
 ) -> None:
-    """Create a new research profile."""
+    """Create a new analysis profile."""
 
     async def _create() -> None:
         use_case = container.create_profile_use_case()
@@ -54,7 +54,7 @@ def create_profile(
 def list_profiles(
     limit: int = typer.Option(100, help="Maximum number of profiles to show"),
 ) -> None:
-    """List all research profiles."""
+    """List all analysis profiles."""
 
     async def _list() -> None:
         use_case = container.list_profiles_use_case()
@@ -70,7 +70,7 @@ def list_profiles(
         current_response = await current_use_case.execute(GetCurrentProfileRequest())
         current_id = current_response.profile.id if current_response.profile else None
 
-        table = Table(title="Research Profiles")
+        table = Table(title="Analysis Profiles")
         table.add_column("ID", style="cyan")
         table.add_column("Display Name", style="magenta")
         table.add_column("Financial Literacy", style="green")
@@ -182,7 +182,7 @@ def delete_profile(
     profile_id: UUID = typer.Argument(..., help="Profile ID to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
 ) -> None:
-    """Delete a research profile."""
+    """Delete an analysis profile."""
 
     async def _delete() -> None:
         # Get profile first to show details

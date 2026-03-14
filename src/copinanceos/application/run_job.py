@@ -1,6 +1,6 @@
 """Default job runner implementation.
 
-Runs a single Job by finding a WorkflowExecutor that validates for it,
+Runs a single Job by finding an AnalysisExecutor that validates for it,
 building context (e.g. profile), and calling executor.execute(job, context).
 Consumers can replace this with their own JobRunner (queue-based, custom routing).
 """
@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from copinanceos.domain.exceptions import DomainError, WorkflowNotFoundError
+from copinanceos.domain.exceptions import DomainError, ExecutorNotFoundError
 from copinanceos.domain.models.job import Job, RunJobResult
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
-from copinanceos.domain.ports.workflows import JobRunner, WorkflowExecutor
+from copinanceos.domain.ports.analysis_execution import AnalysisExecutor, JobRunner
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 
 
 class DefaultJobRunner(JobRunner):
@@ -20,17 +20,17 @@ class DefaultJobRunner(JobRunner):
 
     def __init__(
         self,
-        profile_repository: ResearchProfileRepository | None,
-        workflow_executors: list[WorkflowExecutor],
+        profile_repository: AnalysisProfileRepository | None,
+        analysis_executors: list[AnalysisExecutor],
     ) -> None:
         self._profile_repository = profile_repository
-        self._workflow_executors = workflow_executors
+        self._analysis_executors = analysis_executors
 
-    async def _find_executor(self, job: Job) -> WorkflowExecutor:
-        for executor in self._workflow_executors:
+    async def _find_executor(self, job: Job) -> AnalysisExecutor:
+        for executor in self._analysis_executors:
             if await executor.validate(job):
                 return executor
-        raise WorkflowNotFoundError(job.workflow_type)
+        raise ExecutorNotFoundError(job.execution_type)
 
     async def _build_context(self, job: Job, base: dict[str, Any]) -> dict[str, Any]:
         out = dict(base)
@@ -55,5 +55,5 @@ class DefaultJobRunner(JobRunner):
             return RunJobResult(
                 success=False,
                 results=None,
-                error_message=f"Workflow execution failed: {e!s}",
+                error_message=f"Analysis execution failed: {e!s}",
             )

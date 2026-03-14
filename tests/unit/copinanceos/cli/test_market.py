@@ -6,12 +6,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from copinanceos.application.use_cases.fundamentals import (
+    GetStockFundamentalsRequest,
+)
 from copinanceos.application.use_cases.market import (
+    GetHistoricalDataRequest,
+    GetQuoteRequest,
     InstrumentSearchMode,
     SearchInstrumentsRequest,
     SearchInstrumentsResponse,
 )
-from copinanceos.cli.market import get_market_history, get_market_quote, search_instruments
+from copinanceos.cli.market import (
+    get_market_fundamentals,
+    get_market_history,
+    get_market_quote,
+    search_instruments,
+)
 from copinanceos.domain.models.market import MarketDataPoint
 from copinanceos.domain.models.stock import Stock
 
@@ -55,50 +65,79 @@ class TestMarketCLI:
         print_calls = [str(call) for call in mock_console.print.call_args_list]
         assert any("No instruments found" in str(call) for call in print_calls)
 
-    @patch("copinanceos.cli.market.container.market_data_provider")
+    @patch("copinanceos.cli.market.container.cache_manager")
+    @patch("copinanceos.cli.market.container.get_quote_use_case")
     @patch("copinanceos.cli.market.console")
-    def test_get_market_quote(self, mock_console: MagicMock, mock_provider: MagicMock) -> None:
-        provider = AsyncMock()
-        provider.get_quote = AsyncMock(
-            return_value={
-                "symbol": "AAPL",
-                "current_price": Decimal("150.25"),
-                "previous_close": Decimal("149.10"),
-                "open": Decimal("150.00"),
-                "high": Decimal("151.00"),
-                "low": Decimal("148.90"),
-                "volume": 1000000,
-                "market_cap": 2000000000,
-                "currency": "USD",
-                "exchange": "NASDAQ",
-                "timestamp": "2026-03-14T09:30:00+00:00",
-            }
+    def test_get_market_quote(
+        self,
+        mock_console: MagicMock,
+        mock_use_case_provider: MagicMock,
+        mock_cache_manager: MagicMock,
+    ) -> None:
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        mock_cache_manager.return_value = cache
+
+        mock_uc = AsyncMock()
+        mock_uc.execute = AsyncMock(
+            return_value=MagicMock(
+                quote={
+                    "symbol": "AAPL",
+                    "current_price": Decimal("150.25"),
+                    "previous_close": Decimal("149.10"),
+                    "open": Decimal("150.00"),
+                    "high": Decimal("151.00"),
+                    "low": Decimal("148.90"),
+                    "volume": 1000000,
+                    "market_cap": 2000000000,
+                    "currency": "USD",
+                    "exchange": "NASDAQ",
+                    "timestamp": "2026-03-14T09:30:00+00:00",
+                },
+                symbol="AAPL",
+            )
         )
-        mock_provider.return_value = provider
+        mock_use_case_provider.return_value = mock_uc
 
         get_market_quote(symbol="aapl")
 
-        provider.get_quote.assert_called_once_with("AAPL")
+        mock_uc.execute.assert_called_once()
+        call_args = mock_uc.execute.call_args[0][0]
+        assert isinstance(call_args, GetQuoteRequest)
+        assert call_args.symbol == "AAPL"
         assert mock_console.print.called
 
-    @patch("copinanceos.cli.market.container.market_data_provider")
+    @patch("copinanceos.cli.market.container.cache_manager")
+    @patch("copinanceos.cli.market.container.get_historical_data_use_case")
     @patch("copinanceos.cli.market.console")
-    def test_get_market_history(self, mock_console: MagicMock, mock_provider: MagicMock) -> None:
-        provider = AsyncMock()
-        provider.get_historical_data = AsyncMock(
-            return_value=[
-                MarketDataPoint(
-                    symbol="AAPL",
-                    timestamp=datetime(2026, 3, 10, tzinfo=UTC),
-                    open_price=Decimal("150.00"),
-                    close_price=Decimal("151.00"),
-                    high_price=Decimal("152.00"),
-                    low_price=Decimal("149.00"),
-                    volume=1000000,
-                )
-            ]
+    def test_get_market_history(
+        self,
+        mock_console: MagicMock,
+        mock_use_case_provider: MagicMock,
+        mock_cache_manager: MagicMock,
+    ) -> None:
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        mock_cache_manager.return_value = cache
+
+        mock_uc = AsyncMock()
+        mock_uc.execute = AsyncMock(
+            return_value=MagicMock(
+                data=[
+                    MarketDataPoint(
+                        symbol="AAPL",
+                        timestamp=datetime(2026, 3, 10, tzinfo=UTC),
+                        open_price=Decimal("150.00"),
+                        close_price=Decimal("151.00"),
+                        high_price=Decimal("152.00"),
+                        low_price=Decimal("149.00"),
+                        volume=1000000,
+                    )
+                ],
+                symbol="AAPL",
+            )
         )
-        mock_provider.return_value = provider
+        mock_use_case_provider.return_value = mock_uc
 
         get_market_history(
             symbol="aapl",
@@ -108,10 +147,11 @@ class TestMarketCLI:
             limit=10,
         )
 
-        provider.get_historical_data.assert_called_once()
-        call_kwargs = provider.get_historical_data.call_args.kwargs
-        assert call_kwargs["symbol"] == "AAPL"
-        assert call_kwargs["interval"] == "1d"
+        mock_uc.execute.assert_called_once()
+        call_args = mock_uc.execute.call_args[0][0]
+        assert isinstance(call_args, GetHistoricalDataRequest)
+        assert call_args.symbol == "AAPL"
+        assert call_args.interval == "1d"
         assert mock_console.print.called
 
     @patch("copinanceos.cli.market.handle_cli_error")
@@ -129,3 +169,47 @@ class TestMarketCLI:
 
         mock_handle_error.assert_called_once()
         mock_console.print.assert_not_called()
+
+    @patch("copinanceos.cli.market.container.cache_manager")
+    @patch("copinanceos.cli.market.container.get_stock_fundamentals_use_case")
+    @patch("copinanceos.cli.market.console")
+    def test_get_market_fundamentals(
+        self,
+        mock_console: MagicMock,
+        mock_use_case_provider: MagicMock,
+        mock_cache_manager: MagicMock,
+    ) -> None:
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        mock_cache_manager.return_value = cache
+
+        fundamentals_dict = {
+            "symbol": "AAPL",
+            "company_name": "Apple Inc.",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "market_cap": "2800000000000",
+            "current_price": "175.50",
+            "provider": "yfinance",
+            "data_as_of": "2026-03-14T12:00:00+00:00",
+            "income_statements": [],
+            "balance_sheets": [],
+            "cash_flow_statements": [],
+            "ratios": {"price_to_earnings": "28.5", "return_on_equity": "147.2"},
+        }
+        mock_fundamentals = MagicMock()
+        mock_fundamentals.model_dump = MagicMock(return_value=fundamentals_dict)
+
+        mock_uc = AsyncMock()
+        mock_uc.execute = AsyncMock(return_value=MagicMock(fundamentals=mock_fundamentals))
+        mock_use_case_provider.return_value = mock_uc
+
+        get_market_fundamentals(symbol="aapl", periods=5, period_type="annual")
+
+        mock_uc.execute.assert_called_once()
+        call_args = mock_uc.execute.call_args[0][0]
+        assert isinstance(call_args, GetStockFundamentalsRequest)
+        assert call_args.symbol == "AAPL"
+        assert call_args.periods == 5
+        assert call_args.period_type == "annual"
+        assert mock_console.print.called

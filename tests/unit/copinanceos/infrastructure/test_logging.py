@@ -286,8 +286,8 @@ class TestLoggingIntegration:
         root_logger.setLevel(logging.WARNING)
         root_logger.handlers.clear()
 
-    def test_full_logging_workflow(self) -> None:
-        """Test complete logging workflow from configuration to usage."""
+    def test_full_logging_flow(self) -> None:
+        """Test complete logging flow from configuration to usage."""
         # Configure logging
         settings = create_settings(log_level="INFO", log_format="json")
         configure_logging(settings)

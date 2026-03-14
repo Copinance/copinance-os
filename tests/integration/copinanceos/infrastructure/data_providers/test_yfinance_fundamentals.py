@@ -5,8 +5,8 @@ from decimal import Decimal
 import pytest
 
 from copinanceos.application.use_cases.fundamentals import (
-    ResearchStockFundamentalsRequest,
-    ResearchStockFundamentalsUseCase,
+    GetStockFundamentalsRequest,
+    GetStockFundamentalsUseCase,
 )
 from copinanceos.domain.exceptions import InvalidStockSymbolError, ValidationError
 from copinanceos.domain.models.fundamentals import (
@@ -466,25 +466,25 @@ class TestYFinanceFundamentalProvider:
 
 
 @pytest.mark.integration
-class TestResearchStockFundamentalsUseCase:
-    """Integration tests for ResearchStockFundamentalsUseCase with yfinance."""
+class TestGetStockFundamentalsUseCase:
+    """Integration tests for GetStockFundamentalsUseCase with yfinance."""
 
     @pytest.fixture(scope="class")
-    def use_case(self) -> ResearchStockFundamentalsUseCase:
-        """Provide a ResearchStockFundamentalsUseCase instance with caching enabled.
+    def use_case(self) -> GetStockFundamentalsUseCase:
+        """Provide a GetStockFundamentalsUseCase instance with caching enabled.
 
         Using class scope so all tests in this class share the same provider instance
         and benefit from caching, reducing API calls and improving test reliability.
         """
         provider = YFinanceFundamentalProvider(cache_ttl_seconds=3600)
-        return ResearchStockFundamentalsUseCase(provider)
+        return GetStockFundamentalsUseCase(provider)
 
     @pytest.mark.asyncio
     async def test_research_fundamentals_use_case(
-        self, use_case: ResearchStockFundamentalsUseCase
+        self, use_case: GetStockFundamentalsUseCase
     ) -> None:
         """Test the complete use case for researching stock fundamentals."""
-        request = ResearchStockFundamentalsRequest(
+        request = GetStockFundamentalsRequest(
             symbol="AAPL",
             periods=3,
             period_type="annual",
@@ -498,10 +498,10 @@ class TestResearchStockFundamentalsUseCase:
 
     @pytest.mark.asyncio
     async def test_use_case_validation_empty_symbol(
-        self, use_case: ResearchStockFundamentalsUseCase
+        self, use_case: GetStockFundamentalsUseCase
     ) -> None:
         """Test that empty symbol is rejected."""
-        request = ResearchStockFundamentalsRequest(
+        request = GetStockFundamentalsRequest(
             symbol="",
             periods=1,
             period_type="annual",
@@ -512,10 +512,10 @@ class TestResearchStockFundamentalsUseCase:
 
     @pytest.mark.asyncio
     async def test_use_case_validation_invalid_period_type(
-        self, use_case: ResearchStockFundamentalsUseCase
+        self, use_case: GetStockFundamentalsUseCase
     ) -> None:
         """Test that invalid period type is rejected."""
-        request = ResearchStockFundamentalsRequest(
+        request = GetStockFundamentalsRequest(
             symbol="AAPL",
             periods=1,
             period_type="invalid",
@@ -526,10 +526,10 @@ class TestResearchStockFundamentalsUseCase:
 
     @pytest.mark.asyncio
     async def test_use_case_validation_invalid_periods(
-        self, use_case: ResearchStockFundamentalsUseCase
+        self, use_case: GetStockFundamentalsUseCase
     ) -> None:
         """Test that invalid periods count is rejected."""
-        request = ResearchStockFundamentalsRequest(
+        request = GetStockFundamentalsRequest(
             symbol="AAPL",
             periods=0,
             period_type="annual",
@@ -540,10 +540,10 @@ class TestResearchStockFundamentalsUseCase:
 
     @pytest.mark.asyncio
     async def test_use_case_symbol_normalization(
-        self, use_case: ResearchStockFundamentalsUseCase
+        self, use_case: GetStockFundamentalsUseCase
     ) -> None:
         """Test that symbol is normalized to uppercase."""
-        request = ResearchStockFundamentalsRequest(
+        request = GetStockFundamentalsRequest(
             symbol="aapl",
             periods=1,
             period_type="annual",

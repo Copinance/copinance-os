@@ -26,7 +26,7 @@ llm_config = LLMConfig(
     temperature=0.7,             # Optional: 0.0-1.0, default 0.7
     max_tokens=4096,             # Optional: provider-dependent
     base_url=None,               # Optional: for custom endpoints
-    workflow_providers={},       # Optional: per-workflow provider mapping
+    execution_type_providers={},  # Optional: per-execution-type provider mapping
     provider_config={},          # Optional: provider-specific settings
 )
 ```
@@ -54,7 +54,7 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 
 ## LLM Provider Setup
 
-Copinance OS supports multiple LLM providers for agent workflows. You can use either Gemini (cloud-based) or Ollama (local).
+Copinance OS supports multiple LLM providers for question-driven analysis. You can use either Gemini (cloud-based) or Ollama (local).
 
 ### Gemini API (Cloud-based)
 
@@ -82,7 +82,8 @@ export COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 ### 3. Verify
 
 ```bash
-copinance ask "What is the current price?" --instrument AAPL
+# Verify Gemini: run question-driven analysis; you should see AI-generated output
+copinance analyze equity AAPL --question "What is the current price?"
 ```
 
 If configured correctly, you'll see AI analysis. If not, check:
@@ -109,7 +110,7 @@ COPINANCEOS_GEMINI_MODEL=gemini-1.5-flash
 
 ## FRED API Setup (Macroeconomic Data)
 
-FRED (Federal Reserve Economic Data) provides high-quality macroeconomic time series for rates, credit spreads, and commodities. While the macro workflow works with yfinance proxies, FRED provides more accurate data.
+FRED (Federal Reserve Economic Data) provides high-quality macroeconomic time series for rates, credit spreads, and commodities. While the macro analysis works with yfinance proxies, FRED provides more accurate data.
 
 ### 1. Get API Key
 
@@ -133,6 +134,7 @@ export COPINANCEOS_FRED_API_KEY=your-fred-api-key-here
 ### 3. Verify
 
 ```bash
+# Verify FRED: run macro analysis; results should show "source": "fred"
 copinance analyze macro
 ```
 
@@ -141,7 +143,7 @@ If configured correctly, you'll see `"source": "fred"` in the results. If not, c
 - Variable name is exactly `COPINANCEOS_FRED_API_KEY`
 - No extra spaces around the `=` sign
 
-**Note:** The macro workflow will automatically fall back to yfinance proxies if FRED is unavailable, so it works without an API key (with lower data quality).
+**Note:** The macro analysis will automatically fall back to yfinance proxies if FRED is unavailable, so it works without an API key (with lower data quality).
 
 ## Storage Configuration
 
@@ -155,6 +157,18 @@ COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinanceos
 ```
 
+## Cache
+
+The built-in cache stores tool results and agent prompts under the storage path. You can disable it via env or when using the library.
+
+```bash
+# Enable or disable cache (default: true)
+COPINANCEOS_CACHE_ENABLED=true
+```
+
+- **CLI:** Set `COPINANCEOS_CACHE_ENABLED=false` to disable caching.
+- **Library:** Pass `cache_enabled=False` or your own `cache_manager` to `get_container()`. See [Using Copinance OS as a Library](/getting-started/library#cache).
+
 ## Complete .env Example
 
 **Using Gemini (Cloud):**
@@ -162,7 +176,7 @@ COPINANCEOS_STORAGE_PATH=~/.copinanceos
 # LLM Provider (optional, default: gemini)
 COPINANCEOS_LLM_PROVIDER=gemini
 
-# Gemini API (required for agent workflows with Gemini)
+# Gemini API (required for question-driven analysis with Gemini)
 COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-actual-key
 
 # Model selection (optional, default: gemini-1.5-pro)
@@ -174,6 +188,9 @@ COPINANCEOS_FRED_API_KEY=your-fred-api-key
 # Storage (optional)
 COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinanceos
+
+# Cache (optional, default: true)
+COPINANCEOS_CACHE_ENABLED=true
 ```
 
 **Using Ollama (Local):**
@@ -190,16 +207,16 @@ COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinanceos
 ```
 
-**Mixed Configuration (per-workflow):**
+**Mixed Configuration (per analysis mode):**
 ```bash
-# Use different providers for different workflows
-COPINANCEOS_WORKFLOW_LLM_PROVIDERS=agent:gemini
+# Use different providers for different analysis modes
+COPINANCEOS_LLM_PROVIDERS=agent:gemini
 
-# Gemini API (for agent workflows)
+# Gemini API (for question-driven analysis)
 COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-actual-key
 COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro
 
-# Ollama (for agent workflows)
+# Ollama (for question-driven analysis)
 COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
 COPINANCEOS_OLLAMA_MODEL=llama2
 ```
@@ -263,16 +280,17 @@ export COPINANCEOS_OLLAMA_MODEL=llama2
 ### 3. Verify
 
 ```bash
-copinance ask "What is the current price?" --instrument AAPL
+# Verify Ollama: run question-driven analysis using local LLM
+copinance analyze equity AAPL --question "What is the current price?"
 ```
 
-### Per-Workflow Provider Configuration
+### Per-Mode Provider Configuration
 
-You can use different providers for different workflows:
+You can use different providers for different analysis modes:
 
 ```bash
-# Use Ollama locally for agent workflows
-COPINANCEOS_WORKFLOW_LLM_PROVIDERS=agent:ollama
+# Use Ollama locally for question-driven analysis
+COPINANCEOS_LLM_PROVIDERS=agent:ollama
 ```
 
 This allows you to use local models for simple tasks and cloud models for complex analysis.
@@ -302,16 +320,16 @@ use_case = container.get_instrument_use_case()
 # ... integrate into your application
 ```
 
-### Per-Workflow Provider Configuration
+### Per-Mode Provider Configuration
 
-You can configure different providers for different workflows:
+You can configure different providers for different analysis modes:
 
 ```python
 llm_config = LLMConfig(
     provider="gemini",  # Default provider
     api_key="your-gemini-key",
-    workflow_providers={
-        "agent": "gemini",     # Use Gemini for agent workflows
+    execution_type_providers={
+        "question_driven_analysis": "gemini",
     },
 )
 ```

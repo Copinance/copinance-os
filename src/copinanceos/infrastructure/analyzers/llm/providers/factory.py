@@ -91,23 +91,14 @@ class LLMProviderFactory:
             )
 
     @staticmethod
-    def get_provider_for_workflow(
-        workflow_type: str,
+    def get_provider_for_execution_type(
+        execution_type: str,
         llm_config: LLMConfig | None = None,
         default_provider: str | None = None,
     ) -> str:
-        """Get the provider name for a specific workflow.
-
-        Args:
-            workflow_type: The workflow type (e.g., "agent")
-            llm_config: LLM configuration. If None, uses default_provider.
-            default_provider: Default provider to use if no mapping is found
-
-        Returns:
-            Provider name to use for this workflow
-        """
+        """Get the provider name for an execution type (e.g. question_driven_analysis)."""
         if llm_config:
-            return llm_config.get_provider_for_workflow(workflow_type)
+            return llm_config.get_provider_for_execution_type(execution_type)
 
         # Fall back to default provider
         if default_provider:

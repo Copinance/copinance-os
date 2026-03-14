@@ -1,5 +1,5 @@
 export default {
   "cli": "CLI Reference",
-  "workflows": "Workflows",
+  "analysis-modes": "Analysis Modes",
   "configuration": "Configuration"
 }

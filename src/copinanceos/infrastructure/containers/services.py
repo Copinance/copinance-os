@@ -6,12 +6,12 @@ from copinanceos.domain.services import ProfileManagementService
 
 
 def configure_services(
-    research_profile_repository: providers.Provider,
+    profile_repository: providers.Provider,
 ) -> dict[str, providers.Provider]:
     """Configure domain service providers.
 
     Args:
-        research_profile_repository: Research profile repository provider
+        profile_repository: Analysis profile repository provider
 
     Returns:
         Dictionary of domain service providers
@@ -19,6 +19,6 @@ def configure_services(
     return {
         "profile_management_service": providers.Factory(
             ProfileManagementService,
-            profile_repository=research_profile_repository,
+            profile_repository=profile_repository,
         ),
     }

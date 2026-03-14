@@ -6,28 +6,30 @@ Complete guide to using the Copinance OS command-line interface.
 
 | Command | Description |
 |--------|-------------|
-| `copinance version` | Show version |
-| `copinance market` | Market data (search, quote, history, options) |
-| `copinance profile` | Research profiles (create, list, get, current, set-current, delete) |
-| `copinance analyze` | One-off analysis (market equity/options, macro) |
-| `copinance ask` | Agentic Q&A (instrument or market-wide) |
-| `copinance cache` | Cache management (clear, refresh, info) |
+| `analyze` | Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. |
+| `cache` | Cache management commands. |
+| `market` | Market data commands. |
+| `profile` | Analysis profile management commands. |
+| `version` | Show version information. |
 
 ## Running Commands
 
 **After installation:**
 ```bash
+# Invoke any CLI subcommand (analyze, market, profile, cache, version)
 copinance <command>
 ```
 
 **Without installation:**
 ```bash
+# Run CLI as a module from repo root (no pip install required)
 python -m copinanceos.cli <command>
 ```
 
 ## Version
 
 ```bash
+# Print Copinance OS version (e.g. "Copinance OS v0.1.0")
 copinance version
 ```
 
@@ -38,7 +40,10 @@ copinance version
 Search market instruments by symbol or display name.
 
 ```bash
+# Search by display name; returns up to 10 matches (default)
 copinance market search "Apple"
+
+# Search by symbol with at most 5 results and symbol-only matching
 copinance market search "AAPL" --limit 5 --mode symbol
 ```
 
@@ -48,10 +53,13 @@ copinance market search "AAPL" --limit 5 --mode symbol
 
 ### Current Quote
 
-Fetch the latest market quote for an instrument. Uses the same cache as agent tools.
+Fetch the latest market quote for an instrument. Uses the same cache as in question-driven analysis.
 
 ```bash
+# Get current price, volume, and other quote data for AAPL (uses cache)
 copinance market quote AAPL
+
+# Get quote for SPY and bypass cache to fetch fresh data
 copinance market quote SPY --no-cache
 ```
 
@@ -60,10 +68,13 @@ copinance market quote SPY --no-cache
 
 ### Historical Data
 
-Fetch historical OHLCV data for an instrument and date range. Uses the same cache as agent tools.
+Fetch historical OHLCV data for an instrument and date range. Uses the same cache as in question-driven analysis.
 
 ```bash
+# Daily OHLCV for AAPL between two dates (default interval 1d)
 copinance market history AAPL --start 2026-01-01 --end 2026-03-14
+
+# Hourly data for SPY over a range; limit 0 shows all rows
 copinance market history SPY --start 2026-03-01 --end 2026-03-14 --interval 1h --limit 0
 ```
 
@@ -76,11 +87,16 @@ copinance market history SPY --start 2026-03-01 --end 2026-03-14 --interval 1h -
 
 ### Options Chain Snapshot
 
-Fetch an options chain for an underlying symbol. Uses the same cache as agent tools; with `--side all`, calls and puts are interleaved so a small limit shows both.
+Fetch an options chain for an underlying symbol. Uses the same cache as in question-driven analysis; with `--side all`, calls and puts are interleaved so a small limit shows both.
 
 ```bash
+# List options for AAPL (default expiration; all sides; uses cache)
 copinance market options AAPL
+
+# List only call options expiring on 2026-06-19 for AAPL
 copinance market options AAPL --expiration 2026-06-19 --side call
+
+# List both calls and puts for MSTR, up to 20 contracts, skip cache
 copinance market options MSTR --side all --limit 20 --no-cache
 ```
 
@@ -90,15 +106,36 @@ copinance market options MSTR --side all --limit 20 --no-cache
 - `--limit <number>`: Maximum contracts to show (default: `0` = show all)
 - `--no-cache`: Bypass cache and fetch fresh data
 
+### Fundamentals
+
+Fetch fundamental data for an equity (financial statements, ratios, and key metrics). Uses the same cache as in question-driven analysis.
+
+```bash
+# Fetch fundamentals for AAPL (default: 5 annual periods, cached)
+copinance market fundamentals AAPL
+
+# Five years of annual financials for MSFT
+copinance market fundamentals MSFT --periods 5 --period-type annual
+
+# Eight quarters of AAPL data, bypass cache for latest figures
+copinance market fundamentals AAPL --period-type quarterly --periods 8 --no-cache
+```
+
+**Options:**
+- `--periods <number>` / `-n`: Number of periods (e.g. 5 years or 5 quarters) (default: `5`)
+- `--period-type <type>`: `annual` or `quarterly` (default: `annual`)
+- `--no-cache`: Bypass cache and fetch fresh data
+
 ## Profile Commands
 
 Profiles customize analysis output based on your financial literacy level.
 
-**Note:** When you run `analyze` or `ask` without a profile, the system will prompt you to set your financial literacy level for more personalized results.
+**Note:** When you run `analyze` without a profile, the system will prompt you to set your financial literacy level for more personalized results.
 
 ### Create Profile
 
 ```bash
+# Create a profile with intermediate literacy and an optional display name
 copinance profile create --literacy intermediate --name "My Profile"
 ```
 
@@ -107,30 +144,35 @@ copinance profile create --literacy intermediate --name "My Profile"
 ### List Profiles
 
 ```bash
+# List all analysis profiles (IDs, literacy, display names)
 copinance profile list
 ```
 
 ### Get Profile
 
 ```bash
+# Show details for a specific profile by ID
 copinance profile get <profile-id>
 ```
 
 ### Get Current Profile
 
 ```bash
+# Show the profile currently used for analyze (if set)
 copinance profile current
 ```
 
 ### Set Current Profile
 
 ```bash
+# Set which profile is used by default for analyze; omit ID to clear
 copinance profile set-current <profile-id>
 ```
 
 ### Delete Profile
 
 ```bash
+# Remove a profile; --force skips confirmation
 copinance profile delete <profile-id> --force
 ```
 
@@ -138,89 +180,98 @@ copinance profile delete <profile-id> --force
 
 Run one-off analysis. Results are saved under `.copinance/results/v2/`; profiles, cache, and state live under versioned subdirectories inside `.copinance`.
 
+Analyze is progressive:
+- Without `--question`, it runs deterministic analysis.
+- With `--question`, it runs question-driven analysis and lets the model call the relevant tools.
+- Use `--mode auto|deterministic|question_driven` when you want to force the execution style.
+
 ### Analyze an Equity
 
-Run a predefined equity analysis (instrument info, quote, history, fundamentals, summary).
+Run equity analysis. By default it returns deterministic instrument, quote, history, fundamentals, and summary output. Add `--question` to switch to tool-using question-driven analysis.
 
 ```bash
-copinance analyze market equity AAPL --timeframe mid_term
-copinance analyze market equity AAPL --timeframe long_term --profile-id <id>
+# Run deterministic equity analysis for AAPL with mid-term timeframe (default)
+copinance analyze equity AAPL --timeframe mid_term
+
+# Run question-driven analysis with a custom question and optional profile
+copinance analyze equity AAPL --question "What are the key risks?" --timeframe long_term --profile-id <id>
 ```
 
 **Options:**
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
+- `--question` / `-q`: Optional natural-language question
+- `--mode <mode>`: `auto`, `deterministic`, or `question_driven`
 - `--profile-id <id>`: Profile ID for context
+- `--include-prompt`: Include rendered prompts in saved results for question-driven runs
 
 ### Analyze Options
 
-Run a predefined options analysis (underlying quote, options chain summary, open interest, volume, implied volatility).
+Run options analysis. By default it returns deterministic options-chain output. Add `--question` to let the AI fetch and interpret the relevant options and market data.
 
 ```bash
-copinance analyze market options AAPL
-copinance analyze market options AAPL --expiration 2026-06-19 --side put --timeframe short_term
+# Run deterministic options analysis for AAPL (default expiration/side)
+copinance analyze options AAPL
+
+# Deterministic analysis for puts expiring 2026-06-19, short-term focus
+copinance analyze options AAPL --expiration 2026-06-19 --side put --timeframe short_term
+
+# Question-driven analysis: AI uses options and market tools to answer the question
+copinance analyze options AAPL --question "What does skew say about sentiment?" --expiration 2026-06-19
 ```
 
 **Options:**
 - `--expiration <date>`: Optional expiration date (YYYY-MM-DD)
 - `--side <side>`: `call`, `put`, or `all`
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
+- `--question` / `-q`: Optional natural-language question
+- `--mode <mode>`: `auto`, `deterministic`, or `question_driven`
 - `--profile-id <id>`: Profile ID for context
+- `--include-prompt`: Include rendered prompts in saved results for question-driven runs
 
 ### Macro + Market Regime
 
+Run market regime analysis: VIX, market breadth, sector rotation, and (optionally) rates, credit, commodities, and other macro indicators. Deterministic runs compute all enabled indicators; with `--question` the AI uses the same tools to answer in natural language.
+
+**What gets fetched**
+
+- **`--market-index`** (e.g. `SPY`, `QQQ`, `DIA`, `IWM`) is the **reference index**. It is used for:
+  - Trend and volatility regime detection (that index’s price history).
+  - The “market” benchmark when comparing sectors (breadth and rotation are relative to this index).
+- **VIX** (^VIX) and the **11 S&P sector ETFs** (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE) are **always** fetched when VIX, market breadth, or sector rotation are enabled. They are the same for any `--market-index`; only the reference used for comparison changes.
+
+So when you run `copinance analyze macro --market-index QQQ`, the process fetches QQQ (reference), all 11 sector ETFs (for breadth/rotation), and VIX. That is expected.
+
+**Examples**
+
 ```bash
+# Run deterministic macro/market regime analysis (default: SPY, 252-day lookback)
 copinance analyze macro
+
+# Use QQQ as the reference index and 90-day lookback (sector ETFs and VIX still fetched)
 copinance analyze macro --market-index QQQ --lookback-days 90
+
+# Shorter lookback; DIA as reference
+copinance analyze macro --market-index DIA --lookback-days 60
+
+# Question-driven: AI uses macro and market tools to answer
+copinance analyze macro --question "Is this a risk-on or risk-off regime?"
+
+# Only VIX and breadth, no sector rotation; SPY as reference
+copinance analyze macro --no-include-sector-rotation
 ```
 
 **Options:**
-- `--market-index <symbol>`: Anchor market index (`SPY`, `QQQ`, `DIA`, `IWM`)
-- `--lookback-days <days>`: Lookback window
-- `--include-*` / `--no-include-*`: Toggle indicator groups
-
-## Ask (Agentic)
-
-Ask questions using the agent workflow. The agent can use tools (quotes, historical data, options chain, fundamentals, macro indicators) to answer. Requires LLM configuration (see [Configuration](configuration)).
-
-**Usage:** Pass the question with `-q` / `--question` (quote long text). Options can be in any order.
-
-**Equity (instrument):**
-```bash
-copinance ask -q "What are the key risks for this equity?" -i AAPL
-copinance ask --question "Summarize recent price action and fundamentals." -i AAPL --timeframe short_term
-```
-
-**Options (instrument):** Ask about specific stock options data. Use `--market-type options` and optionally `--expiration` and `--side` so the agent gets options context and can fetch the options chain.
-
-```bash
-copinance ask -q "What's the put/call open interest for AAPL?" -i AAPL --market-type options
-copinance ask -q "Summarize AAPL options for June 2026" -i AAPL --market-type options --expiration 2026-06-19
-copinance ask -q "What are the most active calls?" -i AAPL --market-type options --side call
-copinance ask -q "What does options data say about pricing and sentiment?" -i MSTR --market-type options --expiration 2026-06-19
-```
-
-**Market-wide:**
-```bash
-copinance ask -q "What is the current market sentiment and which sectors are leading?"
-copinance ask -q "What is the current VIX level and market fear sentiment?" -m SPY
-copinance ask -q "How are rates and credit spreads trending?" -m SPY
-```
-
-**Options:**
-- `--question` / `-q`: Question text (required). Quote long questions.
-- `--instrument <symbol>` / `-i <symbol>`: Instrument symbol (omit for market-wide)
-- `--market-type <type>`: `equity` or `options` (for instrument questions)
-- `--expiration <date>`: Optional options expiration hint (YYYY-MM-DD)
-- `--side <side>`: Optional options side hint: `call`, `put`, or `all`
-- `--market-index <symbol>` / `-m <symbol>`: Anchor index for market-wide questions (default: SPY)
-- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
-- `--profile-id <id>`: Profile ID for context
-- `--show-prompt`: Also display the prompt used for the question (system and user parts) before the answer.
-
-**Example with prompt visible:**
-```bash
-copinance ask -q "What does options data say about pricing?" -i MSTR --market-type options --show-prompt
-```
+- `--market-index` / `-m`: Reference index for trend/volatility and sector comparison (`SPY`, `QQQ`, `DIA`, `IWM`). Breadth and rotation always use the 11 S&P sector ETFs and VIX.
+- `--timeframe`: `short_term`, `mid_term`, or `long_term`
+- `--question` / `-q`: Optional natural-language question (enables question-driven mode in auto)
+- `--mode`: `auto`, `deterministic`, or `question_driven`
+- `--lookback-days`: Lookback window in days (default: 252)
+- `--include-vix` / `--no-include-vix`: Include VIX (default: on)
+- `--include-market-breadth` / `--no-include-market-breadth`: Include market breadth (default: on)
+- `--include-sector-rotation` / `--no-include-sector-rotation`: Include sector rotation (default: on)
+- `--include-rates`, `--include-credit`, `--include-commodities`, etc.: Toggle other macro indicator groups
+- `--profile-id`: Profile ID for context
+- `--include-prompt`: Include rendered prompts in saved results for question-driven runs
 
 ## Cache Commands
 
@@ -228,11 +279,16 @@ Copinance OS caches tool results (quotes, history, options chain, etc.) and stor
 
 ### Clear Cache
 
-Clears cached tool data and stored instrument/market data (e.g. under `.copinance/cache/` and `.copinance/data/`). Does not clear profiles or workflow results.
+Clears cached tool data and stored instrument/market data (under versioned paths `.copinance/cache/v2/` and `.copinance/data/v2/`). Does not clear profiles or analysis results.
 
 ```bash
+# Clear all tool cache and stored instrument/market data
 copinance cache clear
+
+# Clear only quote cache entries
 copinance cache clear --tool get_market_quote
+
+# Clear only options chain cache entries
 copinance cache clear --tool get_options_chain
 ```
 
@@ -244,8 +300,13 @@ copinance cache clear --tool get_options_chain
 Delete a specific cache entry so the next call fetches fresh data.
 
 ```bash
+# Invalidate cached quote for AAPL; next quote call will fetch live
 copinance cache refresh get_market_quote --arg symbol=AAPL
+
+# Invalidate options chain cache for SPY at given expiration
 copinance cache refresh get_options_chain --arg underlying_symbol=SPY --arg expiration_date=2026-06-19
+
+# Invalidate historical data cache for symbol and date range
 copinance cache refresh get_historical_market_data --arg symbol=AAPL --arg start_date=2026-01-01 --arg end_date=2026-03-14 --arg interval=1d
 ```
 
@@ -255,6 +316,7 @@ copinance cache refresh get_historical_market_data --arg symbol=AAPL --arg start
 ### Cache Information
 
 ```bash
+# Show cache backend, tool cache path, and stored data path
 copinance cache info
 ```
 
@@ -267,11 +329,15 @@ All CLI data is stored under the `.copinance` folder (or `COPINANCEOS_STORAGE_PA
 ## Getting Help
 
 ```bash
+# Main help and list of commands
 copinance --help
+
+# Show version
 copinance version
+
+# Subcommand help (options and usage for each group)
 copinance market --help
 copinance profile --help
 copinance analyze --help
-copinance ask --help
 copinance cache --help
 ```

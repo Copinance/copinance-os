@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "copinance-os"
 version = "0.1.0"
-description = "Open-source market research platform and framework with agent AI and instrument/macro workflows"
+description = "Open-source market research platform and framework with agent AI and instrument/macro analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "Copinance OS Contributors"}
 ]
-keywords = ["market", "research", "finance", "trading", "options", "ai", "workflow"]
+keywords = ["market", "research", "finance", "trading", "options", "ai", "analysis"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",

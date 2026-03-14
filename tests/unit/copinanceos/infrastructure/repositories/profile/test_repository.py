@@ -1,28 +1,26 @@
-"""Unit tests for research profile repository implementation."""
+"""Unit tests for analysis profile repository implementation."""
 
 from uuid import uuid4
 
 import pytest
 
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 from copinanceos.domain.ports.storage import Storage
-from copinanceos.infrastructure.repositories.profile.repository import (
-    ResearchProfileRepositoryImpl,
-)
+from copinanceos.infrastructure.repositories.profile.repository import AnalysisProfileRepositoryImpl
 
 
 @pytest.mark.unit
-class TestResearchProfileRepository:
-    """Test ResearchProfileRepositoryImpl."""
+class TestAnalysisProfileRepository:
+    """Test AnalysisProfileRepositoryImpl."""
 
     @pytest.mark.asyncio
     async def test_save_profile(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test saving a profile."""
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Test Investor",
             preferences={"theme": "tech"},
@@ -38,10 +36,10 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_get_profile_by_id(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test retrieving a profile by ID."""
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.ADVANCED,
             display_name="Advanced Investor",
         )
@@ -57,7 +55,7 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_get_profile_by_id_not_found(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test retrieving a non-existent profile returns None."""
         profile = await profile_repository.get_by_id(uuid4())
@@ -67,10 +65,10 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_update_profile(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test updating an existing profile."""
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.BEGINNER,
             display_name="Beginner",
         )
@@ -88,10 +86,10 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_delete_profile(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test deleting a profile."""
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.BEGINNER,
         )
         saved_profile = await profile_repository.save(profile)
@@ -107,7 +105,7 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_delete_profile_not_found(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test deleting a non-existent profile returns False."""
         result = await profile_repository.delete(uuid4())
@@ -117,12 +115,12 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_list_all_profiles(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test listing all profiles."""
         # Create multiple profiles
         profiles = [
-            ResearchProfile(
+            AnalysisProfile(
                 financial_literacy=FinancialLiteracy.BEGINNER,
                 display_name=f"Profile {i}",
             )
@@ -135,17 +133,17 @@ class TestResearchProfileRepository:
         all_profiles = await profile_repository.list_all()
 
         assert len(all_profiles) == 5
-        assert all(isinstance(p, ResearchProfile) for p in all_profiles)
+        assert all(isinstance(p, AnalysisProfile) for p in all_profiles)
 
     @pytest.mark.asyncio
     async def test_list_profiles_with_limit(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test listing profiles with limit."""
         # Create multiple profiles
         profiles = [
-            ResearchProfile(
+            AnalysisProfile(
                 financial_literacy=FinancialLiteracy.BEGINNER,
                 display_name=f"Profile {i}",
             )
@@ -162,12 +160,12 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_list_profiles_with_offset(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test listing profiles with offset."""
         # Create multiple profiles
         profiles = [
-            ResearchProfile(
+            AnalysisProfile(
                 financial_literacy=FinancialLiteracy.BEGINNER,
                 display_name=f"Profile {i}",
             )
@@ -186,7 +184,7 @@ class TestResearchProfileRepository:
     @pytest.mark.asyncio
     async def test_list_profiles_empty(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test listing profiles when none exist."""
         profiles = await profile_repository.list_all()
@@ -200,15 +198,15 @@ class TestResearchProfileRepository:
     ) -> None:
         """Test that profiles persist across repository instances."""
         # Create first repository instance and save profile
-        repo1 = ResearchProfileRepositoryImpl(storage=isolated_storage)
-        profile = ResearchProfile(
+        repo1 = AnalysisProfileRepositoryImpl(storage=isolated_storage)
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.ADVANCED,
             display_name="Persistent Profile",
         )
         saved_profile = await repo1.save(profile)
 
         # Create second repository instance with same storage
-        repo2 = ResearchProfileRepositoryImpl(storage=isolated_storage)
+        repo2 = AnalysisProfileRepositoryImpl(storage=isolated_storage)
 
         # Verify profile can be retrieved from new instance
         retrieved_profile = await repo2.get_by_id(saved_profile.id)

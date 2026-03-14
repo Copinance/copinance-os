@@ -100,7 +100,9 @@ class TestLocalFileCacheBackend:
         result = await cache_backend.get("test_key")
 
         assert result is not None
-        assert result.metadata == metadata
+        # Backend may add cache_file_path; original metadata must be preserved
+        assert result.metadata.get("source") == metadata["source"]
+        assert result.metadata.get("version") == metadata["version"]
 
     async def test_delete_existing(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test deleting existing cache entry."""

@@ -429,43 +429,72 @@ if result.data.get('parameters_adjusted'):
     print(f"Adjusted parameters used: {result.data.get('short_ma_period_used')}/{result.data.get('long_ma_period_used')}")
 ```
 
-## Using Tools in Workflows
+## CLI: What Gets Fetched
 
-### Agentic Workflows
+When you run `copinance analyze macro`, the CLI fetches data for several symbols. Here’s how it works:
 
-Tools are automatically available in agent workflows when a market data provider is configured. The LLM will automatically select and use the appropriate tools based on your question.
+- **Reference index (`--market-index`)**: The symbol you pass (e.g. `SPY`, `QQQ`, `DIA`, `IWM`) is the **reference index**. It is used for:
+  - **Trend and volatility regime detection** — that index’s price history is analyzed.
+  - **Sector comparison** — “market” return in breadth and rotation is this index’s return.
+- **Fixed inputs (same for any reference index)**:
+  - **VIX** (^VIX) — always fetched when VIX is included.
+  - **11 S&P sector ETFs** (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE) — always fetched when market breadth or sector rotation is included. They are the same whether you choose SPY, QQQ, DIA, or IWM.
+
+So `copinance analyze macro --market-index QQQ` fetches: **QQQ** (reference), **all 11 sector ETFs**, and **^VIX**. That is expected and not “fetching all indexes.”
+
+**Examples:**
+
+```bash
+# Default: SPY as reference; 252-day lookback; VIX + breadth + rotation
+copinance analyze macro
+
+# QQQ as reference; 90-day lookback (still fetches 11 sector ETFs + VIX)
+copinance analyze macro --market-index QQQ --lookback-days 90
+
+# DIA as reference; skip sector rotation (still fetches sector ETFs if breadth is on)
+copinance analyze macro --market-index DIA --no-include-sector-rotation
+
+# Question-driven: same data sources; AI answers in natural language
+copinance analyze macro --market-index SPY --question "Which sectors are leading and what is the rotation theme?"
+```
+
+## Using Tools in Analysis
+
+### Question-driven analysis
+
+Tools are automatically available in question-driven analysis when a market data provider is configured. The LLM will automatically select and use the appropriate tools based on your question.
 
 **Individual Instrument Analysis:**
 ```bash
 # Analyze trend and volatility for a specific instrument
-copinance ask "What is the current market trend and volatility regime?" --instrument AAPL
+copinance analyze equity AAPL --question "What is the current market trend and volatility regime?"
 
 # Analyze market cycles
-copinance ask "What market cycle phase is this instrument in?" --instrument TSLA
+copinance analyze equity TSLA --question "What market cycle phase is this instrument in?"
 
 # Comprehensive regime analysis
-copinance ask "Analyze the market regime for this instrument including trend, volatility, and cycle phases" --instrument MSFT
+copinance analyze equity MSFT --question "Analyze the market regime for this instrument including trend, volatility, and cycle phases"
 ```
 
 **Market-Wide Indicators:**
 ```bash
 # Get market-wide context with VIX and sector analysis
-copinance ask "What is the current market sentiment and which sectors are leading?" --market-index SPY
+copinance analyze macro --question "What is the current market sentiment and which sectors are leading?" --market-index SPY
 
 # Analyze market breadth
-copinance ask "What is the current market breadth and sector rotation?"
+copinance analyze macro --question "What is the current market breadth and sector rotation?"
 
 # VIX and volatility analysis
-copinance ask "What is the current VIX level and market fear sentiment?"
+copinance analyze macro --question "What is the current VIX level and market fear sentiment?"
 
 # Sector rotation analysis
-copinance ask "Which sectors are currently outperforming and what rotation theme is active?"
+copinance analyze macro --question "Which sectors are currently outperforming and what rotation theme is active?"
 ```
 
 **Combined Analysis:**
 ```bash
 # Combine individual instrument and market-wide analysis
-copinance ask "Analyze this instrument's regime and compare it to the broader market conditions including VIX and sector rotation" --instrument AAPL
+copinance analyze equity AAPL --question "Analyze this instrument's regime and compare it to the broader market conditions including VIX and sector rotation"
 ```
 
 The LLM will automatically use the appropriate tools (`detect_market_trend`, `detect_volatility_regime`, `detect_market_cycles`, or `get_market_regime_indicators`) based on your question.
@@ -651,5 +680,5 @@ The structure is designed to accommodate:
 - [Tools Overview](../index) - All available tools
 - [Data Provider Tools](../data-providers) - Data provider tool implementations
 - [API Reference](../../api-reference/data-providers) - Data provider interfaces
-- [Workflows](../../user-guide/workflows) - How to use tools in workflows
+- [Analysis Modes](../../user-guide/analysis-modes) - How to use tools in analysis
 - [Developer Guide](../../developer-guide/extending) - Creating custom tools

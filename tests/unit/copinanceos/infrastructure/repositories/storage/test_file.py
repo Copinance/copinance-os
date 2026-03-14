@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 
 from copinanceos.domain.models.base import Entity
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
 from copinanceos.infrastructure.persistence import get_data_dir
 from copinanceos.infrastructure.repositories.storage.file import JsonFileStorage
 
@@ -156,21 +156,22 @@ class TestJsonFileStorage:
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = JsonFileStorage(base_path=tmpdir)
 
-            # Create ResearchProfile entity
+            # Create AnalysisProfile entity
             profile_id = uuid4()
-            profile = ResearchProfile(
+            profile = AnalysisProfile(
                 id=profile_id,
                 financial_literacy=FinancialLiteracy.INTERMEDIATE,
                 display_name="Test Profile",
                 preferences={"key": "value"},
             )
 
-            collection = storage.get_collection("research/profiles", ResearchProfile)
+            collection = storage.get_collection("analysis/profiles", AnalysisProfile)
             collection[profile_id] = profile
-            storage.save("research/profiles")
+            storage.save("analysis/profiles")
 
-            # Verify file exists
-            file_path = Path(tmpdir) / "data" / "v2" / "research" / "profiles.json"
+            # Verify file exists (collection "analysis/profiles" -> data/v2/analysis/profiles.json)
+            data_dir = get_data_dir(tmpdir)
+            file_path = data_dir / "analysis" / "profiles.json"
             assert file_path.exists()
 
             # Load and verify
@@ -463,26 +464,26 @@ class TestJsonFileStorage:
             test_entity = SampleEntity(id=test_entity_id, name="Test", value=1)
 
             profile_id = uuid4()
-            profile = ResearchProfile(
+            profile = AnalysisProfile(
                 id=profile_id,
                 financial_literacy=FinancialLiteracy.BEGINNER,
                 display_name="Test Profile",
             )
 
             test_collection = storage.get_collection("test_entities", SampleEntity)
-            profile_collection = storage.get_collection("research/profiles", ResearchProfile)
+            profile_collection = storage.get_collection("analysis/profiles", AnalysisProfile)
 
             test_collection[test_entity_id] = test_entity
             profile_collection[profile_id] = profile
 
             storage.save("test_entities")
-            storage.save("research/profiles")
+            storage.save("analysis/profiles")
 
             # Verify both collections work independently
             assert len(test_collection) == 1
             assert len(profile_collection) == 1
             assert isinstance(test_collection[test_entity_id], SampleEntity)
-            assert isinstance(profile_collection[profile_id], ResearchProfile)
+            assert isinstance(profile_collection[profile_id], AnalysisProfile)
 
     def test_clear_removes_file_but_not_collection_in_memory(self) -> None:
         """Test that clear removes file but collection dict remains in memory."""

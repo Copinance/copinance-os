@@ -29,17 +29,33 @@ Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear 
 │  (Implementations - Adapters)           │
 │  • Repositories                         │
 │  • Data Providers                       │
-│  • Workflows                            │
+│  • Analysis executors                   │
 │  • Container (Dependency Injection)     │
 └─────────────────────────────────────────┘
 ```
+
+## Core Vocabulary
+
+Copinance OS centers on **analysis** as the main user-facing concept. The canonical terms are:
+
+| Term | Description | In code |
+|------|-------------|---------|
+| **Analysis request** | What the user wants to know (target, mode, options). | `AnalyzeInstrumentRequest`, `AnalyzeMarketRequest` (`application.use_cases.analyze`) |
+| **Analysis mode** | How the analysis runs: deterministic (fixed pipeline) or question-driven (AI with tools). | `AnalyzeMode` (`auto`, `deterministic`, `question_driven`) |
+| **Analysis result** | Outcome of a single run: success, payload, or error. | `RunJobResult` (`success`, `results`, `error_message`) |
+| **Job** | Optional orchestration envelope: scope, target, timeframe, and internal execution type. Used for job-based execution (e.g. queues, batch). Not persisted. | `Job` (`domain.models.job`) |
+| **Executor** | Internal component that performs one kind of analysis (deterministic instrument, deterministic market, question-driven). Selected by the runner from the job. | `AnalysisExecutor` port; implementations in `infrastructure.executors` |
+
+The public API is **analysis requests and use cases**; **Job** and **AnalysisExecutor** are for library integrators who need custom orchestration or new execution strategies.
+
+**Routing:** Executor selection is based on the job’s `execution_type`. Derive it from scope + analysis mode via `execution_type_from_scope_and_mode(scope, mode)` in `application.use_cases.analyze` when building jobs from requests.
 
 ## Layer Responsibilities
 
 ### Domain Layer
 - **Core business logic** with zero external dependencies
-- **Entities**: Job, Stock, ResearchProfile
-- **Ports**: Interfaces for data providers, repositories, workflows
+- **Entities**: Job, Stock, AnalysisProfile
+- **Ports**: Interfaces for data providers, repositories, job execution (JobRunner, AnalysisExecutor)
 - **Services**: Complex business logic
 - **Validation**: Domain validation rules
 
@@ -52,7 +68,7 @@ Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear 
 - **Implementations**: Concrete implementations of domain ports
 - **Repositories**: Data persistence (memory, file, database)
 - **Data Providers**: External data sources (yfinance, EDGAR, etc.)
-- **Workflows**: Workflow execution engines
+- **Analysis executors**: Deterministic and question-driven execution (implement `AnalysisExecutor`)
 - **Container**: Dependency injection configuration
 
 ### CLI Layer
@@ -99,9 +115,9 @@ The architecture provides 22 port interfaces for extension:
 - **1 Analyzer interface**: LLM
 - **6 Strategy interfaces**: Screening, Due Diligence, Valuation, Risk, Thematic, Monitoring
 - **4 Tool interfaces**: Tool, ToolParameter, ToolSchema, ToolResult
-- **2 Repository interfaces**: Stock, ResearchProfile
+- **2 Repository interfaces**: Stock, AnalysisProfile
 - **Job runner**: JobRunner (default implementation provided; replace for custom orchestration)
-- **1 Workflow interface**: WorkflowExecutor
+- **Analysis executor**: AnalysisExecutor (one implementation per analysis mode)
 - **2 Storage interfaces**: CacheBackend, Storage
 
 See [Extending](extending) for how to implement these.

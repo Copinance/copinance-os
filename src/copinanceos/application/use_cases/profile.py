@@ -1,38 +1,38 @@
-"""Research profile-related use cases."""
+"""Analysis profile-related use cases."""
 
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from copinanceos.application.use_cases.base import UseCase
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 from copinanceos.domain.services import ProfileManagementService
 from copinanceos.infrastructure.repositories.profile import CurrentProfile
 
 
 class CreateProfileRequest(BaseModel):
-    """Request to create a new research profile."""
+    """Request to create a new analysis profile."""
 
     financial_literacy: FinancialLiteracy = Field(
         default=FinancialLiteracy.BEGINNER, description="Financial literacy level"
     )
     display_name: str | None = Field(None, description="Optional display name")
-    preferences: dict[str, str] = Field(default_factory=dict, description="Research preferences")
+    preferences: dict[str, str] = Field(default_factory=dict, description="Analysis preferences")
 
 
 class CreateProfileResponse(BaseModel):
     """Response from creating a profile."""
 
-    profile: ResearchProfile = Field(..., description="Created profile entity")
+    profile: AnalysisProfile = Field(..., description="Created profile entity")
 
 
 class CreateProfileUseCase(UseCase[CreateProfileRequest, CreateProfileResponse]):
-    """Use case for creating a new research profile."""
+    """Use case for creating a new analysis profile."""
 
     def __init__(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile | None = None,
     ) -> None:
@@ -43,7 +43,7 @@ class CreateProfileUseCase(UseCase[CreateProfileRequest, CreateProfileResponse])
 
     async def execute(self, request: CreateProfileRequest) -> CreateProfileResponse:
         """Execute the create profile use case."""
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=request.financial_literacy,
             display_name=request.display_name,
             preferences=request.preferences,
@@ -67,13 +67,13 @@ class GetProfileRequest(BaseModel):
 class GetProfileResponse(BaseModel):
     """Response from getting a profile."""
 
-    profile: ResearchProfile | None = Field(..., description="Profile entity if found")
+    profile: AnalysisProfile | None = Field(..., description="Profile entity if found")
 
 
 class GetProfileUseCase(UseCase[GetProfileRequest, GetProfileResponse]):
     """Use case for retrieving a profile by ID."""
 
-    def __init__(self, profile_repository: ResearchProfileRepository) -> None:
+    def __init__(self, profile_repository: AnalysisProfileRepository) -> None:
         """Initialize use case."""
         self._profile_repository = profile_repository
 
@@ -93,13 +93,13 @@ class ListProfilesRequest(BaseModel):
 class ListProfilesResponse(BaseModel):
     """Response from listing profiles."""
 
-    profiles: list[ResearchProfile] = Field(..., description="List of profiles")
+    profiles: list[AnalysisProfile] = Field(..., description="List of profiles")
 
 
 class ListProfilesUseCase(UseCase[ListProfilesRequest, ListProfilesResponse]):
     """Use case for listing all profiles."""
 
-    def __init__(self, profile_repository: ResearchProfileRepository) -> None:
+    def __init__(self, profile_repository: AnalysisProfileRepository) -> None:
         """Initialize use case."""
         self._profile_repository = profile_repository
 
@@ -118,7 +118,7 @@ class GetCurrentProfileRequest(BaseModel):
 class GetCurrentProfileResponse(BaseModel):
     """Response from getting the current profile."""
 
-    profile: ResearchProfile | None = Field(..., description="Current profile if set")
+    profile: AnalysisProfile | None = Field(..., description="Current profile if set")
 
 
 class GetCurrentProfileUseCase(UseCase[GetCurrentProfileRequest, GetCurrentProfileResponse]):
@@ -126,7 +126,7 @@ class GetCurrentProfileUseCase(UseCase[GetCurrentProfileRequest, GetCurrentProfi
 
     def __init__(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         current_profile: CurrentProfile | None = None,
     ) -> None:
         """Initialize use case."""
@@ -154,7 +154,7 @@ class SetCurrentProfileRequest(BaseModel):
 class SetCurrentProfileResponse(BaseModel):
     """Response from setting the current profile."""
 
-    profile: ResearchProfile | None = Field(..., description="Current profile if set")
+    profile: AnalysisProfile | None = Field(..., description="Current profile if set")
 
 
 class SetCurrentProfileUseCase(UseCase[SetCurrentProfileRequest, SetCurrentProfileResponse]):
@@ -162,7 +162,7 @@ class SetCurrentProfileUseCase(UseCase[SetCurrentProfileRequest, SetCurrentProfi
 
     def __init__(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile | None = None,
     ) -> None:
@@ -201,7 +201,7 @@ class DeleteProfileUseCase(UseCase[DeleteProfileRequest, DeleteProfileResponse])
 
     def __init__(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile | None = None,
     ) -> None:

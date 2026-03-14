@@ -6,7 +6,6 @@ import pytest
 
 from copinanceos.infrastructure.analyzers.llm.llm import GeminiLLMAnalyzer, LLMAnalyzerImpl
 from copinanceos.infrastructure.analyzers.llm.providers.base import LLMProvider
-from copinanceos.infrastructure.analyzers.llm.resources.prompt_manager import PromptManager
 
 
 @pytest.mark.unit
@@ -21,19 +20,6 @@ class TestLLMAnalyzerImpl:
         analyzer = LLMAnalyzerImpl(llm_provider=mock_provider)
 
         assert analyzer._llm_provider is mock_provider
-        assert analyzer._prompt_manager is not None
-        assert isinstance(analyzer._prompt_manager, PromptManager)
-
-    def test_initialization_with_custom_prompt_manager(self) -> None:
-        """Test initialization with custom prompt manager."""
-        mock_provider = MagicMock(spec=LLMProvider)
-        mock_provider.get_provider_name = MagicMock(return_value="test_provider")
-        mock_prompt_manager = MagicMock(spec=PromptManager)
-
-        analyzer = LLMAnalyzerImpl(llm_provider=mock_provider, prompt_manager=mock_prompt_manager)
-
-        assert analyzer._llm_provider is mock_provider
-        assert analyzer._prompt_manager is mock_prompt_manager
 
 
 @pytest.mark.unit

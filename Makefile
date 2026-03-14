@@ -1,4 +1,4 @@
-.PHONY: help venv setup install install-dev test test-unit test-integration coverage lint format format-check type-check quality fix clean clean-cache clean-cache-data clean-venv clean-docs cli docs docs-serve pre-commit check version
+.PHONY: help venv setup install install-dev test test-unit test-integration coverage lint format format-check type-check quality clean clean-cache clean-cache-data clean-venv clean-docs cli docs docs-serve pre-commit check version
 
 ESC := \033
 RESET := $(ESC)[0m
@@ -9,7 +9,7 @@ YELLOW := $(ESC)[33m
 CYAN := $(ESC)[36m
 
 SETUP_TARGETS := venv setup install install-dev
-QUALITY_TARGETS := lint format format-check type-check fix quality pre-commit
+QUALITY_TARGETS := lint format format-check type-check quality pre-commit
 TEST_TARGETS := test test-unit test-integration coverage check
 DOCS_TARGETS := docs docs-serve
 UTILITY_TARGETS := cli version
@@ -17,7 +17,7 @@ CLEAN_TARGETS := clean clean-cache clean-cache-data clean-venv clean-docs
 
 # Detect Python version and virtual environment
 PYTHON := python3
-VENV := venv
+VENV := .venv
 VENV_BIN := $(VENV)/bin
 
 # Use venv tools if venv exists, otherwise use system tools
@@ -59,14 +59,17 @@ help: ## Show this help message
 	print_group "Utilities" $(UTILITY_TARGETS); \
 	print_group "Cleanup" $(CLEAN_TARGETS)
 
-venv: ## Create a Python virtual environment
+venv: ## Create a Python virtual environment; then run: . .venv/bin/activate
 	@printf "$(BLUE)Creating virtual environment...$(RESET)\n"
 	$(PYTHON) -m venv $(VENV)
 	@printf "$(GREEN)Virtual environment created at $(VENV)$(RESET)\n\n"
-	@printf "$(BOLD)Activate it with:$(RESET)\n"
-	@printf "  $(CYAN)source $(VENV_BIN)/activate$(RESET)\n\n"
-	@printf "$(BOLD)Or on Windows:$(RESET)\n"
+	@printf "$(BOLD)Enable it in your shell (copy-paste):$(RESET)\n"
+	@printf "  $(CYAN). $(VENV_BIN)/activate$(RESET)\n\n"
+	@printf "$(BOLD)Or from any directory:$(RESET)\n"
+	@printf "  $(CYAN)cd $(CURDIR) && . $(VENV_BIN)/activate$(RESET)\n\n"
+	@printf "$(BOLD)On Windows:$(RESET)\n"
 	@printf "  $(CYAN)$(VENV_BIN)\\\\activate$(RESET)\n"
+	@$(VENV_BIN)/python --version
 
 setup: venv ## Set up development environment (create venv and install dev dependencies)
 	@printf "$(BLUE)Installing development dependencies...$(RESET)\n"
@@ -95,37 +98,54 @@ install-dev: ## Install package in development mode with all dependencies
 	fi
 
 test: ## Run all tests
-	$(PYTEST) --cov=copinance --cov-report=html --cov-report=term-missing
+	$(PYTEST) --cov=copinanceos --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 test-unit: ## Run unit tests only
-	$(PYTEST) -m unit --cov=copinance --cov-report=html --cov-report=term-missing
+	$(PYTEST) -m unit --cov=copinanceos --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 test-integration: ## Run integration tests only
-	$(PYTEST) -m integration --cov=copinance --cov-report=html --cov-report=term-missing
+	$(PYTEST) -m integration --cov=copinanceos --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 coverage: ## Run tests with coverage report
-	$(PYTEST) --cov=copinance --cov-report=html --cov-report=term-missing
+	$(PYTEST) --cov=copinanceos --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 lint: ## Run linting checks
-	$(RUFF) check src/ tests/ .pre-commit-hooks/
+	@if [ -d "$(VENV)" ] && [ ! -x "$(VENV_BIN)/ruff" ]; then \
+		printf "$(YELLOW)Dev tools not installed in $(VENV).$(RESET)\n"; \
+		printf "Run: $(CYAN)make setup$(RESET)\n"; \
+		exit 1; \
+	fi
+	$(RUFF) check src/ tests/ .pre-commit-hooks/ --fix
 
 format: ## Format code with black
+	@if [ -d "$(VENV)" ] && [ ! -x "$(VENV_BIN)/black" ]; then \
+		printf "$(YELLOW)Dev tools not installed in $(VENV).$(RESET)\n"; \
+		printf "Run: $(CYAN)make setup$(RESET)\n"; \
+		exit 1; \
+	fi
 	$(BLACK) src/ tests/ .pre-commit-hooks/
 
 format-check: ## Check code formatting without making changes
+	@if [ -d "$(VENV)" ] && [ ! -x "$(VENV_BIN)/black" ]; then \
+		printf "$(YELLOW)Dev tools not installed in $(VENV).$(RESET)\n"; \
+		printf "Run: $(CYAN)make setup$(RESET)\n"; \
+		exit 1; \
+	fi
 	$(BLACK) --check src/ tests/ .pre-commit-hooks/
 
 type-check: ## Run type checking with mypy
+	@if [ -d "$(VENV)" ] && [ ! -x "$(VENV_BIN)/mypy" ]; then \
+		printf "$(YELLOW)Dev tools not installed in $(VENV).$(RESET)\n"; \
+		printf "Run: $(CYAN)make setup$(RESET)\n"; \
+		exit 1; \
+	fi
 	$(MYPY) src/
 
 quality: lint type-check format-check ## Run all quality checks
-
-fix: format ## Fix code formatting and auto-fixable linting issues
-	$(RUFF) check src/ tests/ --fix
 
 clean: clean-cache ## Clean up generated files (keeps venv)
 	rm -rf build/
@@ -170,7 +190,7 @@ clean-docs: ## Remove generated docs build files and dependencies
 pre-commit: ## Run pre-commit hooks on all files
 	pre-commit run --all-files
 
-check: quality test ## Run all checks (quality + tests)
+check: format quality test ## Run all checks (quality + tests)
 
 version: ## Show package version
 	@$(PYTHON_CMD) -c "from copinance import __version__; print(__version__)"

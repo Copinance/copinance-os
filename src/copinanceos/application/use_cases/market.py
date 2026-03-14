@@ -1,20 +1,76 @@
-"""Market instrument use cases."""
+"""Market use cases: search, instrument, quote, historical data, options chain."""
 
-import asyncio
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 import structlog
 from pydantic import BaseModel, Field
 
 from copinanceos.application.use_cases.base import UseCase
-from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.domain.models.market import MarketDataPoint, OptionsChain
 from copinanceos.domain.models.stock import Stock
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.repositories import StockRepository
 from copinanceos.domain.validation import StockSymbolValidator
 
 logger = structlog.get_logger(__name__)
+
+
+def _stock_from_quote(symbol: str, quote: dict[str, Any]) -> Stock:
+    """Build a Stock from a provider quote dict (provider-agnostic)."""
+    name = (
+        quote.get("longName")
+        or quote.get("shortName")
+        or quote.get("name")
+        or quote.get("symbol", symbol)
+    )
+    if isinstance(name, str):
+        name = name.strip() or symbol.upper()
+    else:
+        name = symbol.upper()
+
+    def _dec(v: Any) -> Decimal | None:
+        if v is None:
+            return None
+        try:
+            return Decimal(str(v))
+        except (ValueError, TypeError):
+            return None
+
+    def _int(v: Any) -> int | None:
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return None
+
+    return Stock(
+        symbol=(quote.get("symbol") or symbol).upper(),
+        name=name,
+        exchange=str(quote.get("exchange", "") or ""),
+        sector=quote.get("sector"),
+        industry=quote.get("industry"),
+        market_cap=_dec(quote.get("market_cap")),
+        website=quote.get("website"),
+        country=quote.get("country"),
+        currency=quote.get("currency"),
+        phone=quote.get("phone"),
+        city=quote.get("city"),
+        state=quote.get("state"),
+        enterprise_value=_dec(quote.get("enterprise_value")),
+        shares_outstanding=_int(quote.get("sharesOutstanding") or quote.get("shares_outstanding")),
+        float_shares=_int(quote.get("floatShares") or quote.get("float_shares")),
+        beta=_dec(quote.get("beta")),
+        dividend_yield=_dec(quote.get("dividendYield") or quote.get("dividend_yield")),
+        employees=_int(quote.get("fullTimeEmployees") or quote.get("employees")),
+        data_provider=quote.get("data_provider"),
+    )
+
+
+# ---- Search ----
 
 
 class InstrumentSearchMode(StrEnum):
@@ -25,34 +81,11 @@ class InstrumentSearchMode(StrEnum):
     GENERAL = "general"
 
 
-class GetInstrumentRequest(BaseModel):
-    """Request to get equity instrument information."""
-
-    symbol: str = Field(..., description="Instrument symbol")
-
-
-class GetInstrumentResponse(BaseModel):
-    """Response from getting instrument information."""
-
-    instrument: Stock | None = Field(..., description="Instrument entity if found")
-
-
-class GetInstrumentUseCase(UseCase[GetInstrumentRequest, GetInstrumentResponse]):
-    """Use case for retrieving cached equity instrument information."""
-
-    def __init__(self, instrument_repository: StockRepository) -> None:
-        self._instrument_repository = instrument_repository
-
-    async def execute(self, request: GetInstrumentRequest) -> GetInstrumentResponse:
-        instrument = await self._instrument_repository.get_by_symbol(request.symbol)
-        return GetInstrumentResponse(instrument=instrument)
-
-
 class SearchInstrumentsRequest(BaseModel):
-    """Request to search market instruments."""
+    """Request to search market instruments by name or symbol."""
 
-    query: str = Field(..., description="Search query")
-    limit: int = Field(default=10, description="Maximum results to return")
+    query: str = Field(..., description="Search query (symbol or company name)")
+    limit: int = Field(default=10, ge=1, le=100, description="Maximum results to return")
     search_mode: InstrumentSearchMode = Field(
         default=InstrumentSearchMode.AUTO,
         description="Search mode: auto, symbol, or general",
@@ -66,7 +99,7 @@ class SearchInstrumentsResponse(BaseModel):
 
 
 class SearchInstrumentsUseCase(UseCase[SearchInstrumentsRequest, SearchInstrumentsResponse]):
-    """Use case for searching market instruments."""
+    """Search market instruments by symbol or name; uses repository cache and live provider."""
 
     def __init__(
         self,
@@ -76,180 +109,185 @@ class SearchInstrumentsUseCase(UseCase[SearchInstrumentsRequest, SearchInstrumen
         self._instrument_repository = instrument_repository
         self._market_data_provider = market_data_provider
 
-    async def _fetch_instrument_from_provider(self, symbol: str) -> Stock | None:
+    async def _resolve_instrument_from_provider(self, symbol: str) -> Stock | None:
         if not self._market_data_provider:
             return None
-
         try:
             if not await self._market_data_provider.is_available():
                 logger.debug("Market data provider not available", symbol=symbol)
                 return None
-
             quote = await self._market_data_provider.get_quote(symbol.upper())
-
-            try:
-                import yfinance as yf  # type: ignore[import-untyped]  # noqa: PLC0415
-
-                loop = asyncio.get_event_loop()
-                ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol.upper()))
-                info = await loop.run_in_executor(None, lambda: ticker.info)
-
-                if not info or not isinstance(info, dict):
-                    logger.warning("Invalid symbol or no data from yfinance", symbol=symbol)
-                    return None
-
-                instrument_name = info.get("longName") or info.get("shortName")
-                if not instrument_name:
-                    logger.warning("No instrument name found for symbol", symbol=symbol)
-                    return None
-
-                instrument = Stock(
-                    symbol=symbol.upper(),
-                    name=instrument_name,
-                    exchange=info.get("exchange", quote.get("exchange", "")),
-                    sector=info.get("sector"),
-                    industry=info.get("industry"),
-                    market_cap=(
-                        Decimal(str(info.get("marketCap", 0))) if info.get("marketCap") else None
-                    ),
-                    website=info.get("website"),
-                    country=info.get("country"),
-                    currency=info.get("currency"),
-                    phone=info.get("phone"),
-                    city=info.get("city"),
-                    state=info.get("state"),
-                    enterprise_value=(
-                        Decimal(str(info.get("enterpriseValue", 0)))
-                        if info.get("enterpriseValue")
-                        else None
-                    ),
-                    shares_outstanding=(
-                        int(info.get("sharesOutstanding", 0))
-                        if info.get("sharesOutstanding")
-                        else None
-                    ),
-                    float_shares=(
-                        int(info.get("floatShares", 0)) if info.get("floatShares") else None
-                    ),
-                    beta=(
-                        Decimal(str(info.get("beta", 0))) if info.get("beta") is not None else None
-                    ),
-                    dividend_yield=(
-                        Decimal(str(info.get("dividendYield", 0)))
-                        if info.get("dividendYield") is not None
-                        else None
-                    ),
-                    employees=(
-                        int(info.get("fullTimeEmployees", 0))
-                        if info.get("fullTimeEmployees")
-                        else None
-                    ),
-                    data_provider="yfinance",
-                )
-
-                await self._instrument_repository.save(instrument)
-                logger.info("Fetched and saved instrument from provider", symbol=symbol)
-                return instrument
-
-            except ImportError:
-                if quote.get("exchange"):
-                    instrument = Stock(
-                        symbol=symbol.upper(),
-                        name=quote.get("symbol", symbol.upper()),
-                        exchange=quote.get("exchange", ""),
-                        sector=None,
-                        industry=None,
-                        market_cap=None,
-                        website=None,
-                        country=None,
-                        currency=None,
-                        phone=None,
-                        city=None,
-                        state=None,
-                        enterprise_value=None,
-                        shares_outstanding=None,
-                        float_shares=None,
-                        beta=None,
-                        dividend_yield=None,
-                        employees=None,
-                        data_provider="quote",
-                    )
-                    await self._instrument_repository.save(instrument)
-                    return instrument
+            if not quote or not quote.get("symbol"):
                 return None
-            except Exception as provider_error:
-                logger.warning(
-                    "Failed to fetch instrument info from yfinance",
-                    symbol=symbol,
-                    error=str(provider_error),
-                )
-                return None
-
+            instrument = _stock_from_quote(symbol.upper(), quote)
+            await self._instrument_repository.save(instrument)
+            logger.info("Resolved and saved instrument from provider", symbol=symbol)
+            return instrument
         except Exception as e:
-            logger.warning("Failed to fetch instrument from provider", symbol=symbol, error=str(e))
+            logger.warning(
+                "Failed to resolve instrument from provider", symbol=symbol, error=str(e)
+            )
             return None
 
     async def execute(self, request: SearchInstrumentsRequest) -> SearchInstrumentsResponse:
         instruments = await self._instrument_repository.search(request.query, request.limit)
 
         if not instruments and self._market_data_provider:
-            use_symbol_search = False
-            use_general_search = False
-
+            use_symbol = False
             if request.search_mode == InstrumentSearchMode.SYMBOL:
-                use_symbol_search = True
+                use_symbol = True
             elif request.search_mode == InstrumentSearchMode.GENERAL:
-                use_general_search = True
+                use_symbol = False
             else:
-                if StockSymbolValidator.looks_like_symbol(request.query):
-                    use_symbol_search = True
-                else:
-                    use_general_search = True
+                use_symbol = StockSymbolValidator.looks_like_symbol(request.query)
 
-            if use_symbol_search:
-                fetched_instrument = await self._fetch_instrument_from_provider(
-                    request.query.upper()
-                )
-                if fetched_instrument:
-                    instruments = [fetched_instrument]
-            elif use_general_search:
-                search_results = await self._market_data_provider.search_instruments(
+            if use_symbol:
+                one = await self._resolve_instrument_from_provider(request.query.upper())
+                if one:
+                    instruments = [one]
+            else:
+                raw = await self._market_data_provider.search_instruments(
                     request.query, limit=request.limit
                 )
-                for result in search_results:
-                    symbol = result.get("symbol", "")
-                    if symbol:
-                        fetched_instrument = await self._fetch_instrument_from_provider(symbol)
-                        if fetched_instrument:
-                            instruments.append(fetched_instrument)
-                            if len(instruments) >= request.limit:
-                                break
+                for item in raw:
+                    sym = (item.get("symbol") or "").strip()
+                    if not sym:
+                        continue
+                    one = await self._resolve_instrument_from_provider(sym)
+                    if one:
+                        instruments.append(one)
+                        if len(instruments) >= request.limit:
+                            break
 
         return SearchInstrumentsResponse(instruments=instruments)
 
 
-class GetMarketDataRequest(BaseModel):
-    """Request to get historical instrument market data."""
+# ---- Get instrument (cached) ----
+
+
+class GetInstrumentRequest(BaseModel):
+    """Request to get equity instrument information by symbol."""
 
     symbol: str = Field(..., description="Instrument symbol")
-    limit: int = Field(default=100, description="Number of data points to retrieve")
 
 
-class GetMarketDataResponse(BaseModel):
-    """Response from getting historical market data."""
+class GetInstrumentResponse(BaseModel):
+    """Response from getting instrument information."""
 
-    data: list[MarketDataPoint] = Field(
-        default_factory=list,
-        description="Historical market data",
-    )
+    instrument: Stock | None = Field(..., description="Instrument if found")
 
 
-class GetMarketDataUseCase(UseCase[GetMarketDataRequest, GetMarketDataResponse]):
-    """Use case for retrieving cached historical market data."""
+class GetInstrumentUseCase(UseCase[GetInstrumentRequest, GetInstrumentResponse]):
+    """Get cached equity instrument by symbol."""
 
     def __init__(self, instrument_repository: StockRepository) -> None:
         self._instrument_repository = instrument_repository
 
-    async def execute(self, request: GetMarketDataRequest) -> GetMarketDataResponse:
-        data = await self._instrument_repository.get_market_data(request.symbol, request.limit)
-        return GetMarketDataResponse(data=data)
+    async def execute(self, request: GetInstrumentRequest) -> GetInstrumentResponse:
+        instrument = await self._instrument_repository.get_by_symbol(request.symbol)
+        return GetInstrumentResponse(instrument=instrument)
+
+
+# ---- Get quote ----
+
+
+class GetQuoteRequest(BaseModel):
+    """Request to get current market quote for a symbol."""
+
+    symbol: str = Field(..., description="Instrument symbol")
+
+
+class GetQuoteResponse(BaseModel):
+    """Response with current quote data."""
+
+    quote: dict[str, Any] = Field(default_factory=dict, description="Quote payload from provider")
+    symbol: str = Field(..., description="Instrument symbol")
+
+
+class GetQuoteUseCase(UseCase[GetQuoteRequest, GetQuoteResponse]):
+    """Get current market quote for a symbol from the market data provider."""
+
+    def __init__(self, market_data_provider: MarketDataProvider) -> None:
+        self._market_data_provider = market_data_provider
+
+    async def execute(self, request: GetQuoteRequest) -> GetQuoteResponse:
+        symbol = request.symbol.upper()
+        quote = await self._market_data_provider.get_quote(symbol)
+        quote = dict(quote) if quote else {}
+        if "symbol" not in quote:
+            quote["symbol"] = symbol
+        return GetQuoteResponse(quote=quote, symbol=symbol)
+
+
+# ---- Get historical data ----
+
+
+class GetHistoricalDataRequest(BaseModel):
+    """Request to get historical OHLCV data for a symbol."""
+
+    symbol: str = Field(..., description="Instrument symbol")
+    start_date: datetime = Field(..., description="Start date (inclusive)")
+    end_date: datetime = Field(..., description="End date (inclusive)")
+    interval: str = Field(default="1d", description="Bar interval (e.g. 1d, 1h, 5m)")
+
+
+class GetHistoricalDataResponse(BaseModel):
+    """Response with historical market data points."""
+
+    data: list[MarketDataPoint] = Field(
+        default_factory=list,
+        description="Historical OHLCV data points",
+    )
+    symbol: str = Field(..., description="Instrument symbol")
+
+
+class GetHistoricalDataUseCase(UseCase[GetHistoricalDataRequest, GetHistoricalDataResponse]):
+    """Get historical market data for a symbol from the market data provider."""
+
+    def __init__(self, market_data_provider: MarketDataProvider) -> None:
+        self._market_data_provider = market_data_provider
+
+    async def execute(self, request: GetHistoricalDataRequest) -> GetHistoricalDataResponse:
+        symbol = request.symbol.upper()
+        data = await self._market_data_provider.get_historical_data(
+            symbol=symbol,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            interval=request.interval,
+        )
+        return GetHistoricalDataResponse(data=data, symbol=symbol)
+
+
+# ---- Get options chain ----
+
+
+class GetOptionsChainRequest(BaseModel):
+    """Request to get options chain for an underlying symbol."""
+
+    underlying_symbol: str = Field(..., description="Underlying instrument symbol")
+    expiration_date: str | None = Field(
+        None,
+        description="Optional expiration date (YYYY-MM-DD); provider default if omitted",
+    )
+
+
+class GetOptionsChainResponse(BaseModel):
+    """Response with options chain."""
+
+    chain: OptionsChain = Field(..., description="Options chain for the underlying")
+    underlying_symbol: str = Field(..., description="Underlying instrument symbol")
+
+
+class GetOptionsChainUseCase(UseCase[GetOptionsChainRequest, GetOptionsChainResponse]):
+    """Get options chain for an underlying symbol from the market data provider."""
+
+    def __init__(self, market_data_provider: MarketDataProvider) -> None:
+        self._market_data_provider = market_data_provider
+
+    async def execute(self, request: GetOptionsChainRequest) -> GetOptionsChainResponse:
+        underlying = request.underlying_symbol.upper()
+        chain = await self._market_data_provider.get_options_chain(
+            underlying_symbol=underlying,
+            expiration_date=request.expiration_date,
+        )
+        return GetOptionsChainResponse(chain=chain, underlying_symbol=underlying)

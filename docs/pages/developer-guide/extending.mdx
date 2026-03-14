@@ -85,8 +85,16 @@ class AlphaVantageProvider(MarketDataProvider):
     async def get_options_chain(
         self, underlying_symbol: str, expiration_date: str | None = None
     ) -> OptionsChain:
-        """Get an options chain."""
-        return []
+        """Get an options chain. Return an OptionsChain instance, not a list."""
+        from datetime import date
+        exp = date.fromisoformat(expiration_date) if expiration_date else date.today()
+        return OptionsChain(
+            underlying_symbol=underlying_symbol,
+            expiration_date=exp,
+            available_expirations=[],
+            calls=[],
+            puts=[],
+        )
 ```
 
 ### Step 3: Register in Container
@@ -101,9 +109,9 @@ container.market_data_provider.override(
 )
 ```
 
-### Step 4: Use in Workflows
+### Step 4: Use in Analysis
 
-The provider will automatically be used by workflows that need market data.
+The provider will automatically be used by analysis that needs market data.
 
 ## Adding a Custom Analyzer
 
@@ -138,35 +146,53 @@ container.llm_analyzer.override(
 
 **Note:** If you're using LLM features, make sure to provide `LLMConfig` when creating the container. See [Configuration Guide](../user-guide/configuration#library-integration) for details.
 
-## Adding a Custom Workflow
+## Adding a Custom Executor
 
-### 1. Extend BaseWorkflowExecutor
+### 1. Extend BaseAnalysisExecutor
 
 ```python
-from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
+from copinanceos.infrastructure.executors.base import BaseAnalysisExecutor
 from copinanceos.domain.models.job import Job
 from typing import Any
 
-class MyCustomWorkflow(BaseWorkflowExecutor):
-    """Custom workflow executor."""
+class MyCustomExecutor(BaseAnalysisExecutor):
+    """Custom analysis executor."""
 
-    def get_workflow_type(self) -> str:
+    def get_executor_id(self) -> str:
         return "custom"
 
     async def validate(self, job: Job) -> bool:
-        return job.workflow_type == "custom"
+        return job.execution_type == "custom"
 
-    async def _execute_workflow(
+    async def _execute_analysis(
         self, job: Job, context: dict[str, Any]
     ) -> dict[str, Any]:
-        """Execute custom workflow logic."""
         # Your implementation
         return {"status": "completed", "results": {}}
 ```
 
 ### 2. Register in Container
 
-Add your executor to the workflow executors factory or override in the container. Jobs are run via the `JobRunner` port (default implementation finds an executor and runs it); you can override `container.job_runner` with your own implementation for custom orchestration (e.g. queues, retries).
+Add your executor to the analysis executors factory or override in the container. Jobs are run via the `JobRunner` port (default implementation finds an executor and runs it); you can override `container.job_runner` with your own implementation for custom orchestration (e.g. queues, retries).
+
+## Custom prompt templates
+
+Question-driven (and other LLM) analysis resolves prompts through a **PromptManager**. When using the library you can supply your own templates; if you do not, built-in package prompts are used.
+
+**Template format:** Each template is an object with two string fields: `system_prompt` and `user_prompt`. Use `{variable_name}` placeholders for substitution; escape literal braces as `{{` and `}}`. See [Prompt template format](/getting-started/library#prompt-template-format) in the library guide for the full spec and question-driven prompt variables.
+
+- **Overlay via `get_container()`:** Pass `prompt_templates={ "analyze_question_driven": { "system_prompt": "...", "user_prompt": "..." } }`. Only the keys you provide are overridden; the rest use package defaults.
+- **Custom `PromptManager`:** Pass `prompt_manager=PromptManager(templates=...)` or `PromptManager(resources_dir=Path("..."))` to `get_container()`. With `resources_dir`, use one JSON file per prompt (e.g. `analyze_question_driven.json`) containing `system_prompt` and `user_prompt` strings.
+- **Prompt name:** The built-in question-driven analyze flow uses the name `analyze_question_driven`; import `ANALYZE_QUESTION_DRIVEN_PROMPT_NAME` from `copinanceos.infrastructure.analyzers.llm.resources`.
+
+## Cache
+
+The default container uses a file-based cache for tool results and agent prompts. When using the library you can disable it or supply your own:
+
+- **Disable:** `get_container(..., cache_enabled=False)`.
+- **Custom cache:** `get_container(..., cache_manager=my_cache_manager)`. Your instance must match the `CacheManager` interface (see `copinanceos.infrastructure.cache`). The cache is used for tool outputs and for rendered agent prompts.
+
+You can also set `COPINANCEOS_CACHE_ENABLED=false` (see [Configuration](/user-guide/configuration#cache)).
 
 ## Best Practices
 
@@ -183,4 +209,6 @@ See `src/copinanceos/domain/ports/` for all available interfaces:
 - `analyzers.py` - Analyzer interfaces
 - `strategies.py` - Strategy interfaces
 - `repositories.py` - Repository interfaces
-- `workflows.py` - JobRunner (run a job) and WorkflowExecutor (execute workflow logic) interfaces
+- `storage.py` - Storage and CacheBackend interfaces
+- `tools.py` - Tool, ToolSchema, ToolParameter (for LLM tools)
+- `analysis_execution.py` - JobRunner (run a job) and AnalysisExecutor (execute analysis) interfaces

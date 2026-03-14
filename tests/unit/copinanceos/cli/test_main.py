@@ -3,16 +3,16 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+import typer.testing
 
 import copinanceos.cli.__main__  # noqa: PLC0415 - Testing module import behavior
 from copinanceos.cli import (
     analyze_app,
     app,
-    ask_app,
     cache_app,
     market_app,
     profile_app,
-    version,
+    version_app,
 )
 
 
@@ -20,22 +20,12 @@ from copinanceos.cli import (
 class TestMainCLI:
     """Test main CLI commands."""
 
-    @patch("copinanceos.cli.Console")
-    def test_version_command(self, mock_console_class: MagicMock) -> None:
+    def test_version_command(self) -> None:
         """Test version command."""
-
-        # Setup mock console instance
-        mock_console_instance = MagicMock()
-        mock_console_class.return_value = mock_console_instance
-
-        version()
-
-        # Verify Console was instantiated
-        mock_console_class.assert_called_once()
-        # Verify console.print was called with version
-        mock_console_instance.print.assert_called_once()
-        call_args = str(mock_console_instance.print.call_args)
-        assert "Copinance OS" in call_args
+        runner = typer.testing.CliRunner()
+        result = runner.invoke(app, ["version"])
+        assert result.exit_code == 0
+        assert "Copinance OS" in result.stdout
 
     @patch("copinanceos.cli.app")
     def test_main_module_entry_point(self, mock_app: MagicMock) -> None:
@@ -51,7 +41,7 @@ class TestMainCLI:
         # Verify app is a Typer instance
         assert app is not None
         # Verify sub-commands are registered
-        # The app should have market, profile, analyze, ask, cache sub-commands
+        # The app should have market, profile, analyze, and cache sub-commands
         assert hasattr(app, "registered_commands") or hasattr(app, "commands")
 
 
@@ -87,8 +77,8 @@ class TestCLIIntegration:
         assert analyze_app is not None
         assert app is not None
 
-    def test_ask_app_registered(self) -> None:
-        """Test that ask app is registered."""
+    def test_version_app_registered(self) -> None:
+        """Test that version app is registered."""
 
-        assert ask_app is not None
+        assert version_app is not None
         assert app is not None

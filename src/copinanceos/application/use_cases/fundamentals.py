@@ -8,24 +8,24 @@ from copinanceos.domain.models.fundamentals import StockFundamentals
 from copinanceos.domain.ports.data_providers import FundamentalDataProvider
 
 
-class ResearchStockFundamentalsRequest(BaseModel):
+class GetStockFundamentalsRequest(BaseModel):
     """Request for stock fundamentals."""
 
-    symbol: str = Field(..., description="Stock symbol to research")
+    symbol: str = Field(..., description="Stock symbol to analyze")
     periods: int = Field(default=5, description="Number of periods to retrieve (e.g., 5 years)")
     period_type: str = Field(default="annual", description="Period type: 'annual' or 'quarterly'")
 
 
-class ResearchStockFundamentalsResponse(BaseModel):
-    """Response from researching stock fundamentals."""
+class GetStockFundamentalsResponse(BaseModel):
+    """Response from getting stock fundamentals."""
 
     fundamentals: StockFundamentals = Field(..., description="Comprehensive stock fundamentals")
 
 
-class ResearchStockFundamentalsUseCase(
-    UseCase[ResearchStockFundamentalsRequest, ResearchStockFundamentalsResponse]
+class GetStockFundamentalsUseCase(
+    UseCase[GetStockFundamentalsRequest, GetStockFundamentalsResponse]
 ):
-    """Use case for researching detailed stock fundamentals.
+    """Use case for getting detailed stock fundamentals.
 
     This use case retrieves comprehensive fundamental data for a stock,
     including financial statements, ratios, and key metrics. It is provider-agnostic
@@ -40,9 +40,7 @@ class ResearchStockFundamentalsUseCase(
         """
         self._fundamental_data_provider = fundamental_data_provider
 
-    async def execute(
-        self, request: ResearchStockFundamentalsRequest
-    ) -> ResearchStockFundamentalsResponse:
+    async def execute(self, request: GetStockFundamentalsRequest) -> GetStockFundamentalsResponse:
         """Execute the stock fundamentals use case.
 
         Args:
@@ -74,4 +72,4 @@ class ResearchStockFundamentalsUseCase(
             period_type=request.period_type,
         )
 
-        return ResearchStockFundamentalsResponse(fundamentals=fundamentals)
+        return GetStockFundamentalsResponse(fundamentals=fundamentals)

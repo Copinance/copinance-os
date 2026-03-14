@@ -1,9 +1,10 @@
 """Job domain models.
 
-Job is the execution context for workflows (not persisted). It describes scope
-(instrument or market), instrument/index, timeframe, and workflow type.
-Consumers build Job instances and pass them to a JobRunner (or their own
-orchestrator); workflow executors receive Job + context from the runner.
+Job is the execution context for a single analysis run (not persisted). It describes
+scope (instrument or market), target symbol/index, timeframe, and execution_type
+(derived from scope + analysis mode via execution_type_from_scope_and_mode()).
+Consumers build Job instances and pass them to a JobRunner; analysis executors
+receive Job + context from the runner.
 """
 
 from enum import StrEnum
@@ -50,7 +51,7 @@ class JobScope(StrEnum):
 
 
 class Job(Entity):
-    """Workflow execution context (scope, symbol/index, timeframe, type). Not persisted."""
+    """Analysis execution context (scope, symbol/index, timeframe, internal routing key). Not persisted."""
 
     scope: JobScope = Field(
         default=JobScope.INSTRUMENT,
@@ -71,7 +72,10 @@ class Job(Entity):
     timeframe: JobTimeframe = Field(..., description="Job timeframe")
     profile_id: UUID | None = Field(None, description="Optional profile ID for context")
     status: JobStatus = Field(default=JobStatus.PENDING, description="Current status")
-    workflow_type: str = Field(..., description="Workflow type (stock, macro, or agent)")
+    execution_type: str = Field(
+        ...,
+        description="Executor routing key (use execution_type_from_scope_and_mode(scope, mode) when building from request)",
+    )
     parameters: dict[str, Any] = Field(default_factory=dict, description="Job configuration")
     results: dict[str, Any] = Field(default_factory=dict, description="Latest results")
     error_message: str | None = Field(None, description="Error message if failed")

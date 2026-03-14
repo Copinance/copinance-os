@@ -7,18 +7,20 @@ Get started with Copinance OS in 5 minutes.
 ### 1. Search for an Instrument
 
 ```bash
+# Search for instruments by display name; returns symbols and matches
 copinance market search "Apple"
 ```
 
 This shows matching market instruments and their symbols.
 
-### 2. Run an Equity Workflow
+### 2. Run an Equity Analysis
 
 ```bash
-copinance analyze market equity AAPL --timeframe mid_term
+# Run deterministic equity analysis (quote, history, fundamentals, summary)
+copinance analyze equity AAPL --timeframe mid_term
 ```
 
-This performs a comprehensive equity workflow with:
+This performs a comprehensive equity analysis with:
 - Current market quote
 - Historical price data
 - Fundamental analysis
@@ -27,6 +29,7 @@ This performs a comprehensive equity workflow with:
 ### 3. Check a Live Quote
 
 ```bash
+# Get current price, volume, and other quote data for a symbol
 copinance market quote AAPL
 ```
 
@@ -35,19 +38,21 @@ This returns the latest quote snapshot for the selected instrument.
 ### 4. Explore the Options Market
 
 ```bash
+# Fetch options chain for an underlying (calls/puts, IV, open interest)
 copinance market options AAPL --expiration 2026-06-19
 ```
 
 This fetches an options chain snapshot with contract prices, implied volatility, open interest, and volume.
 
-### 5. Ask a Question
+### 5. Analyze with a Question
 
 ```bash
-copinance ask "What is the current price and P/E ratio?" --instrument AAPL
-copinance ask "How is the options chain positioned?" --instrument AAPL --market-type options
+# Question-driven analysis: AI uses tools to answer (equity or options context)
+copinance analyze equity AAPL --question "What is the current price and P/E ratio?"
+copinance analyze options AAPL --question "How is the options chain positioned?"
 ```
 
-The AI will analyze the selected market context using available data tools.
+The AI will analyze the selected market context using available data tools. Use `--question` for the question and choose `analyze equity`, `analyze options`, or `analyze macro` for the target context.
 
 ## Working with Profiles
 
@@ -55,40 +60,42 @@ Profiles let you customize analysis output based on your financial literacy leve
 
 ### Automatic Profile Prompting
 
-When you run `analyze` or `ask` without a profile, the system will automatically prompt you to set your financial literacy level for more personalized results. You can:
+When you run `analyze` without a profile, the system will automatically prompt you to set your financial literacy level for more personalized results. You can:
 - Choose to create a profile with your literacy level (`beginner`, `intermediate`, or `advanced`)
 - Decline and continue with default settings
 
 ### Create a Profile Manually
 
 ```bash
+# Create an analysis profile with literacy level and optional display name
 copinance profile create --literacy intermediate --name "My Profile"
 ```
 
 ### Use Profile in Analysis
 
 ```bash
-copinance analyze market equity AAPL --profile-id <profile-id>
+# Run analysis using a specific profile (replace <profile-id> with actual ID)
+copinance analyze equity AAPL --profile-id <profile-id>
 ```
 
 Or simply use your current profile (set with `profile set-current`).
 
-## Common Workflows
+## Common Analyses
 
 ### Quick Analysis
 
 ```bash
-# Static equity workflow
-copinance analyze market equity AAPL --timeframe mid_term
+# Deterministic equity analysis (fixed pipeline); options; question-driven (equity/options)
+copinance analyze equity AAPL --timeframe mid_term
 
-# Static options workflow
-copinance analyze market options AAPL --expiration 2026-06-19
+# Deterministic options analysis
+copinance analyze options AAPL --expiration 2026-06-19
 
-# Agentic workflow (equity)
-copinance ask -q "Analyze this equity for me" -i AAPL
+# Question-driven analysis (equity)
+copinance analyze equity AAPL --question "Analyze this equity for me"
 
-# Agentic workflow (options)
-copinance ask -q "What's the put/call open interest?" -i AAPL --market-type options --expiration 2026-06-19
+# Question-driven analysis (options)
+copinance analyze options AAPL --question "What's the put/call open interest?" --expiration 2026-06-19
 ```
 
 ### Data and Cache
@@ -100,17 +107,17 @@ All CLI data is stored under `.copinance` using versioned subdirectories such as
 Get a comprehensive view of market conditions and macroeconomic indicators:
 
 ```bash
-# Full analysis with defaults
+# Full macro/market regime analysis (defaults: SPY, 252-day lookback)
 copinance analyze macro
 
-# Custom index and lookback period
+# Custom index and lookback period (QQQ = reference; sector ETFs + VIX still fetched)
 copinance analyze macro --market-index QQQ --lookback-days 180
 ```
 
-See [Workflows](../user-guide/workflows#macro-regime-workflow) for all customization options.
+`--market-index` sets the reference index; VIX and the 11 S&P sector ETFs are always used for breadth and rotation. See [CLI Reference — Macro + Market Regime](../user-guide/cli#macro--market-regime) for details and [Analysis Modes](../user-guide/analysis-modes#macro-regime-analysis) for all options.
 
 ## Next Steps
 
 - [CLI Reference](../user-guide/cli) - Complete command guide
-- [Workflows](../user-guide/workflows) - Understanding workflow types
+- [Analysis Modes](../user-guide/analysis-modes) - Understanding analysis modes
 - [Configuration](../user-guide/configuration) - Advanced configuration

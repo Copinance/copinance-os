@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from copinanceos.application.run_job import DefaultJobRunner
+from copinanceos.application.use_cases.analyze import INSTRUMENT_DETERMINISTIC_TYPE
 from copinanceos.domain.models.job import Job, JobScope, JobTimeframe, RunJobResult
 from copinanceos.domain.models.market import MarketType
-from copinanceos.domain.ports.workflows import WorkflowExecutor
+from copinanceos.domain.ports.analysis_execution import AnalysisExecutor
 
 
 @pytest.mark.unit
@@ -17,16 +18,16 @@ class TestDefaultJobRunner:
     @pytest.mark.asyncio
     async def test_run_success(self) -> None:
         """Test successful one-off job run."""
-        mock_executor = AsyncMock(spec=WorkflowExecutor)
-        mock_executor.get_workflow_type = MagicMock(return_value="instrument")
+        mock_executor = AsyncMock(spec=AnalysisExecutor)
+        mock_executor.get_executor_id = MagicMock(return_value="analyze_instrument")
         mock_executor.validate = AsyncMock(return_value=True)
         mock_executor.execute = AsyncMock(
-            return_value={"workflow_type": "equity", "instrument_symbol": "AAPL"}
+            return_value={"execution_type": "analyze_instrument", "instrument_symbol": "AAPL"}
         )
 
         runner = DefaultJobRunner(
             profile_repository=None,
-            workflow_executors=[mock_executor],
+            analysis_executors=[mock_executor],
         )
         job = Job(
             scope=JobScope.INSTRUMENT,
@@ -34,7 +35,7 @@ class TestDefaultJobRunner:
             instrument_symbol="AAPL",
             market_index=None,
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="equity",
+            execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
         result = await runner.run(job, {})
 
@@ -46,4 +47,4 @@ class TestDefaultJobRunner:
         mock_executor.execute.assert_called_once()
         call_job = mock_executor.execute.call_args[0][0]
         assert call_job.instrument_symbol == "AAPL"
-        assert call_job.workflow_type == "equity"
+        assert call_job.execution_type == INSTRUMENT_DETERMINISTIC_TYPE

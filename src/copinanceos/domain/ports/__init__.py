@@ -1,6 +1,7 @@
 """Domain ports (interfaces) for external dependencies."""
 
 from copinanceos.domain.models.tool_results import ToolResult
+from copinanceos.domain.ports.analysis_execution import AnalysisExecutor, JobRunner
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.domain.ports.data_providers import (
     AlternativeDataProvider,
@@ -10,7 +11,7 @@ from copinanceos.domain.ports.data_providers import (
     MarketDataProvider,
 )
 from copinanceos.domain.ports.repositories import (
-    ResearchProfileRepository,
+    AnalysisProfileRepository,
     StockRepository,
 )
 from copinanceos.domain.ports.storage import Storage
@@ -27,17 +28,15 @@ from copinanceos.domain.ports.tools import (
     ToolParameter,
     ToolSchema,
 )
-from copinanceos.domain.ports.workflows import JobRunner, WorkflowExecutor
 
 __all__ = [
     "JobRunner",
+    "AnalysisExecutor",
     # Repositories
-    "ResearchProfileRepository",
+    "AnalysisProfileRepository",
     "StockRepository",
     # Storage
     "Storage",
-    # Workflows
-    "WorkflowExecutor",
     # Data Providers
     "DataProvider",
     "MarketDataProvider",

@@ -1,4 +1,4 @@
-"""Market regime workflow domain models."""
+"""Market regime domain models."""
 
 from __future__ import annotations
 

@@ -55,7 +55,7 @@ class StockNotFoundError(EntityNotFoundError):
 
 
 class ProfileNotFoundError(EntityNotFoundError):
-    """Raised when a research profile is not found."""
+    """Raised when an analysis profile is not found."""
 
     def __init__(self, profile_id: str, details: dict[str, str] | None = None) -> None:
         """Initialize profile not found error.
@@ -64,7 +64,7 @@ class ProfileNotFoundError(EntityNotFoundError):
             profile_id: Profile ID that was not found
             details: Optional additional details
         """
-        super().__init__("ResearchProfile", profile_id, details)
+        super().__init__("AnalysisProfile", profile_id, details)
         self.profile_id = profile_id
 
 
@@ -104,42 +104,42 @@ class InvalidStockSymbolError(ValidationError):
         self.reason = reason
 
 
-class WorkflowExecutionError(DomainError):
-    """Raised when a workflow execution fails."""
+class AnalysisExecutionError(DomainError):
+    """Raised when an analysis execution fails."""
 
     def __init__(
         self,
-        workflow_type: str,
+        execution_type: str,
         message: str,
         job_id: str | None = None,
         details: dict[str, str] | None = None,
     ) -> None:
-        """Initialize workflow execution error.
+        """Initialize analysis execution error.
 
         Args:
-            workflow_type: Type of workflow that failed
+            execution_type: Type of analysis that failed
             message: Error message
-            job_id: Optional job ID associated with the workflow
+            job_id: Optional job ID
             details: Optional additional details
         """
-        super().__init__(f"Workflow '{workflow_type}' execution failed: {message}", details)
-        self.workflow_type = workflow_type
+        super().__init__(f"Analysis '{execution_type}' execution failed: {message}", details)
+        self.execution_type = execution_type
         self.job_id = job_id
 
 
-class WorkflowNotFoundError(DomainError):
-    """Raised when a requested workflow executor is not found."""
+class ExecutorNotFoundError(DomainError):
+    """Raised when no executor is found for the job's execution type."""
 
-    def __init__(self, workflow_type: str, details: dict[str, str] | None = None) -> None:
-        """Initialize workflow not found error.
+    def __init__(self, execution_type: str, details: dict[str, str] | None = None) -> None:
+        """Initialize executor not found error.
 
         Args:
-            workflow_type: Workflow type that was not found
+            execution_type: Execution type that was not found
             details: Optional additional details
         """
-        message = f"No executor found for workflow type: {workflow_type}"
+        message = f"No executor found for execution type: {execution_type}"
         super().__init__(message, details)
-        self.workflow_type = workflow_type
+        self.execution_type = execution_type
 
 
 class DataProviderError(DomainError):

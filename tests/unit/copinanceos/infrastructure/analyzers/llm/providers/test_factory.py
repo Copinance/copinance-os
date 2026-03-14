@@ -129,65 +129,65 @@ class TestLLMProviderFactory:
         # Should use default model when no config provided
         assert provider._model_name == "gemini-1.5-pro"
 
-    def test_get_provider_for_workflow_with_mapping(self) -> None:
-        """Test getting provider for workflow with mapping configured."""
+    def test_get_provider_for_execution_type_with_mapping(self) -> None:
+        """Test getting provider for execution type with mapping configured."""
         llm_config = LLMConfig(
             provider="gemini",
-            workflow_providers={"stock": "ollama", "agent": "gemini"},
+            execution_type_providers={"stock": "ollama", "agent": "gemini"},
         )
-        result = LLMProviderFactory.get_provider_for_workflow("stock", llm_config=llm_config)
+        result = LLMProviderFactory.get_provider_for_execution_type("stock", llm_config=llm_config)
 
         assert result == "ollama"
 
-    def test_get_provider_for_workflow_without_mapping(self) -> None:
-        """Test getting provider for workflow without mapping."""
+    def test_get_provider_for_execution_type_without_mapping(self) -> None:
+        """Test getting provider for execution type without mapping."""
         llm_config = LLMConfig(provider="gemini")
-        result = LLMProviderFactory.get_provider_for_workflow("stock", llm_config=llm_config)
+        result = LLMProviderFactory.get_provider_for_execution_type("stock", llm_config=llm_config)
 
         assert result == "gemini"
 
-    def test_get_provider_for_workflow_with_default_provider(self) -> None:
-        """Test getting provider for workflow with default_provider parameter."""
-        result = LLMProviderFactory.get_provider_for_workflow(
+    def test_get_provider_for_execution_type_with_default_provider(self) -> None:
+        """Test getting provider for execution type with default_provider parameter."""
+        result = LLMProviderFactory.get_provider_for_execution_type(
             "stock", llm_config=None, default_provider="ollama"
         )
 
         assert result == "ollama"
 
-    def test_get_provider_for_workflow_default_overrides_config(self) -> None:
+    def test_get_provider_for_execution_type_default_overrides_config(self) -> None:
         """Test that default_provider parameter is used when llm_config is None."""
         # When llm_config is None, default_provider should be used
-        result = LLMProviderFactory.get_provider_for_workflow(
-            "unknown_workflow", llm_config=None, default_provider="ollama"
+        result = LLMProviderFactory.get_provider_for_execution_type(
+            "unknown_execution_type", llm_config=None, default_provider="ollama"
         )
 
         assert result == "ollama"
 
-    def test_get_provider_for_workflow_config_takes_precedence(self) -> None:
+    def test_get_provider_for_execution_type_config_takes_precedence(self) -> None:
         """Test that llm_config provider is used when config is provided."""
         # When llm_config is provided, it takes precedence over default_provider
         llm_config = LLMConfig(provider="gemini")
-        result = LLMProviderFactory.get_provider_for_workflow(
-            "unknown_workflow", llm_config=llm_config, default_provider="ollama"
+        result = LLMProviderFactory.get_provider_for_execution_type(
+            "unknown_execution_type", llm_config=llm_config, default_provider="ollama"
         )
 
         assert result == "gemini"  # Config provider takes precedence
 
-    def test_get_provider_for_workflow_uses_default_when_none(self) -> None:
-        """Test that get_provider_for_workflow uses default when llm_config is None."""
-        result = LLMProviderFactory.get_provider_for_workflow(
+    def test_get_provider_for_execution_type_uses_default_when_none(self) -> None:
+        """Test that get_provider_for_execution_type uses default when llm_config is None."""
+        result = LLMProviderFactory.get_provider_for_execution_type(
             "stock", llm_config=None, default_provider="gemini"
         )
 
         assert result == "gemini"
 
-    def test_get_provider_for_workflow_mapping_takes_precedence(self) -> None:
-        """Test that workflow mapping takes precedence over default."""
+    def test_get_provider_for_execution_type_mapping_takes_precedence(self) -> None:
+        """Test that execution type mapping takes precedence over default."""
         llm_config = LLMConfig(
             provider="gemini",
-            workflow_providers={"stock": "ollama"},
+            execution_type_providers={"stock": "ollama"},
         )
-        result = LLMProviderFactory.get_provider_for_workflow(
+        result = LLMProviderFactory.get_provider_for_execution_type(
             "stock", llm_config=llm_config, default_provider="gemini"
         )
 

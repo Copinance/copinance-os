@@ -14,9 +14,11 @@ from typing import Any
 
 import structlog
 
+from copinanceos.domain.models.market import MarketDataPoint
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.tools import Tool, ToolSchema
+from copinanceos.infrastructure.cache import CacheManager
 from copinanceos.infrastructure.tools.analysis.market_regime.base import (
     _calculate_moving_average,
     _calculate_rsi,
@@ -54,13 +56,19 @@ class MarketRegimeIndicatorsTool(Tool):
     All data is fetched using free sources via yfinance.
     """
 
-    def __init__(self, market_data_provider: MarketDataProvider) -> None:
-        """Initialize tool with market data provider.
+    def __init__(
+        self,
+        market_data_provider: MarketDataProvider,
+        cache_manager: CacheManager | None = None,
+    ) -> None:
+        """Initialize tool with market data provider and optional cache.
 
         Args:
             market_data_provider: Provider for historical market data
+            cache_manager: Optional cache manager to avoid redundant fetches
         """
         self._provider = market_data_provider
+        self._cache_manager = cache_manager
 
     def get_name(self) -> str:
         """Get tool name."""
@@ -116,6 +124,92 @@ class MarketRegimeIndicatorsTool(Tool):
             },
         )
 
+    async def _get_historical_data_cached(
+        self,
+        symbol: str,
+        start_date: datetime,
+        end_date: datetime,
+        interval: str = "1d",
+    ) -> list[MarketDataPoint]:
+        """Fetch historical data, using cache when available to avoid redundant requests."""
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+        symbol_upper = symbol.upper()
+        if self._cache_manager:
+            try:
+                entry = await self._cache_manager.get(
+                    "get_historical_market_data",
+                    symbol=symbol_upper,
+                    start_date=start_str,
+                    end_date=end_str,
+                    interval=interval,
+                )
+                if entry and entry.data:
+                    logger.debug(
+                        "Returning cached historical data for regime indicators",
+                        symbol=symbol_upper,
+                        cached_at=entry.cached_at.isoformat(),
+                    )
+                    return [MarketDataPoint.model_validate(p) for p in (entry.data or [])]
+            except Exception as e:
+                logger.debug(
+                    "Cache lookup failed for historical data, fetching",
+                    symbol=symbol_upper,
+                    error=str(e),
+                )
+        data = await self._provider.get_historical_data(
+            symbol_upper, start_date, end_date, interval=interval
+        )
+        if self._cache_manager and data:
+            try:
+                serialized = [
+                    p.model_dump(mode="json") if hasattr(p, "model_dump") else p for p in data
+                ]
+                await self._cache_manager.set(
+                    "get_historical_market_data",
+                    data=serialized,
+                    metadata={"symbol": symbol_upper, "interval": interval},
+                    symbol=symbol_upper,
+                    start_date=start_str,
+                    end_date=end_str,
+                    interval=interval,
+                )
+            except Exception:
+                pass
+        return data or []
+
+    async def _get_quote_cached(self, symbol: str) -> dict[str, Any]:
+        """Fetch quote, using cache when available to avoid redundant requests."""
+        symbol_upper = symbol.upper()
+        if self._cache_manager:
+            try:
+                entry = await self._cache_manager.get("get_market_quote", symbol=symbol_upper)
+                if entry and entry.data:
+                    logger.debug(
+                        "Returning cached quote for regime indicators",
+                        symbol=symbol_upper,
+                        cached_at=entry.cached_at.isoformat(),
+                    )
+                    return dict(entry.data)
+            except Exception as e:
+                logger.debug(
+                    "Cache lookup failed for quote, fetching",
+                    symbol=symbol_upper,
+                    error=str(e),
+                )
+        quote = await self._provider.get_quote(symbol_upper)
+        if self._cache_manager and quote:
+            try:
+                await self._cache_manager.set(
+                    "get_market_quote",
+                    data=quote,
+                    metadata={"symbol": symbol_upper},
+                    symbol=symbol_upper,
+                )
+            except Exception:
+                pass
+        return quote or {}
+
     async def execute(self, **kwargs: Any) -> ToolResult:
         """Execute market regime indicators analysis."""
         try:
@@ -148,8 +242,8 @@ class MarketRegimeIndicatorsTool(Tool):
             if needs_shared_data:
                 try:
                     # Fetch market index data once (used by both breadth and rotation)
-                    market_data = await self._provider.get_historical_data(
-                        market_index, start_date, end_date, interval="1d"
+                    market_data = await self._get_historical_data_cached(
+                        market_index, start_date, end_date, "1d"
                     )
                 except Exception as e:
                     logger.warning(
@@ -162,8 +256,8 @@ class MarketRegimeIndicatorsTool(Tool):
                 # Fetch all sector ETF data once (used by both breadth and rotation)
                 for sector_symbol in SECTOR_ETFS.keys():
                     try:
-                        sector_data = await self._provider.get_historical_data(
-                            sector_symbol, start_date, end_date, interval="1d"
+                        sector_data = await self._get_historical_data_cached(
+                            sector_symbol, start_date, end_date, "1d"
                         )
                         if sector_data:
                             sector_data_cache[sector_symbol] = sector_data
@@ -251,8 +345,8 @@ class MarketRegimeIndicatorsTool(Tool):
             Dictionary with VIX data including current level, recent average, and trend
         """
         try:
-            vix_data_list = await self._provider.get_historical_data(
-                "^VIX", start_date, end_date, interval="1d"
+            vix_data_list = await self._get_historical_data_cached(
+                "^VIX", start_date, end_date, "1d"
             )
 
             if not vix_data_list:
@@ -340,8 +434,8 @@ class MarketRegimeIndicatorsTool(Tool):
         try:
             # Use provided market data or fetch if not provided
             if market_data is None:
-                market_data = await self._provider.get_historical_data(
-                    market_index, start_date, end_date, interval="1d"
+                market_data = await self._get_historical_data_cached(
+                    market_index, start_date, end_date, "1d"
                 )
 
             if not market_data:
@@ -391,8 +485,8 @@ class MarketRegimeIndicatorsTool(Tool):
                     if sector_symbol in sector_data_cache:
                         sector_data = sector_data_cache[sector_symbol]
                     else:
-                        sector_data = await self._provider.get_historical_data(
-                            sector_symbol, start_date, end_date, interval="1d"
+                        sector_data = await self._get_historical_data_cached(
+                            sector_symbol, start_date, end_date, "1d"
                         )
 
                     if not sector_data:
@@ -413,7 +507,7 @@ class MarketRegimeIndicatorsTool(Tool):
                     max_retries = 2
                     for attempt in range(max_retries):
                         try:
-                            quote = await self._provider.get_quote(sector_symbol)
+                            quote = await self._get_quote_cached(sector_symbol)
                             market_cap = quote.get("market_cap")
                             if market_cap:
                                 market_caps[sector_symbol] = int(market_cap)
@@ -702,8 +796,8 @@ class MarketRegimeIndicatorsTool(Tool):
         try:
             # Use provided market data or fetch if not provided
             if market_data is None:
-                market_data = await self._provider.get_historical_data(
-                    market_index, start_date, end_date, interval="1d"
+                market_data = await self._get_historical_data_cached(
+                    market_index, start_date, end_date, "1d"
                 )
 
             if not market_data:
@@ -749,8 +843,8 @@ class MarketRegimeIndicatorsTool(Tool):
                     if sector_symbol in sector_data_cache:
                         sector_data = sector_data_cache[sector_symbol]
                     else:
-                        sector_data = await self._provider.get_historical_data(
-                            sector_symbol, start_date, end_date, interval="1d"
+                        sector_data = await self._get_historical_data_cached(
+                            sector_symbol, start_date, end_date, "1d"
                         )
 
                     if not sector_data or len(sector_data) < 60:
@@ -863,13 +957,15 @@ class MarketRegimeIndicatorsTool(Tool):
 
 def create_market_regime_indicators_tool(
     market_data_provider: MarketDataProvider,
+    cache_manager: CacheManager | None = None,
 ) -> MarketRegimeIndicatorsTool:
     """Create market regime indicators tool.
 
     Args:
         market_data_provider: Market data provider instance
+        cache_manager: Optional cache manager to avoid redundant data fetches
 
     Returns:
         MarketRegimeIndicatorsTool instance
     """
-    return MarketRegimeIndicatorsTool(market_data_provider)
+    return MarketRegimeIndicatorsTool(market_data_provider, cache_manager=cache_manager)

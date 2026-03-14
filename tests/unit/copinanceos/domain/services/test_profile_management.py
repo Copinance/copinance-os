@@ -6,8 +6,8 @@ from uuid import uuid4
 import pytest
 
 from copinanceos.domain.exceptions import ProfileNotFoundError
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 from copinanceos.domain.services.profile_management import ProfileManagementService
 
 
@@ -18,7 +18,7 @@ class TestProfileManagementService:
     @pytest.fixture
     def mock_repository(self) -> AsyncMock:
         """Provide a mock profile repository."""
-        return AsyncMock(spec=ResearchProfileRepository)
+        return AsyncMock(spec=AnalysisProfileRepository)
 
     @pytest.fixture
     def service(self, mock_repository: AsyncMock) -> ProfileManagementService:
@@ -30,7 +30,7 @@ class TestProfileManagementService:
     ) -> None:
         """Test validate_profile_exists when profile exists."""
         profile_id = uuid4()
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Test Profile",
@@ -58,7 +58,7 @@ class TestProfileManagementService:
         self, service: ProfileManagementService, mock_repository: AsyncMock
     ) -> None:
         """Test should_auto_set_as_current returns True for new profiles."""
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             id=uuid4(),
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Test Profile",

@@ -55,9 +55,9 @@ def configure_data_providers(
             provider_name=None,  # Will use default from llm_config if provided
             llm_config=llm_config,
         ),
-        "llm_analyzer_for_workflow": providers.Factory(
-            LLMAnalyzerFactory.create_for_workflow,
-            workflow_type="agent",  # Default workflow type
+        "llm_analyzer_for_analysis": providers.Factory(
+            LLMAnalyzerFactory.create_for_execution_type,
+            execution_type="question_driven_analysis",
             llm_config=llm_config,
         ),
     }

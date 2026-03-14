@@ -4,7 +4,7 @@ import pytest
 
 from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
 from copinanceos.domain.models.market import MarketType
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
 
 
 @pytest.mark.unit
@@ -18,24 +18,24 @@ class TestJobModel:
             market_type=MarketType.EQUITY,
             instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="equity",
+            execution_type="equity",
         )
 
         assert job.instrument_symbol == "AAPL"
         assert job.timeframe == JobTimeframe.MID_TERM
-        assert job.workflow_type == "equity"
+        assert job.execution_type == "equity"
         assert job.status == JobStatus.PENDING
         assert job.profile_id is None
 
     def test_job_with_profile(self) -> None:
         """Test creating job with a profile."""
-        profile = ResearchProfile(financial_literacy=FinancialLiteracy.ADVANCED)
+        profile = AnalysisProfile(financial_literacy=FinancialLiteracy.ADVANCED)
         job = Job(
             scope=JobScope.INSTRUMENT,
             market_type=MarketType.EQUITY,
             instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="equity",
+            execution_type="equity",
             profile_id=profile.id,
         )
 
@@ -48,7 +48,7 @@ class TestJobModel:
             market_type=MarketType.EQUITY,
             instrument_symbol="AAPL",
             timeframe=JobTimeframe.SHORT_TERM,
-            workflow_type="equity",
+            execution_type="equity",
         )
 
         assert job.status == JobStatus.PENDING

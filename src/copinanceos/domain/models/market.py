@@ -10,7 +10,7 @@ from copinanceos.domain.models.base import ValueObject
 
 
 class MarketType(StrEnum):
-    """Supported market segments for instrument-level workflows."""
+    """Supported market segments for instrument-level analysis."""
 
     EQUITY = "equity"
     OPTIONS = "options"

@@ -11,7 +11,7 @@ from copinanceos.application.use_cases.profile import (
     CreateProfileRequest,
     GetCurrentProfileRequest,
 )
-from copinanceos.domain.models.research_profile import FinancialLiteracy
+from copinanceos.domain.models.profile import FinancialLiteracy
 from copinanceos.infrastructure.containers import container
 
 console = Console()

@@ -1,6 +1,6 @@
-"""Static macro + market regime workflow executor.
+"""Deterministic market analysis executor.
 
-This workflow is intentionally non-LLM and returns a combined payload containing:
+This executor is intentionally non-LLM and returns a combined payload containing:
 - Macro regime indicators (rates, credit, commodities) preferring FRED
 - Market regime indicators (VIX, breadth, sector rotation) + rule-based regime detections
 """
@@ -12,9 +12,10 @@ from typing import Any
 
 import structlog
 
+from copinanceos.application.use_cases.analyze import MARKET_DETERMINISTIC_TYPE
 from copinanceos.domain.models.job import Job, JobScope
-from copinanceos.domain.models.tool_results import ToolResult
-from copinanceos.domain.models.workflows import (
+from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.domain.models.regime import (
     AdvancedData,
     AnalysisMetadata,
     CommoditiesData,
@@ -25,7 +26,7 @@ from copinanceos.domain.models.workflows import (
     LaborData,
     MacroRegimeIndicatorsData,
     MacroRegimeIndicatorsResult,
-    MacroRegimeWorkflowResult,
+    MacroRegimeResult,
     MacroSeriesMetadata,
     ManufacturingData,
     MarketCyclesData,
@@ -36,7 +37,10 @@ from copinanceos.domain.models.workflows import (
     RatesData,
     VolatilityRegimeData,
 )
+from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
+from copinanceos.infrastructure.cache import CacheManager
+from copinanceos.infrastructure.executors.base import BaseAnalysisExecutor
 from copinanceos.infrastructure.tools.analysis.market_regime import (
     create_market_regime_indicators_tool,
     create_rule_based_regime_tools,
@@ -44,28 +48,29 @@ from copinanceos.infrastructure.tools.analysis.market_regime import (
 from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
     create_macro_regime_indicators_tool,
 )
-from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
 logger = structlog.get_logger(__name__)
 
 
-class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
-    """Static workflow that returns macro data and market regime info together."""
+class MarketAnalysisExecutor(BaseAnalysisExecutor):
+    """Deterministic executor that returns macro data and market regime information."""
 
     def __init__(
         self,
         market_data_provider: MarketDataProvider | None = None,
         macro_data_provider: MacroeconomicDataProvider | None = None,
+        cache_manager: CacheManager | None = None,
     ) -> None:
         self._market_data_provider = market_data_provider
         self._macro_data_provider = macro_data_provider
+        self._cache_manager = cache_manager
 
-    async def _execute_workflow(self, job: Job, context: dict[str, Any]) -> Any:
+    async def _execute_analysis(self, job: Job, context: dict[str, Any]) -> Any:
         if not self._market_data_provider:
-            raise RuntimeError("MarketDataProvider not configured - required for macro workflow")
+            raise RuntimeError("MarketDataProvider not configured - required for macro analysis")
         if not self._macro_data_provider:
             raise RuntimeError(
-                "MacroeconomicDataProvider not configured - required for macro workflow"
+                "MacroeconomicDataProvider not configured - required for macro analysis"
             )
 
         # Inputs
@@ -89,7 +94,10 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         include_advanced = bool(context.get("include_advanced", True))
 
         # Market regime indicators (VIX, breadth, rotation)
-        market_indicators_tool = create_market_regime_indicators_tool(self._market_data_provider)
+        market_indicators_tool = create_market_regime_indicators_tool(
+            self._market_data_provider,
+            cache_manager=self._cache_manager,
+        )
         market_indicators_result = await market_indicators_tool.execute(
             market_index=market_index,
             lookback_days=lookback_days,
@@ -118,21 +126,74 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         # Fetch market data once and reuse for all regime detection tools to avoid duplicate API calls
         end_date = datetime.now(UTC)
         start_date = end_date - timedelta(days=lookback_days)
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
         regime_historical_data = None
 
-        try:
-            regime_historical_data = await self._market_data_provider.get_historical_data(
-                symbol=market_index,
-                start_date=start_date,
-                end_date=end_date,
-                interval="1d",
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to fetch market data for regime detection tools",
-                market_index=market_index,
-                error=str(e),
-            )
+        if self._cache_manager:
+            try:
+                entry = await self._cache_manager.get(
+                    "get_historical_market_data",
+                    symbol=market_index,
+                    start_date=start_str,
+                    end_date=end_str,
+                    interval="1d",
+                )
+                if entry and entry.data:
+                    logger.info(
+                        "Returning cached historical data for regime",
+                        market_index=market_index,
+                        cached_at=entry.cached_at.isoformat(),
+                    )
+                    try:
+                        regime_historical_data = [
+                            MarketDataPoint.model_validate(p) for p in (entry.data or [])
+                        ]
+                    except Exception:
+                        regime_historical_data = None
+            except Exception as e:
+                logger.debug(
+                    "Cache lookup failed for regime historical data, fetching",
+                    market_index=market_index,
+                    error=str(e),
+                )
+
+        if regime_historical_data is None:
+            try:
+                regime_historical_data = await self._market_data_provider.get_historical_data(
+                    symbol=market_index,
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval="1d",
+                )
+                if self._cache_manager and regime_historical_data:
+                    try:
+                        serialized = [
+                            p.model_dump(mode="json") if hasattr(p, "model_dump") else p
+                            for p in regime_historical_data
+                        ]
+                        await self._cache_manager.set(
+                            "get_historical_market_data",
+                            data=serialized,
+                            metadata={
+                                "symbol": market_index,
+                                "start_date": start_str,
+                                "end_date": end_str,
+                                "interval": "1d",
+                            },
+                            symbol=market_index,
+                            start_date=start_str,
+                            end_date=end_str,
+                            interval="1d",
+                        )
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch market data for regime detection tools",
+                    market_index=market_index,
+                    error=str(e),
+                )
 
         regime_tools = create_rule_based_regime_tools(self._market_data_provider)
         regime_detection_data: dict[str, ToolResult] = {}
@@ -246,6 +307,7 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         macro_tool = create_macro_regime_indicators_tool(
             macro_data_provider=self._macro_data_provider,
             market_data_provider=self._market_data_provider,
+            cache_manager=self._cache_manager,
         )
         macro_result = await macro_tool.execute(
             lookback_days=lookback_days,
@@ -325,8 +387,8 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
             ),
         )
 
-        # Construct and return typed workflow result
-        return MacroRegimeWorkflowResult(
+        # Construct and return typed result
+        return MacroRegimeResult(
             market_index=market_index,
             execution_timestamp=datetime.now(UTC),
             market_regime_indicators=market_regime_indicators,
@@ -337,7 +399,7 @@ class MacroRegimeStaticWorkflowExecutor(BaseWorkflowExecutor):
         )
 
     async def validate(self, job: Job) -> bool:
-        return job.workflow_type == "macro" and job.scope == JobScope.MARKET
+        return job.execution_type == MARKET_DETERMINISTIC_TYPE and job.scope == JobScope.MARKET
 
-    def get_workflow_type(self) -> str:
-        return "macro"
+    def get_executor_id(self) -> str:
+        return "market_analysis"

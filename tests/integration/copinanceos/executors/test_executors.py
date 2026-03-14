@@ -1,7 +1,11 @@
-"""Integration tests for core workflows (one-off run via JobRunner)."""
+"""Integration tests for analysis executors (one-off run via JobRunner)."""
 
 import pytest
 
+from copinanceos.application.use_cases.analyze import (
+    INSTRUMENT_DETERMINISTIC_TYPE,
+    INSTRUMENT_QUESTION_DRIVEN_TYPE,
+)
 from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
 from copinanceos.domain.models.market import MarketType
 from copinanceos.domain.ports.data_providers import FundamentalDataProvider
@@ -9,12 +13,12 @@ from copinanceos.infrastructure.containers import get_container
 
 
 @pytest.mark.integration
-class TestEndToEndWorkflow:
-    """Test complete end-to-end workflows via job_runner (no persistence)."""
+class TestEndToEndExecutors:
+    """Test complete end-to-end analysis execution via job_runner (no persistence)."""
 
     @pytest.mark.asyncio
-    async def test_complete_equity_workflow(self) -> None:
-        """Test equity workflow execution (one-off)."""
+    async def test_complete_equity_analysis(self) -> None:
+        """Test equity analysis execution (one-off)."""
         container = get_container()
         runner = container.job_runner()
 
@@ -24,7 +28,7 @@ class TestEndToEndWorkflow:
             instrument_symbol="AAPL",
             market_index=None,
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="equity",
+            execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
         response = await runner.run(job, {})
 
@@ -33,8 +37,8 @@ class TestEndToEndWorkflow:
         assert len(response.results) > 0
 
     @pytest.mark.asyncio
-    async def test_agentic_workflow_execution(self) -> None:
-        """Test agent workflow execution (one-off)."""
+    async def test_question_driven_analysis_execution(self) -> None:
+        """Test question-driven analysis execution (one-off)."""
         container = get_container()
         runner = container.job_runner()
 
@@ -44,7 +48,7 @@ class TestEndToEndWorkflow:
             instrument_symbol="MSFT",
             market_index=None,
             timeframe=JobTimeframe.SHORT_TERM,
-            workflow_type="agent",
+            execution_type=INSTRUMENT_QUESTION_DRIVEN_TYPE,
         )
         response = await runner.run(job, {})
 
@@ -59,10 +63,10 @@ class TestEndToEndWorkflow:
                 assert "LLM analyzer not configured" in str(response.results.get("error", ""))
 
     @pytest.mark.asyncio
-    async def test_static_workflow_with_fundamentals(
+    async def test_deterministic_analysis_with_fundamentals(
         self, fundamental_data_provider: FundamentalDataProvider
     ) -> None:
-        """Test equity workflow execution includes fundamentals data."""
+        """Test equity analysis execution includes fundamentals data."""
         container = get_container()
         runner = container.job_runner()
 
@@ -72,7 +76,7 @@ class TestEndToEndWorkflow:
             instrument_symbol="AAPL",
             market_index=None,
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="equity",
+            execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
         response = await runner.run(job, {})
 
@@ -81,8 +85,7 @@ class TestEndToEndWorkflow:
         assert len(response.results) > 0
 
         results = response.results
-        assert results["workflow_type"] == "equity"
+        assert results["execution_type"] == "instrument_analysis"
         assert results["instrument_symbol"] == "AAPL"
         assert "fundamentals" in results
         assert "company_name" in results["fundamentals"]
-        # Static workflow fundamentals include company_name, symbol, ratios, etc. (no statement keys)

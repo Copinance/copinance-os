@@ -1,18 +1,18 @@
 # Tools Overview
 
-Copinance OS provides a comprehensive suite of tools for market research and analysis. Tools are executable functions that can be used in workflows, especially agent workflows where AI agents can dynamically select and use tools to answer questions.
+Copinance OS provides a comprehensive suite of tools for market analysis. Tools are executable functions that can be used in analysis, especially question-driven analysis where the AI can dynamically select and use tools to answer questions.
 
 ## Tool Categories
 
 ### Analysis Tools
-Advanced analytical functions for market regime detection, technical analysis, and macroeconomic research.
+Advanced analytical functions for market regime detection, technical analysis, and macroeconomic analysis.
 
 - **Market Regime Detection**: Identify bull/bear markets, volatility regimes, and market cycles
 - **Macro Economic Indicators**: Comprehensive economic data across 9 categories (47+ indicators)
 - See [Analysis Tools](/tools/analysis) for details
 
 ### Data Provider Tools
-Tools that wrap data provider methods, making them accessible to AI agents and workflows.
+Tools that wrap data provider methods, making them accessible to AI agents and analysis runs.
 
 - **Market Data Tools**: Get quotes, historical prices, search instruments, inspect options chains
 - **Fundamental Data Tools**: Access financial statements, SEC filings, fundamentals
@@ -20,15 +20,16 @@ Tools that wrap data provider methods, making them accessible to AI agents and w
 
 ## Using Tools
 
-### In Agentic Workflows
+### In question-driven analysis
 
-Tools are automatically available when using agent workflows:
+Tools are automatically available when using question-driven analyze:
 
 ```bash
-copinance ask "What is the current market trend?" --instrument AAPL
+# Question-driven analysis: AI selects and uses tools (e.g. quote, history) to answer
+copinance analyze equity AAPL --question "What is the current market trend?"
 ```
 
-The AI agent will automatically select and use the appropriate tools to answer your question.
+The AI will automatically select and use the appropriate tools to answer your question.
 
 ### Programmatic Usage
 
@@ -74,5 +75,5 @@ All tools implement the `Tool` interface, which provides:
 ## See Also
 
 - [API Reference](../api-reference/data-providers) - Data provider interfaces
-- [Workflows](../user-guide/workflows) - Using tools in workflows
+- [Analysis Modes](../user-guide/analysis-modes) - Using tools in analysis
 - [Developer Guide](../developer-guide/extending) - Creating custom tools

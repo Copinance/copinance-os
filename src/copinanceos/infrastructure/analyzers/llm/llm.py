@@ -9,7 +9,6 @@ import structlog
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.infrastructure.analyzers.llm.providers.base import LLMProvider
 from copinanceos.infrastructure.analyzers.llm.providers.gemini import GeminiProvider
-from copinanceos.infrastructure.analyzers.llm.resources.prompt_manager import PromptManager
 
 logger = structlog.get_logger(__name__)
 
@@ -21,19 +20,13 @@ class LLMAnalyzerImpl(LLMAnalyzer):
     LLMProvider instance. This allows easy swapping of LLM backends.
     """
 
-    def __init__(
-        self,
-        llm_provider: LLMProvider,
-        prompt_manager: PromptManager | None = None,
-    ) -> None:
+    def __init__(self, llm_provider: LLMProvider) -> None:
         """Initialize LLM analyzer with a provider.
 
         Args:
-            llm_provider: The LLM provider to use for text generation
-            prompt_manager: Optional prompt manager. If None, creates default one.
+            llm_provider: The LLM provider to use for text generation.
         """
         self._llm_provider = llm_provider
-        self._prompt_manager = prompt_manager or PromptManager()
         logger.info("Initialized LLM analyzer", provider=llm_provider.get_provider_name())
 
 
@@ -75,7 +68,7 @@ class GeminiLLMAnalyzer(LLMAnalyzerImpl):
             api_key: Gemini API key. Required for cloud usage.
             model_name: Gemini model to use (default: "gemini-1.5-pro")
                        Options: gemini-2.5-flash, gemini-1.5-pro, gemini-1.5-flash, gemini-pro
-                       All support function calling for agent workflows
+                       All support function calling for question-driven analysis
             temperature: Default temperature for generation (0.0-1.0)
             max_output_tokens: Default max output tokens. If None, uses provider default.
 

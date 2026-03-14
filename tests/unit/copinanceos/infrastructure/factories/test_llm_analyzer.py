@@ -57,27 +57,26 @@ class TestLLMAnalyzerFactory:
 
     @patch("copinanceos.infrastructure.factories.llm_analyzer.LLMProviderFactory")
     @patch("copinanceos.infrastructure.factories.llm_analyzer.LLMAnalyzerImpl")
-    def test_create_for_workflow(
+    def test_create_for_execution_type(
         self,
         mock_llm_impl: MagicMock,
         mock_factory: MagicMock,
     ) -> None:
-        """Test create_for_workflow."""
+        """Test create_for_execution_type."""
         llm_config = LLMConfig(
             provider="gemini",
             api_key="test-key",
-            workflow_providers={"agent": "gemini"},
+            execution_type_providers={"question_driven_analysis": "gemini"},
         )
         mock_provider = MagicMock()
         mock_factory.create_provider.return_value = mock_provider
         mock_analyzer = MagicMock(spec=LLMAnalyzer)
         mock_llm_impl.return_value = mock_analyzer
 
-        result = LLMAnalyzerFactory.create_for_workflow("agent", llm_config=llm_config)
+        result = LLMAnalyzerFactory.create_for_execution_type(
+            "question_driven_analysis", llm_config=llm_config
+        )
 
         assert result == mock_analyzer
-        # create_for_workflow calls llm_config.get_provider_for_workflow() directly,
-        # which returns "gemini" from workflow_providers mapping
-        # create_provider is called with positional args: provider_name, llm_config
         mock_factory.create_provider.assert_called_once_with("gemini", llm_config)
         mock_llm_impl.assert_called_once_with(mock_provider)

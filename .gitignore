@@ -41,6 +41,8 @@ htmlcov/
 .tox/
 coverage.xml
 *.cover
+# Test artifact when get_settings().get_storage_path() is unmocked
+.mock/
 
 # Type checking
 .mypy_cache/

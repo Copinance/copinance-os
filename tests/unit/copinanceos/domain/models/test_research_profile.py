@@ -1,17 +1,17 @@
-"""Unit tests for ResearchProfile domain model."""
+"""Unit tests for AnalysisProfile domain model."""
 
 import pytest
 
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
 
 
 @pytest.mark.unit
-class TestResearchProfileModel:
-    """Test ResearchProfile domain model."""
+class TestAnalysisProfileModel:
+    """Test AnalysisProfile domain model."""
 
     def test_create_profile(self) -> None:
-        """Test creating a research profile."""
-        profile = ResearchProfile(
+        """Test creating an analysis profile."""
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Test Investor",
         )
@@ -22,6 +22,6 @@ class TestResearchProfileModel:
 
     def test_profile_default_literacy(self) -> None:
         """Test profile with default literacy level."""
-        profile = ResearchProfile()
+        profile = AnalysisProfile()
 
         assert profile.financial_literacy == FinancialLiteracy.BEGINNER

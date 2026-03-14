@@ -1,4 +1,4 @@
-"""Analysis tools for market research.
+"""Analysis tools for market analysis.
 
 This module provides tools for analyzing market data, including market regime detection,
 technical analysis, and other analytical functions.

@@ -17,18 +17,14 @@ from copinanceos.domain.models.market import (
     OptionsChain,
     OptionSide,
 )
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
-from copinanceos.domain.models.stock import Stock
-from copinanceos.domain.models.tool_results import (
-    ToolResult,
-)
-from copinanceos.domain.models.workflows import (
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinanceos.domain.models.regime import (
     AnalysisMetadata,
     CommoditiesData,
     CreditData,
     MacroRegimeIndicatorsData,
     MacroRegimeIndicatorsResult,
-    MacroRegimeWorkflowResult,
+    MacroRegimeResult,
     MacroSeriesData,
     MacroSeriesMetadata,
     MarketBreadthData,
@@ -44,6 +40,10 @@ from copinanceos.domain.models.workflows import (
     VIXData,
     VolatilityRegimeData,
 )
+from copinanceos.domain.models.stock import Stock
+from copinanceos.domain.models.tool_results import (
+    ToolResult,
+)
 
 __all__ = [
     "Job",
@@ -51,7 +51,7 @@ __all__ = [
     "JobStatus",
     "JobTimeframe",
     "RunJobResult",
-    "ResearchProfile",
+    "AnalysisProfile",
     "FinancialLiteracy",
     "Stock",
     "MarketType",
@@ -68,7 +68,7 @@ __all__ = [
     "FinancialStatementPeriod",
     # Core Framework Models
     "ToolResult",
-    # Workflow-specific Models (imported from workflows package)
+    # Regime/macro models (imported from regime package)
     "AnalysisMetadata",
     "MacroSeriesData",
     "MacroSeriesMetadata",
@@ -88,5 +88,5 @@ __all__ = [
     "CommoditiesData",
     "MacroRegimeIndicatorsData",
     "MacroRegimeIndicatorsResult",
-    "MacroRegimeWorkflowResult",
+    "MacroRegimeResult",
 ]

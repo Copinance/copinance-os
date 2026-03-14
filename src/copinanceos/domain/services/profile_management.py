@@ -3,8 +3,8 @@
 from uuid import UUID
 
 from copinanceos.domain.exceptions import ProfileNotFoundError
-from copinanceos.domain.models.research_profile import ResearchProfile
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
+from copinanceos.domain.models.profile import AnalysisProfile
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 
 
 class ProfileManagementService:
@@ -12,23 +12,23 @@ class ProfileManagementService:
 
     def __init__(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Initialize profile management service.
 
         Args:
-            profile_repository: Repository for research profiles
+            profile_repository: Repository for analysis profiles
         """
         self._profile_repository = profile_repository
 
-    async def validate_profile_exists(self, profile_id: UUID) -> ResearchProfile:
+    async def validate_profile_exists(self, profile_id: UUID) -> AnalysisProfile:
         """Validate that a profile exists.
 
         Args:
             profile_id: Profile ID to validate
 
         Returns:
-            Research profile if found
+            Analysis profile if found
 
         Raises:
             ProfileNotFoundError: If profile does not exist
@@ -38,7 +38,7 @@ class ProfileManagementService:
             raise ProfileNotFoundError(str(profile_id))
         return profile
 
-    def should_auto_set_as_current(self, profile: ResearchProfile) -> bool:
+    def should_auto_set_as_current(self, profile: AnalysisProfile) -> bool:
         """Determine if a profile should be automatically set as current.
 
         Business rule: New profiles are automatically set as current.

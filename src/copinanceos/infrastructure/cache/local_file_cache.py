@@ -96,13 +96,16 @@ class LocalFileCacheBackend(CacheBackend):
             else:
                 cached_at = datetime.now(UTC)
 
+            metadata = dict(data.get("metadata", {}))
+            metadata["cache_file_path"] = str(cache_file)
+
             entry = CacheEntry(
                 schema_version=data.get("schema_version", PERSISTENCE_SCHEMA_VERSION),
                 data=data.get("data"),
                 cached_at=cached_at,
                 tool_name=data.get("tool_name", ""),
                 cache_key=data.get("cache_key", key),
-                metadata=data.get("metadata", {}),
+                metadata=metadata,
             )
 
             logger.debug("Cache hit", key=key, tool_name=entry.tool_name)

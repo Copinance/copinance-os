@@ -22,8 +22,8 @@ from copinanceos.application.use_cases.profile import (
     SetCurrentProfileUseCase,
 )
 from copinanceos.domain.exceptions import ProfileNotFoundError
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
-from copinanceos.domain.ports.repositories import ResearchProfileRepository
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinanceos.domain.ports.repositories import AnalysisProfileRepository
 from copinanceos.domain.services.profile_management import ProfileManagementService
 from copinanceos.infrastructure.repositories.profile.current_profile import CurrentProfile
 
@@ -56,7 +56,7 @@ def current_profile(config_file_path: Path) -> CurrentProfile:
 
 @pytest.fixture
 def profile_service(
-    profile_repository: ResearchProfileRepository,
+    profile_repository: AnalysisProfileRepository,
 ) -> ProfileManagementService:
     """Provide a ProfileManagementService instance."""
     return ProfileManagementService(profile_repository)
@@ -69,7 +69,7 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_create_profile_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
@@ -92,7 +92,7 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_create_profile_with_defaults(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
@@ -109,11 +109,11 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_get_profile_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test getting a profile by ID through use case."""
         # Create a profile first
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.ADVANCED,
             display_name="Advanced Investor",
         )
@@ -131,7 +131,7 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_get_profile_not_found(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test getting a non-existent profile."""
         use_case = GetProfileUseCase(profile_repository)
@@ -144,12 +144,12 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_list_profiles_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test listing profiles through use case."""
         # Create multiple profiles
         for i in range(5):
-            profile = ResearchProfile(
+            profile = AnalysisProfile(
                 financial_literacy=FinancialLiteracy.BEGINNER,
                 display_name=f"Profile {i}",
             )
@@ -161,17 +161,17 @@ class TestProfileUseCases:
         response = await use_case.execute(request)
 
         assert len(response.profiles) == 5
-        assert all(isinstance(p, ResearchProfile) for p in response.profiles)
+        assert all(isinstance(p, AnalysisProfile) for p in response.profiles)
 
     @pytest.mark.asyncio
     async def test_list_profiles_with_pagination(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
     ) -> None:
         """Test listing profiles with pagination."""
         # Create multiple profiles
         for i in range(10):
-            profile = ResearchProfile(
+            profile = AnalysisProfile(
                 financial_literacy=FinancialLiteracy.BEGINNER,
                 display_name=f"Profile {i}",
             )
@@ -187,12 +187,12 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_get_current_profile_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         current_profile: CurrentProfile,
     ) -> None:
         """Test getting the current profile through use case."""
         # Create and set a profile as current
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Current Profile",
         )
@@ -211,7 +211,7 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_get_current_profile_when_none_set(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         current_profile: CurrentProfile,
     ) -> None:
         """Test getting current profile when none is set."""
@@ -225,13 +225,13 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_set_current_profile_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
         """Test setting the current profile through use case."""
         # Create a profile
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.ADVANCED,
             display_name="New Current Profile",
         )
@@ -249,7 +249,7 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_set_current_profile_invalid_id(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
@@ -263,13 +263,13 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_clear_current_profile_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
         """Test clearing the current profile through use case."""
         # Set a profile as current first
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.BEGINNER,
         )
         saved_profile = await profile_repository.save(profile)
@@ -286,13 +286,13 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_delete_profile_use_case(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
         """Test deleting a profile through use case."""
         # Create a profile
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.BEGINNER,
             display_name="To Delete",
         )
@@ -312,13 +312,13 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_delete_current_profile_clears_current(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:
         """Test that deleting the current profile clears it."""
         # Create and set a profile as current
-        profile = ResearchProfile(
+        profile = AnalysisProfile(
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
         )
         saved_profile = await profile_repository.save(profile)
@@ -336,7 +336,7 @@ class TestProfileUseCases:
     @pytest.mark.asyncio
     async def test_delete_profile_not_found(
         self,
-        profile_repository: ResearchProfileRepository,
+        profile_repository: AnalysisProfileRepository,
         profile_service: ProfileManagementService,
         current_profile: CurrentProfile,
     ) -> None:

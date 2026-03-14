@@ -21,7 +21,7 @@ from copinanceos.cli.profile import (
     list_profiles,
     set_current_profile,
 )
-from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
+from copinanceos.domain.models.profile import AnalysisProfile, FinancialLiteracy
 
 
 @pytest.mark.unit
@@ -36,7 +36,7 @@ class TestProfileCLI:
         """Test create profile command."""
         # Setup mocks
         profile_id = uuid4()
-        mock_profile = ResearchProfile(
+        mock_profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Test Profile",
@@ -76,12 +76,12 @@ class TestProfileCLI:
         profile_id1 = uuid4()
         profile_id2 = uuid4()
 
-        mock_profile1 = ResearchProfile(
+        mock_profile1 = AnalysisProfile(
             id=profile_id1,
             financial_literacy=FinancialLiteracy.BEGINNER,
             display_name="Profile 1",
         )
-        mock_profile2 = ResearchProfile(
+        mock_profile2 = AnalysisProfile(
             id=profile_id2,
             financial_literacy=FinancialLiteracy.ADVANCED,
             display_name="Profile 2",
@@ -147,7 +147,7 @@ class TestProfileCLI:
 
         # Setup mocks
         profile_id = uuid4()
-        mock_profile = ResearchProfile(
+        mock_profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.INTERMEDIATE,
             display_name="Test Profile",
@@ -199,7 +199,7 @@ class TestProfileCLI:
 
         # Setup mocks
         profile_id = uuid4()
-        mock_profile = ResearchProfile(
+        mock_profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.ADVANCED,
             display_name="Current Profile",
@@ -247,7 +247,7 @@ class TestProfileCLI:
 
         # Setup mocks
         profile_id = uuid4()
-        mock_profile = ResearchProfile(
+        mock_profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.BEGINNER,
             display_name="Test Profile",
@@ -328,7 +328,7 @@ class TestProfileCLI:
 
         # Setup mocks
         profile_id = uuid4()
-        mock_profile = ResearchProfile(
+        mock_profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.BEGINNER,
             display_name="Test Profile",
@@ -377,7 +377,7 @@ class TestProfileCLI:
 
         # Setup mocks
         profile_id = uuid4()
-        mock_profile = ResearchProfile(
+        mock_profile = AnalysisProfile(
             id=profile_id,
             financial_literacy=FinancialLiteracy.BEGINNER,
             display_name="Test Profile",

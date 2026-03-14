@@ -1,0 +1,702 @@
+# Using Copinance OS as a Library
+
+This guide is for developers who want to integrate Copinance OS into their own Python application (web app, script, or service). The project is a **pure Python library**: no built-in HTTP API or frontend. You get analysis execution, use cases, and data providers; you choose how to expose them.
+
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Core Concepts](#core-concepts)
+- [Quick Start: Run an Analysis](#quick-start-run-an-analysis)
+- [Configuration](#configuration)
+- [Running Analysis (JobRunner)](#running-analysis-jobrunner)
+- [Using Use Cases Directly](#using-use-cases-directly)
+- [Library API Reference](#library-api-reference) — **container entry points, request/response types, all options**
+- [Analysis Profiles](#analysis-profiles)
+- [Storage and Persistence](#storage-and-persistence)
+- [Custom Orchestration](#custom-orchestration)
+- [Error Handling](#error-handling)
+- [Complete Example](#complete-example)
+- [Next Steps](#next-steps)
+
+---
+
+## Requirements
+
+- **Python 3.11+**
+- For **question-driven (AI) analysis**: an LLM provider (e.g. Gemini API key or local Ollama)
+- For **macro analysis** (optional): FRED API key for higher-quality economic data
+
+---
+
+## Installation
+
+Install Copinance OS as a dependency in your project.
+
+**From PyPI (when published):**
+```bash
+pip install copinance-os
+```
+
+**From source (development or git clone):**
+```bash
+pip install -e /path/to/copinance-os
+# or from repo root:
+pip install -e .
+```
+
+**Optional: local LLM (Ollama):**
+```bash
+pip install copinance-os[ollama]
+```
+
+Add to your `requirements.txt` or `pyproject.toml`:
+```
+copinance-os>=0.1.0
+# Optional:
+# copinance-os[ollama]>=0.1.0
+```
+
+---
+
+## Core Concepts
+
+| Concept | Description |
+|--------|-------------|
+| **Container** | Dependency-injection container. You get it via `get_container(...)` and use it to resolve use cases, job runner, and data providers. |
+| **Job** | A single run request: scope (instrument vs market), symbol/index, timeframe, and `execution_type`. Not persisted. |
+| **JobRunner** | Runs a `Job` by finding the right analysis executor and executing it. You can use the default or implement your own. |
+| **Analysis modes** | Deterministic (instrument or market) and question-driven. The job’s internal type determines which pipeline runs. |
+| **Use cases** | Fine-grained operations (search instruments, get quote, create profile, etc.). Use them when you need more control than a full analysis run. |
+
+---
+
+## Quick Start: Run an Analysis
+
+1. **Configure the container** with at least an LLM config if you use question-driven analysis.
+2. **Get the job runner** from the container.
+3. **Build a `Job`** and run it with `await runner.run(job, {})`.
+
+```python
+import asyncio
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinanceos.infrastructure.containers import get_container
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType
+
+async def main():
+    # 1. LLM config is REQUIRED for question-driven analysis; optional for equity/options/macro only
+    llm_config = LLMConfig(
+        provider="gemini",
+        api_key="your-gemini-api-key",
+        model="gemini-1.5-pro",
+    )
+    container = get_container(llm_config=llm_config)
+
+    # 2. Get the default job runner
+    runner = container.job_runner()
+
+    # 3. Run an equity analysis for AAPL
+    job = Job(
+        scope=JobScope.INSTRUMENT,
+        market_type=MarketType.EQUITY,
+        instrument_symbol="AAPL",
+        timeframe=JobTimeframe.MID_TERM,
+        execution_type="deterministic_instrument_analysis",
+    )
+    result = await runner.run(job, {})
+
+    if result.success:
+        print(result.results)
+    else:
+        print("Error:", result.error_message)
+
+asyncio.run(main())
+```
+
+---
+
+## Configuration
+
+### Container: `get_container()`
+
+Get the global container with optional overrides:
+
+```python
+from copinanceos.infrastructure.containers import get_container
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+
+container = get_container(
+    llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"),
+    fred_api_key="your-fred-api-key",  # optional; for macro data
+    load_from_env=True,                # default: try env for LLM if llm_config is None
+    prompt_templates=None,             # optional; see Prompt templates below
+    prompt_manager=None,               # optional; custom PromptManager instance
+    cache_enabled=None,                # optional; True/False or None (use settings)
+    cache_manager=None,                # optional; use your own CacheManager
+)
+```
+
+- **Library usage:** Pass `llm_config` explicitly. Environment variables are used by the CLI; for your app you should provide config in code (or your own config layer).
+- **`fred_api_key`:** Optional. If provided, macro analysis can use FRED for better economic data.
+- **`load_from_env`:** If `True` and `llm_config` is `None`, the container will try to load LLM settings from env (e.g. `COPINANCEOS_GEMINI_API_KEY`). Prefer passing `llm_config` in library code.
+- **`prompt_templates`** / **`prompt_manager`:** Optional. See [Prompt templates](#prompt-templates) below.
+- **`cache_enabled`** / **`cache_manager`:** Optional. See [Cache](#cache) below.
+
+### LLMConfig (required for question-driven analysis)
+
+For **question-driven** analysis you must supply `LLMConfig` when creating the container:
+
+```python
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+
+llm_config = LLMConfig(
+    provider="gemini",           # "gemini" | "ollama" | "openai" | "anthropic"
+    api_key="your-api-key",     # required for cloud providers
+    model="gemini-1.5-pro",     # optional; provider default if omitted
+    temperature=0.7,
+    max_tokens=4096,
+    base_url=None,              # for custom endpoints (e.g. Ollama)
+    execution_type_providers={},  # e.g. {"question_driven_analysis": "gemini"}
+    provider_config={},
+)
+```
+
+See [Configuration](/user-guide/configuration) for provider-specific details and environment variables used by the CLI.
+
+### Cache
+
+The built-in **cache** stores tool results (e.g. quotes, fundamentals) and rendered agent prompts under the configured storage path. Library users can disable it or supply their own cache.
+
+- **Default:** Cache is enabled (see also `COPINANCEOS_CACHE_ENABLED` in [Configuration](/user-guide/configuration)).
+- **Disable cache:** Pass `cache_enabled=False` to `get_container()`. No tool or prompt caching is used; every request hits the providers.
+- **Use your own cache:** Pass `cache_manager=my_cache_manager` to `get_container()`. Your instance must implement the same interface as `CacheManager` (from `copinanceos.infrastructure.cache`). When provided, `cache_enabled` is ignored.
+
+```python
+from copinanceos.infrastructure.containers import get_container
+
+# Disable cache (e.g. for real-time data only)
+container = get_container(llm_config=llm_config, cache_enabled=False)
+
+# Or inject your own CacheManager (e.g. Redis-backed)
+container = get_container(llm_config=llm_config, cache_manager=my_cache_manager)
+```
+
+### Prompt templates
+
+Question-driven (and other LLM) analysis uses **prompt templates** to build system and user prompts. By default, Copinance OS uses built-in templates from the package. As a library user you can **inject your own** so that your app controls wording, tone, and placeholders.
+
+- **If you pass nothing:** The default `PromptManager` is used and all prompts come from package defaults.
+- **If you pass `prompt_templates`:** A dict overlay is used. Keys are prompt names (e.g. `analyze_question_driven`), values follow the [template format](#prompt-template-format) below. Only the names you provide are overridden; any other name falls back to the built-in default.
+- **If you pass `prompt_manager`:** Your own `PromptManager` instance is used for all prompt resolution (e.g. `PromptManager(templates=...)` or `PromptManager(resources_dir=Path("my_prompts"))`).
+
+#### Prompt template format
+
+Each template is an object with exactly two string fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `system_prompt` | string | Instructions and context for the LLM (role, style, constraints). |
+| `user_prompt` | string | The task or query sent as the user message; can include tool descriptions and format rules. |
+
+**Variable substitution:** Use Python-style placeholders `{variable_name}` in either string. When the template is rendered, every placeholder is replaced by the value passed for that name. To include a literal `{` or `}` in the output (e.g. JSON examples in the prompt), escape as `{{` and `}}`.
+
+**In code (dict overlay):**
+
+```python
+{
+    "system_prompt": "You are a financial assistant. User level: {financial_literacy}.",
+    "user_prompt": "Task: {question}\n\nTools:\n{tools_description}\n\nExamples:\n{tool_examples}",
+}
+```
+
+**In a file (`resources_dir`):** One JSON file per prompt name, e.g. `analyze_question_driven.json`:
+
+```json
+{
+  "system_prompt": "You are a financial assistant. User level: {financial_literacy}.",
+  "user_prompt": "Task: {question}\n\nTools:\n{tools_description}\n\nExamples:\n{tool_examples}"
+}
+```
+
+**Question-driven prompt variables:** The built-in question-driven analyze flow uses the prompt name `analyze_question_driven` and supplies these variables when rendering; your custom template must use the same names if you override it:
+
+| Variable | Description |
+|----------|-------------|
+| `question` | The user's question (may be prefixed with symbol context by the executor). |
+| `tools_description` | Text describing available tools. |
+| `tool_examples` | Example tool-call snippets. |
+| `financial_literacy` | `"beginner"`, `"intermediate"`, or `"advanced"`. |
+
+You can import the constant for the prompt name: `ANALYZE_QUESTION_DRIVEN_PROMPT_NAME` from `copinanceos.infrastructure.analyzers.llm.resources`.
+
+#### Example: overlay a single template (question-driven analysis)
+
+```python
+from copinanceos.infrastructure.containers import get_container
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinanceos.infrastructure.analyzers.llm.resources import ANALYZE_QUESTION_DRIVEN_PROMPT_NAME
+
+prompt_templates = {
+    ANALYZE_QUESTION_DRIVEN_PROMPT_NAME: {
+        "system_prompt": "You are a concise financial assistant. User level: {financial_literacy}.",
+        "user_prompt": "Task: {question}\n\nTools:\n{tools_description}\n\nExamples:\n{tool_examples}\n\nRespond with a JSON tool call only.",
+    },
+}
+
+container = get_container(
+    llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"),
+    prompt_templates=prompt_templates,
+)
+```
+
+#### Example: full control with PromptManager
+
+```python
+from pathlib import Path
+from copinanceos.infrastructure.containers import get_container
+from copinanceos.infrastructure.analyzers.llm.resources import PromptManager
+
+# Load custom prompts from a directory (JSON files: analyze_question_driven.json, etc.)
+pm = PromptManager(resources_dir=Path("config/prompts"), use_package_data=True)
+
+container = get_container(
+    llm_config=my_llm_config,
+    prompt_manager=pm,
+)
+```
+
+---
+
+## Running Analysis (JobRunner)
+
+### Job model
+
+Build a `Job` with:
+
+| Field | Description |
+|-------|-------------|
+| `scope` | `JobScope.INSTRUMENT` or `JobScope.MARKET` |
+| `market_type` | `MarketType.EQUITY` or `MarketType.OPTIONS` (for instrument scope) |
+| `instrument_symbol` | e.g. `"AAPL"` (required when scope=INSTRUMENT) |
+| `market_index` | e.g. `"SPY"` (for scope=MARKET; default `"SPY"`) |
+| `timeframe` | `JobTimeframe.SHORT_TERM`, `MID_TERM`, or `LONG_TERM` |
+| `execution_type` | `"deterministic_instrument_analysis"`, `"deterministic_market_analysis"`, `"question_driven_instrument_analysis"`, or `"question_driven_market_analysis"` |
+| `profile_id` | Optional UUID; sets financial literacy and preferences for the run |
+| `parameters` | Optional dict (reserved; built-in executors use the **context** dict passed to `run()` instead) |
+
+### Analysis modes and context
+
+Built-in executors read mode-specific options from the **context** dict (second argument to `runner.run(job, context)`), not from `job.parameters`:
+
+- **`deterministic_instrument_analysis`** — Instrument scope, deterministic equity/options analysis. Context may include `expiration_date` and `option_side` for options.
+- **`deterministic_market_analysis`** — Market scope, deterministic macro regime dashboard. Context includes `market_index`, `lookback_days`, and `include_*` booleans.
+- **`question_driven_instrument_analysis`** — Instrument scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, optional options context, and `include_prompt`.
+- **`question_driven_market_analysis`** — Market scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, `market_index`, and `include_prompt`.
+
+### Example: deterministic and question-driven jobs
+
+```python
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType
+
+# Equity (no extra context)
+job_equity = Job(
+    scope=JobScope.INSTRUMENT,
+    market_type=MarketType.EQUITY,
+    instrument_symbol="AAPL",
+    timeframe=JobTimeframe.MID_TERM,
+    execution_type="deterministic_instrument_analysis",
+)
+
+# Options — pass expiration and side in context
+job_options = Job(
+    scope=JobScope.INSTRUMENT,
+    market_type=MarketType.OPTIONS,
+    instrument_symbol="AAPL",
+    timeframe=JobTimeframe.MID_TERM,
+    execution_type="deterministic_instrument_analysis",
+)
+context_options = {"expiration_date": "2026-06-19", "option_side": "all"}
+
+# Macro — pass market_index and lookback in context
+job_macro = Job(
+    scope=JobScope.MARKET,
+    market_index="SPY",
+    timeframe=JobTimeframe.MID_TERM,
+    execution_type="deterministic_market_analysis",
+)
+context_macro = {"market_index": "SPY", "lookback_days": 180}
+
+# Question-driven analyze — pass question in context (required)
+job_agent = Job(
+    scope=JobScope.INSTRUMENT,
+    market_type=MarketType.EQUITY,
+    instrument_symbol="AAPL",
+    timeframe=JobTimeframe.MID_TERM,
+    execution_type="question_driven_instrument_analysis",
+)
+context_agent = {"question": "What are the key risks?"}
+```
+
+### Run and read result
+
+```python
+runner = container.job_runner()
+# Pass context for options, macro, or question-driven analysis; use {} for equity
+result = await runner.run(job_equity, {})
+# result = await runner.run(job_options, context_options)
+# result = await runner.run(job_agent, context_agent)
+
+# result is RunJobResult
+# result.success: bool
+# result.results: dict | None  — analysis output
+# result.error_message: str | None
+```
+
+All analysis execution is **async**; use `asyncio.run()` or run inside an async framework.
+
+---
+
+## Using Use Cases Directly
+
+When you need a single operation (e.g. search, quote, profile) instead of a full analysis run, use the use cases from the container. Each is a factory: call `container.<use_case>()` to get an instance, then `await use_case.execute(request)`.
+
+### Available use cases
+
+| Use case | Method | Purpose |
+|----------|--------|---------|
+| Search instruments | `search_instruments_use_case()` | Search by name or symbol |
+| Get instrument | `get_instrument_use_case()` | Get cached instrument by symbol |
+| Get quote | `get_quote_use_case()` | Current market quote for a symbol |
+| Get historical data | `get_historical_data_use_case()` | OHLCV history for symbol and date range |
+| Get options chain | `get_options_chain_use_case()` | Options chain for an underlying symbol |
+| Get fundamentals | `get_stock_fundamentals_use_case()` | Fundamentals for a symbol (financials, ratios) |
+| **Analyze instrument** | `analyze_instrument_use_case()` | Progressive instrument analysis (deterministic or question-driven) |
+| **Analyze market** | `analyze_market_use_case()` | Progressive market analysis (deterministic or question-driven) |
+| Create profile | `create_profile_use_case()` | Create analysis profile |
+| Get / list profiles | `get_profile_use_case()`, `list_profiles_use_case()` | Read profiles |
+| Current profile | `get_current_profile_use_case()`, `set_current_profile_use_case()` | Get/set current profile |
+| Delete profile | `delete_profile_use_case()` | Delete a profile |
+
+### Example: search, quote, historical data, options, fundamentals
+
+```python
+from datetime import datetime
+
+from copinanceos.infrastructure.containers import get_container
+from copinanceos.application.use_cases.market import (
+    SearchInstrumentsRequest,
+    GetQuoteRequest,
+    GetHistoricalDataRequest,
+    GetOptionsChainRequest,
+)
+from copinanceos.application.use_cases.fundamentals import GetStockFundamentalsRequest
+
+container = get_container(llm_config=my_llm_config)
+
+# Search by name or symbol
+search_uc = container.search_instruments_use_case()
+search_res = await search_uc.execute(SearchInstrumentsRequest(query="Apple", limit=5))
+for s in search_res.instruments:
+    print(s.symbol, s.name)
+
+# Current quote
+quote_uc = container.get_quote_use_case()
+quote_res = await quote_uc.execute(GetQuoteRequest(symbol="AAPL"))
+# quote_res.quote: dict with current_price, volume, etc.
+
+# Historical OHLCV
+hist_uc = container.get_historical_data_use_case()
+hist_res = await hist_uc.execute(
+    GetHistoricalDataRequest(
+        symbol="AAPL",
+        start_date=datetime(2024, 1, 1),
+        end_date=datetime(2024, 12, 31),
+        interval="1d",
+    )
+)
+# hist_res.data: list of MarketDataPoint
+
+# Options chain
+options_uc = container.get_options_chain_use_case()
+options_res = await options_uc.execute(
+    GetOptionsChainRequest(underlying_symbol="AAPL", expiration_date=None)
+)
+# options_res.chain: OptionsChain (calls, puts, underlying_price, etc.)
+
+# Fundamentals (financial statements, ratios)
+fundamentals_uc = container.get_stock_fundamentals_use_case()
+fund_res = await fundamentals_uc.execute(
+    GetStockFundamentalsRequest(symbol="AAPL", periods=5, period_type="annual")
+)
+# fund_res.fundamentals: StockFundamentals (income_statements, balance_sheets, ratios, etc.)
+```
+
+### Example: progressive analyze
+
+```python
+from copinanceos.application.use_cases.analyze import (
+    AnalyzeInstrumentRequest,
+    AnalyzeMarketRequest,
+)
+from copinanceos.domain.models.market import MarketType
+
+# Deterministic equity analysis
+instrument_uc = container.analyze_instrument_use_case()
+equity_res = await instrument_uc.execute(
+    AnalyzeInstrumentRequest(symbol="AAPL")
+)
+
+# Question-driven options analysis
+options_res = await instrument_uc.execute(
+    AnalyzeInstrumentRequest(
+        symbol="AAPL",
+        market_type=MarketType.OPTIONS,
+        expiration_date="2026-06-19",
+        question="What does skew imply about sentiment?",
+    )
+)
+
+# Deterministic macro / market regime analysis
+market_uc = container.analyze_market_use_case()
+macro_res = await market_uc.execute(
+    AnalyzeMarketRequest(market_index="SPY", lookback_days=90)
+)
+
+# Question-driven market analysis
+market_question_res = await market_uc.execute(
+    AnalyzeMarketRequest(
+        market_index="SPY",
+        question="Is this a risk-on or risk-off regime?",
+    )
+)
+```
+
+---
+
+## Library API Reference
+
+Use this section as a single reference for every option available when using Copinance OS as a library. All request/response types and container entry points are listed with correct module paths.
+
+### Container entry points
+
+Get the container with `get_container(...)` from `copinanceos.infrastructure.containers`. You can pass `prompt_templates` or `prompt_manager` for custom prompts (see [Prompt templates](#prompt-templates)), and `cache_enabled` or `cache_manager` for cache control (see [Cache](#cache)). Then call these methods to obtain use cases, runners, or the job runner:
+
+| Entry point | Method | Returns | Purpose |
+|-------------|--------|---------|--------|
+| **Market** | `container.search_instruments_use_case()` | `SearchInstrumentsUseCase` | Search by name or symbol |
+| | `container.get_instrument_use_case()` | `GetInstrumentUseCase` | Get cached instrument by symbol |
+| | `container.get_quote_use_case()` | `GetQuoteUseCase` | Current quote for a symbol |
+| | `container.get_historical_data_use_case()` | `GetHistoricalDataUseCase` | OHLCV history for symbol/date range |
+| | `container.get_options_chain_use_case()` | `GetOptionsChainUseCase` | Options chain for underlying |
+| | `container.get_stock_fundamentals_use_case()` | `GetStockFundamentalsUseCase` | Fundamentals for a symbol |
+| **Analyze** | `container.analyze_instrument_use_case()` | `AnalyzeInstrumentUseCase` | Progressive instrument analysis |
+| | `container.analyze_market_use_case()` | `AnalyzeMarketUseCase` | Progressive market analysis |
+| **Runners (override these)** | `container.analyze_instrument_runner()` | `AnalyzeInstrumentRunner` impl | Default: builds Job, calls JobRunner |
+| | `container.analyze_market_runner()` | `AnalyzeMarketRunner` impl | Default: builds Job, calls JobRunner |
+| **Job execution** | `container.job_runner()` | `JobRunner` | Run a `Job`; override for custom orchestration |
+| | `container.analysis_executors()` | `list[AnalysisExecutor]` | All registered analysis executors (for custom routing) |
+| **Profiles** | `container.create_profile_use_case()` | `CreateProfileUseCase` | Create analysis profile |
+| | `container.get_profile_use_case()` | `GetProfileUseCase` | Get profile by ID |
+| | `container.list_profiles_use_case()` | `ListProfilesUseCase` | List profiles (paginated) |
+| | `container.get_current_profile_use_case()` | `GetCurrentProfileUseCase` | Get current profile |
+| | `container.set_current_profile_use_case()` | `SetCurrentProfileUseCase` | Set current profile |
+| | `container.delete_profile_use_case()` | `DeleteProfileUseCase` | Delete profile |
+| **Infrastructure** | `container.market_data_provider()` | `MarketDataProvider` | Market data (quote, history, search, options) |
+| | `container.cache_manager()` | `CacheManager` | Cache for tool/CLI data |
+
+**Imports:** Container from `copinanceos.infrastructure.containers`; request/response types from the modules below.
+
+### Market use cases — `copinanceos.application.use_cases.market`
+
+| Use case | Request | Response | Request fields (all optional except noted) |
+|----------|---------|----------|--------------------------------------------|
+| Search instruments | `SearchInstrumentsRequest` | `SearchInstrumentsResponse` | `query` (required), `limit` (default `10`, 1–100), `search_mode` (`InstrumentSearchMode`: `auto` / `symbol` / `general`) |
+| Get instrument | `GetInstrumentRequest` | `GetInstrumentResponse` | `symbol` (required). Response: `instrument: Stock \| None` |
+| Get quote | `GetQuoteRequest` | `GetQuoteResponse` | `symbol` (required). Response: `quote: dict`, `symbol: str` |
+| Get historical data | `GetHistoricalDataRequest` | `GetHistoricalDataResponse` | `symbol`, `start_date`, `end_date` (required; `datetime`), `interval` (default `"1d"`). Response: `data: list[MarketDataPoint]`, `symbol` |
+| Get options chain | `GetOptionsChainRequest` | `GetOptionsChainResponse` | `underlying_symbol` (required), `expiration_date: str \| None` (YYYY-MM-DD). Response: `chain: OptionsChain`, `underlying_symbol` |
+
+**Enum:** `InstrumentSearchMode` in the same module (`auto`, `symbol`, `general`).
+
+### Analyze use cases — `copinanceos.application.use_cases.analyze`
+
+| Use case | Request | Response | Request fields |
+|----------|---------|----------|----------------|
+| Analyze instrument | `AnalyzeInstrumentRequest` | `RunJobResult` | `symbol` (required), `market_type` (`MarketType.EQUITY` / `OPTIONS`, default `EQUITY`), `timeframe` (optional; defaults by market type), `question`, `mode` (`auto` / `deterministic` / `question_driven`), `expiration_date`, `option_side`, `profile_id`, `include_prompt_in_results` |
+| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, `include_prompt_in_results` |
+
+**Ports for custom executors:** `AnalyzeInstrumentRunner` and `AnalyzeMarketRunner` — each: `async def run(self, request: ...Request) -> RunJobResult`.
+
+### Profile use cases — `copinanceos.application.use_cases.profile`
+
+| Use case | Request | Response | Request fields |
+|----------|---------|----------|----------------|
+| Create profile | `CreateProfileRequest` | `CreateProfileResponse` | `financial_literacy` (`FinancialLiteracy.BEGINNER` / `INTERMEDIATE` / `ADVANCED`), `display_name`, `preferences: dict[str, str]` |
+| Get profile | `GetProfileRequest` | `GetProfileResponse` | `profile_id: UUID` |
+| List profiles | `ListProfilesRequest` | `ListProfilesResponse` | `limit` (default `100`), `offset` (default `0`) |
+| Get current profile | `GetCurrentProfileRequest` | `GetCurrentProfileResponse` | (no fields) |
+| Set current profile | `SetCurrentProfileRequest` | `SetCurrentProfileResponse` | `profile_id: UUID \| None` (None clears current) |
+| Delete profile | `DeleteProfileRequest` | `DeleteProfileResponse` | `profile_id: UUID` |
+
+**Type:** `FinancialLiteracy` from `copinanceos.domain.models.profile`.
+
+### Fundamentals use case — `copinanceos.application.use_cases.fundamentals` (market data)
+
+| Use case | Request | Response | Request fields |
+|----------|---------|----------|----------------|
+| Get fundamentals | `GetStockFundamentalsRequest` | `GetStockFundamentalsResponse` | `symbol` (required), `periods` (default `5`), `period_type` (`"annual"` or `"quarterly"`, default `"annual"`). Response: `fundamentals: StockFundamentals` |
+
+### Domain types (jobs and results)
+
+| Type | Module | Use |
+|------|--------|-----|
+| `Job` | `copinanceos.domain.models.job` | Analysis execution context: `scope`, `market_type`, `instrument_symbol`, `market_index`, `timeframe`, `execution_type`, `profile_id` |
+| `RunJobResult` | `copinanceos.domain.models.job` | `success: bool`, `results: dict \| None`, `error_message: str \| None` |
+| `JobScope` | `copinanceos.domain.models.job` | `INSTRUMENT`, `MARKET` |
+| `JobTimeframe` | `copinanceos.domain.models.job` | `SHORT_TERM`, `MID_TERM`, `LONG_TERM` |
+| `MarketType` | `copinanceos.domain.models.market` | `EQUITY`, `OPTIONS` |
+| `OptionSide` | `copinanceos.domain.models.market` | `CALL`, `PUT`, `ALL` |
+| `MarketDataPoint` | `copinanceos.domain.models.market` | OHLCV + symbol, timestamp |
+| `OptionsChain` | `copinanceos.domain.models.market` | `underlying_symbol`, `expiration_date`, `calls`, `puts`, `underlying_price`, etc. |
+| `Stock` | `copinanceos.domain.models.stock` | Instrument entity (symbol, name, exchange, sector, …) |
+
+### Override points
+
+- **Custom analyze execution:** Implement `AnalyzeInstrumentRunner` or `AnalyzeMarketRunner` and override `container.analyze_instrument_runner` or `container.analyze_market_runner` (see [Custom executors and runners](#custom-executors-and-runners)).
+- **Custom job orchestration:** Implement `JobRunner` (port in `copinanceos.domain.ports.analysis_execution`) and override `container.job_runner`.
+
+---
+
+### Using analyze without jobs
+
+You use **analyze** only through the use cases above when you want a clean library API; you never create `Job` or call `JobRunner` yourself. The framework builds jobs internally (via default runners) when needed.
+
+### Custom executors and runners
+
+By default, analyze uses **runners** that build a `Job` and call Copinance OS's **JobRunner** (which uses the built-in analysis executors). You can replace this with your own executor or run analysis without the job abstraction:
+
+1. **Implement the runner port** for the flow you want to customize:
+   - **Instrument analysis:** `AnalyzeInstrumentRunner` in `application.use_cases.analyze` — implement `async def run(self, request: AnalyzeInstrumentRequest) -> RunJobResult`.
+   - **Market analysis:** `AnalyzeMarketRunner` in `application.use_cases.analyze` — implement `async def run(self, request: AnalyzeMarketRequest) -> RunJobResult`.
+
+2. **Override the runner in the container** so the use case uses your implementation:
+
+   ```python
+   from dependency_injector import providers
+   from copinanceos.application.use_cases.analyze import AnalyzeInstrumentRunner
+   from copinanceos.domain.models.job import RunJobResult
+   from copinanceos.infrastructure.containers import get_container
+
+   class MyAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
+       async def run(self, request):
+           # Your executor or direct implementation; no Job
+           return RunJobResult(success=True, results={"analysis": "..."}, error_message=None)
+
+   container = get_container(llm_config=my_llm_config)
+   container.analyze_instrument_runner.override(providers.Factory(MyAnalyzeInstrumentRunner))
+   # analyze_instrument_use_case() will now use MyAnalyzeInstrumentRunner
+   ```
+
+3. **Job-based execution:** If you use jobs (e.g. for queues or batch), you can replace **JobRunner** (e.g. `container.job_runner.override(...)`) so execution uses your own runner and executors.
+
+Request/response types live in the same use case modules (e.g. `application.use_cases.market`, `application.use_cases.analyze`). Use them for type hints and validation.
+
+---
+
+## Analysis Profiles
+
+Profiles store **financial literacy level** and preferences; they are not user accounts. Your app owns users and auth; you map users to profile IDs if you want.
+
+- **Create a profile:** use `create_profile_use_case()` with literacy (e.g. `beginner`, `intermediate`, `advanced`) and optional name.
+- **Attach to a job:** set `job.profile_id` to the profile UUID. The runner will pass literacy and preferences into the analysis context.
+- **Current profile:** the container has a “current profile” (used by CLI). In a library you can ignore it and always set `profile_id` on the job, or use `set_current_profile_use_case()` and leave `profile_id` unset to use current.
+
+---
+
+## Storage and Persistence
+
+By default, the container uses **in-memory** storage (or file storage under `.copinance` when run via CLI). For a long-running app you may want:
+
+- **In-memory:** default; no setup; data is lost when the process exits.
+- **File:** set `COPINANCEOS_STORAGE_TYPE=file` and `COPINANCEOS_STORAGE_PATH` (or equivalent in your config) so the container’s storage backend uses disk.
+
+The library does not impose a database. You can implement the repository and storage ports (see [Developer Guide](/developer-guide/extending)) and wire them into the container if you need PostgreSQL, MongoDB, etc.
+
+---
+
+## Custom Orchestration
+
+The default **JobRunner** finds the executor for the job’s `execution_type`, builds context (e.g. profile), and runs the executor once. You can:
+
+- **Replace the job runner:** implement the `JobRunner` port (interface: `async def run(job, context) -> RunJobResult`) and provide your own (e.g. queue-based, retries, custom routing).
+- **Use analysis executors yourself:** resolve `container.analysis_executors()` and call `validate(job)` / `execute(job, context)` on the executor that validates.
+
+See [Architecture](/developer-guide/architecture) and [Extending](/developer-guide/extending) for ports and extension points.
+
+---
+
+## Error Handling
+
+- **`RunJobResult.success == False`:** Check `result.error_message`. The analysis or an underlying service failed.
+- **`ExecutorNotFoundError`:** No executor registered for the job’s execution type. Ensure the container includes the right executors (e.g. LLM config for question-driven analysis).
+- **`DomainError`:** Base type for domain-level errors (e.g. validation, business rule).
+
+Catch these in your app and map them to your HTTP codes or user messages as needed.
+
+---
+
+## Complete Example
+
+```python
+import asyncio
+from datetime import date
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinanceos.infrastructure.containers import get_container
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType
+
+async def main():
+    llm_config = LLMConfig(
+        provider="gemini",
+        api_key="your-api-key",
+        model="gemini-1.5-pro",
+    )
+    container = get_container(
+        llm_config=llm_config,
+        fred_api_key="your-fred-key",  # optional
+    )
+    runner = container.job_runner()
+
+    # Equity analysis
+    job = Job(
+        scope=JobScope.INSTRUMENT,
+        market_type=MarketType.EQUITY,
+        instrument_symbol="AAPL",
+        timeframe=JobTimeframe.MID_TERM,
+        execution_type="deterministic_instrument_analysis",
+    )
+    result = await runner.run(job, {})
+    if result.success:
+        print("Equity result keys:", result.results.keys())
+    else:
+        print("Error:", result.error_message)
+
+    # Optional: use cases for finer control
+    from copinanceos.application.use_cases.market import SearchInstrumentsRequest
+    search_uc = container.search_instruments_use_case()
+    search_res = await search_uc.execute(SearchInstrumentsRequest(query="Tesla", limit=5))
+    # Use search_res.instruments...
+
+asyncio.run(main())
+```
+
+---
+
+## Next Steps
+
+- [Configuration](/user-guide/configuration) — LLM and FRED setup, env vars, security.
+- [API Reference](/api-reference/data-providers) — Data provider and other interfaces.
+- [Architecture](/developer-guide/architecture) — Hexagonal layout, ports, and container.
+- [Extending](/developer-guide/extending) — Custom data providers, executors, and tests.

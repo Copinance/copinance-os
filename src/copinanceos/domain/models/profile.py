@@ -1,4 +1,4 @@
-"""Research profile domain model."""
+"""Analysis profile domain model."""
 
 from enum import StrEnum
 
@@ -8,20 +8,20 @@ from copinanceos.domain.models.base import Entity
 
 
 class FinancialLiteracy(StrEnum):
-    """Financial literacy levels for research output adaptation."""
+    """Financial literacy levels for analysis output adaptation."""
 
     BEGINNER = "beginner"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
 
 
-class ResearchProfile(Entity):
+class AnalysisProfile(Entity):
     """
-    Research profile entity for contextualizing research output.
+    Analysis profile entity for contextualizing analysis output.
 
-    ResearchProfile provides context for how research
+    AnalysisProfile provides context for how analysis
     should be executed and presented. Integrating applications handle their own
-    user management and map users to research profiles as needed.
+    user management and map users to analysis profiles as needed.
     """
 
     financial_literacy: FinancialLiteracy = Field(
@@ -29,6 +29,6 @@ class ResearchProfile(Entity):
         description="Financial literacy level for output adaptation",
     )
     preferences: dict[str, str] = Field(
-        default_factory=dict, description="Research preferences and defaults"
+        default_factory=dict, description="Analysis preferences and defaults"
     )
     display_name: str | None = Field(None, description="Optional display name for the profile")

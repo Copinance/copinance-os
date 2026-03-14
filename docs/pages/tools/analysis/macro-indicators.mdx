@@ -166,7 +166,7 @@ Forward-looking and specialized economic data.
 ### CLI Usage
 
 ```bash
-# Full macro analysis with all categories
+# Run full macro/market regime analysis with all indicator categories
 copinance analyze macro
 
 # Custom analysis with specific categories
@@ -234,7 +234,7 @@ housing_data = result.data["housing"]
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.containers import get_container
 
-# Configure LLM (required for agent workflows)
+# Configure LLM (required for question-driven analysis)
 llm_config = LLMConfig(
     provider="gemini",
     api_key="your-api-key",
@@ -312,7 +312,7 @@ echo "COPINANCEOS_FRED_API_KEY=your-fred-api-key" >> .env
 - Access to 800,000+ economic time series
 - Official government and central bank data
 - Higher data quality and historical depth
-- No rate limits for research use
+- No rate limits for analysis use
 
 Get your free API key at: https://fred.stlouisfed.org/docs/api/api_key.html
 
@@ -355,7 +355,7 @@ async def get_macro_data(category: str):
     return result.data.get(category, {})
 ```
 
-### Investment Research Workflow
+### Investment analysis
 
 ```python
 # Multi-step investment analysis
@@ -421,4 +421,4 @@ async def comprehensive_research(symbol: str):
 - [CLI Reference](../../user-guide/cli) - Command-line usage
 - [Configuration](../../user-guide/configuration) - Setup and configuration
 - [Data Providers](../data-providers) - Available data sources
-- [Workflows](../../user-guide/workflows) - Integration patterns
+- [Analysis Modes](../../user-guide/analysis-modes) - Integration patterns

@@ -1,10 +1,13 @@
 """Prompt manager for loading and formatting LLM prompts.
 
-This module uses Python's importlib.resources for loading default prompts
-from package data, with support for user overrides via config directory.
+Library clients can inject their own prompt templates. If none are provided,
+Copinance OS uses built-in default templates from package data.
 """
 
+from __future__ import annotations
+
 import json
+from datetime import UTC, datetime
 from importlib import resources
 from pathlib import Path
 from typing import Any, cast
@@ -16,162 +19,138 @@ logger = structlog.get_logger(__name__)
 # Package reference for loading default prompts
 _PACKAGE = "copinanceos.infrastructure.analyzers.llm.resources"
 
+# Well-known prompt names (use these keys when providing custom templates)
+ANALYZE_QUESTION_DRIVEN_PROMPT_NAME = "analyze_question_driven"
+
 
 class PromptManager:
-    """Manages LLM prompt templates loaded from resource files.
+    """Manages LLM prompt templates with optional client overrides.
 
-    Prompts are stored as JSON files with system_prompt and user_prompt fields.
-    Templates support variable substitution using {variable_name} syntax.
+    Templates are identified by name (e.g. ``analyze_question_driven``) and each
+    has ``system_prompt`` and ``user_prompt`` strings. Templates support
+    variable substitution using ``{variable_name}``.
 
-    The manager supports two sources for prompts:
-    1. User overrides: Custom prompts in a user-configurable directory
-    2. Package defaults: Default prompts bundled with the package
+    Resolution order when a prompt is requested:
+    1. In-memory overlay (if provided in ``templates``)
+    2. File in ``resources_dir`` (if provided)
+    3. Package defaults (if ``use_package_data`` is True)
 
-    User overrides take precedence over package defaults.
+    Use ``PromptManager()`` for defaults only, or pass ``templates`` and/or
+    ``resources_dir`` to customize. When using as a library, pass
+    ``prompt_templates`` or ``prompt_manager`` to ``get_container()``.
     """
 
     def __init__(
         self,
+        *,
+        templates: dict[str, dict[str, str]] | None = None,
         resources_dir: Path | None = None,
         use_package_data: bool = True,
     ) -> None:
-        """Initialize prompt manager.
+        """Initialize the prompt manager.
 
         Args:
-            resources_dir: Directory containing custom prompt resource files.
-                          If None, checks for user prompts in default location,
-                          then falls back to package data.
-            use_package_data: If True, fall back to package data if custom
-                            prompts not found. If False, only use custom directory.
+            templates: Optional in-memory overlay. Keys are prompt names
+                (e.g. ``analyze_question_driven``), values are dicts with
+                ``system_prompt`` and ``user_prompt``. Used first when
+                resolving a prompt; missing names fall back to resources_dir
+                or package data.
+            resources_dir: Optional directory containing custom prompt JSON
+                files (e.g. ``analyze_question_driven.json``). Checked after
+                ``templates``, before package data.
+            use_package_data: If True, fall back to built-in package prompts
+                for any name not found in templates or resources_dir.
         """
-        self._custom_resources_dir = Path(resources_dir) if resources_dir else None
+        self._templates = dict(templates) if templates else {}
+        self._resources_dir = Path(resources_dir) if resources_dir else None
         self._use_package_data = use_package_data
         self._prompts_cache: dict[str, dict[str, str]] = {}
 
-        # Determine default user prompts directory
-        if self._custom_resources_dir is None:
-            # Check for user prompts in .copinance/prompts/ (similar to storage pattern)
-            user_prompts_dir = Path.home() / ".copinance" / "prompts"
-            if user_prompts_dir.exists():
-                self._custom_resources_dir = user_prompts_dir
-                logger.info("Using user prompts directory", path=str(user_prompts_dir))
-
-        if self._custom_resources_dir:
+        if self._resources_dir:
             logger.info(
-                "Initialized prompt manager",
-                custom_dir=str(self._custom_resources_dir),
+                "Prompt manager initialized",
+                resources_dir=str(self._resources_dir),
                 use_package_data=use_package_data,
+                overlay_keys=list(self._templates.keys()) or None,
             )
         else:
             logger.info(
-                "Initialized prompt manager",
-                source="package_data",
+                "Prompt manager initialized",
                 use_package_data=use_package_data,
+                overlay_keys=list(self._templates.keys()) or None,
             )
 
     def _load_prompt_file(self, prompt_name: str) -> dict[str, str]:
-        """Load a prompt file from resources.
-
-        Tries custom directory first, then falls back to package data.
-
-        Args:
-            prompt_name: Name of the prompt file (without .json extension)
-
-        Returns:
-            Dictionary with 'system_prompt' and 'user_prompt' keys
-
-        Raises:
-            FileNotFoundError: If prompt file doesn't exist in any location
-            ValueError: If prompt file is invalid
-        """
+        """Load prompt data for a name (overlay → resources_dir → package)."""
         if prompt_name in self._prompts_cache:
             return self._prompts_cache[prompt_name]
 
-        # Try custom directory first (user overrides)
-        if self._custom_resources_dir:
-            custom_file = self._custom_resources_dir / f"{prompt_name}.json"
+        # 1. In-memory overlay
+        if prompt_name in self._templates:
+            data = self._templates[prompt_name]
+            self._validate_prompt_data(data, prompt_name)
+            self._prompts_cache[prompt_name] = dict(data)
+            logger.debug("Loaded prompt from overlay", prompt_name=prompt_name)
+            return self._prompts_cache[prompt_name]
+
+        # 2. resources_dir file
+        if self._resources_dir:
+            custom_file = self._resources_dir / f"{prompt_name}.json"
             if custom_file.exists():
                 try:
                     with open(custom_file, encoding="utf-8") as f:
                         prompt_data = cast(dict[str, str], json.load(f))
                     self._validate_prompt_data(prompt_data, prompt_name)
                     self._prompts_cache[prompt_name] = prompt_data
-                    logger.debug("Loaded prompt from custom directory", prompt_name=prompt_name)
+                    logger.debug(
+                        "Loaded prompt from resources_dir",
+                        prompt_name=prompt_name,
+                        path=str(custom_file),
+                    )
                     return prompt_data
                 except (json.JSONDecodeError, ValueError) as e:
                     logger.warning(
-                        "Failed to load custom prompt, falling back to package data",
+                        "Failed to load prompt from resources_dir, falling back",
                         prompt_name=prompt_name,
                         error=str(e),
                     )
 
-        # Fall back to package data
+        # 3. Package data
         if self._use_package_data:
             try:
                 prompt_data = self._load_from_package(prompt_name)
                 self._prompts_cache[prompt_name] = prompt_data
-                logger.debug("Loaded prompt from package data", prompt_name=prompt_name)
+                logger.debug("Loaded prompt from package", prompt_name=prompt_name)
                 return prompt_data
             except FileNotFoundError:
                 pass
 
-        # If we get here, prompt wasn't found anywhere
         raise FileNotFoundError(
-            f"Prompt file '{prompt_name}.json' not found. "
-            f"Checked: {self._custom_resources_dir if self._custom_resources_dir else 'N/A'}, "
-            f"package data: {self._use_package_data}"
+            f"Prompt '{prompt_name}' not found. "
+            f"Checked: overlay, resources_dir={self._resources_dir}, use_package_data={self._use_package_data}"
         )
 
     def _load_from_package(self, prompt_name: str) -> dict[str, str]:
-        """Load prompt from package data using importlib.resources.
-
-        Uses the modern importlib.resources API (Python 3.9+).
-
-        Args:
-            prompt_name: Name of the prompt file (without .json extension)
-
-        Returns:
-            Dictionary with 'system_prompt' and 'user_prompt' keys
-
-        Raises:
-            FileNotFoundError: If prompt file doesn't exist in package
-            ValueError: If prompt file is invalid
-        """
+        """Load prompt from package data using importlib.resources."""
         try:
-            # Use importlib.resources.files() - modern API (Python 3.9+)
             resource_path = resources.files(_PACKAGE) / f"{prompt_name}.json"
-
-            # as_file() converts Traversable to Path, handling both filesystem and zip imports
             with resources.as_file(resource_path) as prompt_file:
                 with open(prompt_file, encoding="utf-8") as f:
                     prompt_data = cast(dict[str, str], json.load(f))
-
             self._validate_prompt_data(prompt_data, prompt_name)
             return prompt_data
-
         except (FileNotFoundError, ModuleNotFoundError, AttributeError) as e:
-            raise FileNotFoundError(
-                f"Prompt file '{prompt_name}.json' not found in package data"
-            ) from e
+            raise FileNotFoundError(f"Prompt file '{prompt_name}.json' not found in package") from e
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in package prompt file {prompt_name}.json: {e}") from e
+            raise ValueError(f"Invalid JSON in package prompt '{prompt_name}.json': {e}") from e
 
     def _validate_prompt_data(self, prompt_data: dict[str, Any], prompt_name: str) -> None:
-        """Validate prompt data structure.
-
-        Args:
-            prompt_data: The loaded prompt data
-            prompt_name: Name of the prompt file (for error messages)
-
-        Raises:
-            ValueError: If prompt data is invalid
-        """
+        """Validate prompt structure (must have system_prompt and user_prompt)."""
         if not isinstance(prompt_data, dict):
-            raise ValueError(f"Prompt file {prompt_name}.json must contain a JSON object")
-
+            raise ValueError(f"Prompt '{prompt_name}' must be a JSON object")
         if "system_prompt" not in prompt_data or "user_prompt" not in prompt_data:
             raise ValueError(
-                f"Prompt file {prompt_name}.json must contain 'system_prompt' and 'user_prompt' fields"
+                f"Prompt '{prompt_name}' must contain 'system_prompt' and 'user_prompt'"
             )
 
     def get_prompt(
@@ -179,56 +158,45 @@ class PromptManager:
         prompt_name: str,
         **kwargs: Any,
     ) -> tuple[str, str]:
-        """Get formatted prompt with variable substitution.
+        """Return (system_prompt, user_prompt) with variables substituted.
 
         Args:
-            prompt_name: Name of the prompt file (without .json extension)
-            **kwargs: Variables to substitute in the prompt template
+            prompt_name: Name of the prompt (e.g. ``analyze_question_driven``).
+            **kwargs: Variables to substitute in the templates (e.g. question,
+                tools_description, financial_literacy).
 
         Returns:
-            Tuple of (system_prompt, user_prompt) with variables substituted
+            Tuple of (system_prompt, user_prompt) with ``{key}`` replaced by
+            kwargs.
 
         Example:
-            ```python
-            manager = PromptManager()
-            system, user = manager.get_prompt(
-                "agentic_workflow",
-                question="What is the current price of AAPL?",
-                tools_description="...",
-                tool_examples="...",
-                financial_literacy="intermediate",
-            )
-            ```
+            >>> pm = PromptManager()
+            >>> system, user = pm.get_prompt(
+            ...     "analyze_question_driven",
+            ...     question="What is the P/E of AAPL?",
+            ...     tools_description="...",
+            ...     tool_examples="...",
+            ...     financial_literacy="intermediate",
+            ... )
         """
         prompt_data = self._load_prompt_file(prompt_name)
-
+        # Provide default for common template variables when not passed
+        kwargs = dict(kwargs)
+        kwargs.setdefault("current_date", datetime.now(UTC).strftime("%Y-%m-%d"))
         system_prompt = prompt_data["system_prompt"].format(**kwargs)
         user_prompt = prompt_data["user_prompt"].format(**kwargs)
-
         return system_prompt, user_prompt
 
     def get_system_prompt(self, prompt_name: str, **kwargs: Any) -> str:
-        """Get only the system prompt.
-
-        Args:
-            prompt_name: Name of the prompt file
-            **kwargs: Variables to substitute
-
-        Returns:
-            Formatted system prompt
-        """
+        """Return only the system prompt with variables substituted."""
         prompt_data = self._load_prompt_file(prompt_name)
+        kwargs = dict(kwargs)
+        kwargs.setdefault("current_date", datetime.now(UTC).strftime("%Y-%m-%d"))
         return prompt_data["system_prompt"].format(**kwargs)
 
     def get_user_prompt(self, prompt_name: str, **kwargs: Any) -> str:
-        """Get only the user prompt.
-
-        Args:
-            prompt_name: Name of the prompt file
-            **kwargs: Variables to substitute
-
-        Returns:
-            Formatted user prompt
-        """
+        """Return only the user prompt with variables substituted."""
         prompt_data = self._load_prompt_file(prompt_name)
+        kwargs = dict(kwargs)
+        kwargs.setdefault("current_date", datetime.now(UTC).strftime("%Y-%m-%d"))
         return prompt_data["user_prompt"].format(**kwargs)

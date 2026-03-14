@@ -1,4 +1,4 @@
-"""Workflow result data models."""
+"""Tool result data models."""
 
 from __future__ import annotations
 

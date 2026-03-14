@@ -201,13 +201,13 @@ No black boxes. No vendor lock-in. Just code, community, and collaboration.
 Works across timeframes—day trading, swing trading, long-term investing.
 
 ### 5. Human + AI Partnership
-Stock/macro workflows for consistency, agent workflows for adaptability.
+Stock/macro analysis for consistency, agent (question-driven) analysis for adaptability.
 
 ### 6. Data Democracy
 Start with free data, scale as you grow. Your data, your control.
 
 ### 7. Clean Architecture
-Built to last, evolve, and extend with 21+ extension interfaces.
+Built to last, evolve, and extend with 22+ extension interfaces.
 
 ### 8. Quality Over Quantity
 Excellence in core capabilities, extensibility for everything else.

@@ -1,4 +1,4 @@
-"""Macro regime workflow domain models."""
+"""Macro regime domain models."""
 
 from __future__ import annotations
 
@@ -169,29 +169,28 @@ class MacroRegimeIndicatorsData(BaseModel):
 
 
 # Import ToolResult from the tool results
-from copinanceos.domain.models.tool_results import ToolResult
-
 # Import required models for type annotations
-from copinanceos.domain.models.workflows.market_regime import (
+from copinanceos.domain.models.regime.market_regime import (
     MarketRegimeDetectionResult,
     MarketRegimeIndicatorsResult,
 )
+from copinanceos.domain.models.tool_results import ToolResult
 
 
 class MacroRegimeIndicatorsResult(ToolResult[MacroRegimeIndicatorsData]):
     """Result from macro regime indicators tool."""
 
 
-class MacroRegimeWorkflowResult(BaseModel):
-    """Complete result from macro regime workflow execution.
+class MacroRegimeResult(BaseModel):
+    """Complete result from macro regime analysis execution.
 
-    This model represents the complete output structure from the macro workflow,
-    combining market regime indicators, regime detection, and macro indicators.
+    This model represents the complete output structure from the macro regime
+    analysis, combining market regime indicators, regime detection, and macro indicators.
     """
 
-    analysis_type: Literal["macro_and_market_regime_static"] = Field(
-        default="macro_and_market_regime_static",
-        description="Type of analysis performed",
+    execution_mode: Literal["deterministic"] = Field(
+        default="deterministic",
+        description="Execution mode used for this analysis",
     )
     market_index: str = Field(..., description="Market index symbol analyzed (e.g., SPY, QQQ)")
     execution_timestamp: datetime = Field(..., description="When the analysis was executed")
@@ -206,7 +205,7 @@ class MacroRegimeWorkflowResult(BaseModel):
         ..., description="Macro regime indicators (rates, credit, commodities)"
     )
 
-    status: str | None = Field(None, description="Workflow execution status")
-    error: str | None = Field(None, description="Error message if workflow failed")
+    status: str | None = Field(None, description="Analysis execution status")
+    error: str | None = Field(None, description="Error message if execution failed")
 
     model_config = {"extra": "allow"}  # Allow additional fields for future extensibility

@@ -7,8 +7,19 @@ testability and lifecycle management.
 
 from dependency_injector import containers, providers
 
+from copinanceos.application.runners import (
+    DefaultAnalyzeInstrumentRunner,
+    DefaultAnalyzeMarketRunner,
+)
+from copinanceos.application.use_cases.analyze import (
+    AnalyzeInstrumentUseCase,
+    AnalyzeMarketUseCase,
+)
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.analyzers.llm.config_loader import load_llm_config_from_env
+from copinanceos.infrastructure.analyzers.llm.resources import PromptManager
+from copinanceos.infrastructure.cache import CacheManager
+from copinanceos.infrastructure.config import get_settings
 from copinanceos.infrastructure.containers.data_providers import configure_data_providers
 from copinanceos.infrastructure.containers.repositories import configure_repositories
 from copinanceos.infrastructure.containers.services import configure_services
@@ -51,6 +62,9 @@ class Container(containers.DeclarativeContainer):
     llm_config = providers.Configuration()
     fred_api_key_config = providers.Configuration()
 
+    # Prompt templates: default manager (package prompts). Override via get_container().
+    prompt_manager = providers.Singleton(PromptManager)
+
     # Storage backend (singleton, configured from settings)
     storage_backend = configure_storage()
 
@@ -59,11 +73,11 @@ class Container(containers.DeclarativeContainer):
     # So we'll call configure_repositories and assign individually
     _repositories_config = configure_repositories(storage_backend)
     stock_repository = _repositories_config["stock_repository"]
-    research_profile_repository = _repositories_config["research_profile_repository"]
+    profile_repository = _repositories_config["profile_repository"]
     current_profile = _repositories_config["current_profile"]
 
     # Domain services
-    _services_config = configure_services(research_profile_repository)
+    _services_config = configure_services(profile_repository)
     profile_management_service = _services_config["profile_management_service"]
 
     # Data providers (singletons, can be overridden)
@@ -100,8 +114,8 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["llm_analyzer"](),
         config=_data_providers_config,
     )
-    llm_analyzer_for_workflow = providers.Callable(
-        lambda config: config["llm_analyzer_for_workflow"](),
+    llm_analyzer_for_analysis = providers.Callable(
+        lambda config: config["llm_analyzer_for_analysis"](),
         config=_data_providers_config,
     )
 
@@ -109,7 +123,7 @@ class Container(containers.DeclarativeContainer):
     _use_cases_config = providers.Callable(
         configure_use_cases,
         stock_repository=stock_repository,
-        research_profile_repository=research_profile_repository,
+        profile_repository=profile_repository,
         current_profile=current_profile,
         market_data_provider=market_data_provider,
         fundamental_data_provider=fundamental_data_provider,
@@ -118,6 +132,7 @@ class Container(containers.DeclarativeContainer):
         cache_manager=cache_manager,
         profile_management_service=profile_management_service,
         llm_config=llm_config,
+        prompt_manager=prompt_manager,
     )
     get_instrument_use_case = providers.Callable(
         lambda config: config["get_instrument_use_case"](),
@@ -127,8 +142,16 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["search_instruments_use_case"](),
         config=_use_cases_config,
     )
-    get_market_data_use_case = providers.Callable(
-        lambda config: config["get_market_data_use_case"](),
+    get_quote_use_case = providers.Callable(
+        lambda config: config["get_quote_use_case"](),
+        config=_use_cases_config,
+    )
+    get_historical_data_use_case = providers.Callable(
+        lambda config: config["get_historical_data_use_case"](),
+        config=_use_cases_config,
+    )
+    get_options_chain_use_case = providers.Callable(
+        lambda config: config["get_options_chain_use_case"](),
         config=_use_cases_config,
     )
     create_profile_use_case = providers.Callable(
@@ -155,16 +178,33 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["list_profiles_use_case"](),
         config=_use_cases_config,
     )
-    research_stock_fundamentals_use_case = providers.Callable(
-        lambda config: config["research_stock_fundamentals_use_case"](),
-        config=_use_cases_config,
-    )
-    workflow_executors = providers.Callable(
-        lambda config: config["workflow_executors"](),
+    get_stock_fundamentals_use_case = providers.Callable(
+        lambda config: config["get_stock_fundamentals_use_case"](),
         config=_use_cases_config,
     )
     job_runner = providers.Callable(
         lambda config: config["job_runner"](),
+        config=_use_cases_config,
+    )
+    # Runners for analyze (override these to use your own executors; default uses JobRunner)
+    analyze_instrument_runner = providers.Factory(
+        DefaultAnalyzeInstrumentRunner,
+        job_runner=job_runner,
+    )
+    analyze_market_runner = providers.Factory(
+        DefaultAnalyzeMarketRunner,
+        job_runner=job_runner,
+    )
+    analyze_instrument_use_case = providers.Factory(
+        AnalyzeInstrumentUseCase,
+        analyze_instrument_runner=analyze_instrument_runner,
+    )
+    analyze_market_use_case = providers.Factory(
+        AnalyzeMarketUseCase,
+        analyze_market_runner=analyze_market_runner,
+    )
+    analysis_executors = providers.Callable(
+        lambda config: config["analysis_executors"](),
         config=_use_cases_config,
     )
 
@@ -177,6 +217,10 @@ def get_container(
     llm_config: LLMConfig | None = None,
     fred_api_key: str | None = None,
     load_from_env: bool = True,
+    prompt_templates: dict[str, dict[str, str]] | None = None,
+    prompt_manager: PromptManager | None = None,
+    cache_enabled: bool | None = None,
+    cache_manager: CacheManager | None = None,
 ) -> Container:
     """Get the global dependency injection container.
 
@@ -188,6 +232,21 @@ def get_container(
                      API key here.
         load_from_env: If True and llm_config is None, attempt to load LLM config
                       from environment variables (CLI convenience).
+        prompt_templates: Optional overlay of prompt templates. Keys are prompt names
+            (e.g. ``analyze_question_driven``), values are ``{"system_prompt": str, "user_prompt": str}``.
+            Used for question-driven and other analysis executors; missing names fall back to built-in defaults.
+            Ignored if ``prompt_manager`` is provided.
+        prompt_manager: Optional custom PromptManager. If provided, used for all prompt
+            resolution; ``prompt_templates`` is ignored. If neither this nor
+            ``prompt_templates`` is provided, the default PromptManager (package prompts)
+            is used.
+        cache_enabled: If False, disable built-in cache (tool results and agent prompts).
+            If None, uses settings (COPINANCEOS_CACHE_ENABLED, default True). Ignored if
+            ``cache_manager`` is provided.
+        cache_manager: Optional custom CacheManager. If provided, used for tool and
+            prompt caching; ``cache_enabled`` is ignored. Pass your own implementation
+            when using the library with your own caching layer. If you want no cache,
+            pass ``cache_enabled=False`` instead.
 
     Returns:
         Container instance
@@ -208,6 +267,20 @@ def get_container(
         # Override FRED API key if provided (for library integrators)
         if fred_api_key is not None:
             container_instance.fred_api_key_config.override(fred_api_key)
+
+        # Prompt templates: custom manager or overlay; otherwise default
+        if prompt_manager is not None:
+            container_instance.prompt_manager.override(providers.Object(prompt_manager))
+        elif prompt_templates is not None:
+            container_instance.prompt_manager.override(
+                providers.Singleton(PromptManager, templates=prompt_templates)
+            )
+
+        # Cache: custom manager, or disable if cache_enabled=False
+        if cache_manager is not None:
+            container_instance.cache_manager.override(providers.Object(cache_manager))
+        elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
+            container_instance.cache_manager.override(providers.Object(None))
 
         if _container is None:
             _container = container_instance
