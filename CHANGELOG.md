@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rewrote MANIFESTO.md for improved clarity, structure, and messaging around the project's mission and vision.
 - Updated README.md section headers to remove emoji formatting for consistency.
 - Updated market regime detection documentation to include comprehensive guide for Market Regime Indicators Tool.
+- Added `pandas-stubs` to dev dependencies so mypy can type-check pandas usage in market regime tools (fixes CI type-check failures).
 
 ### Removed
 
