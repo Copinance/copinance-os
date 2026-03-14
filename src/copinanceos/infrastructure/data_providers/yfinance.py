@@ -26,7 +26,7 @@ To use a custom provider, simply implement the MarketDataProvider interface:
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -39,8 +39,8 @@ try:
 except ImportError:
     YFINANCE_AVAILABLE = False
     yf = None
-    DataFrame = None
-    pd = None
+    DataFrame = None  # type: ignore[misc, assignment]
+    pd = None  # type: ignore[assignment]
 
 from copinanceos.domain.models.fundamentals import (
     BalanceSheet,
@@ -230,13 +230,14 @@ class YFinanceMarketProvider(MarketDataProvider):
 
             stock_data_list: list[MarketDataPoint] = []
             for timestamp, row in hist.iterrows():
+                ts = (
+                    timestamp.to_pydatetime()
+                    if hasattr(timestamp, "to_pydatetime")
+                    else datetime.fromisoformat(str(timestamp))
+                )
                 stock_data = MarketDataPoint(
                     symbol=symbol.upper(),
-                    timestamp=(
-                        timestamp.to_pydatetime()
-                        if hasattr(timestamp, "to_pydatetime")
-                        else timestamp
-                    ),
+                    timestamp=cast(datetime, ts),
                     open_price=Decimal(str(float(row["Open"]))),
                     close_price=Decimal(str(float(row["Close"]))),
                     high_price=Decimal(str(float(row["High"]))),
@@ -298,13 +299,14 @@ class YFinanceMarketProvider(MarketDataProvider):
 
             stock_data_list: list[MarketDataPoint] = []
             for timestamp, row in hist.iterrows():
+                ts = (
+                    timestamp.to_pydatetime()
+                    if hasattr(timestamp, "to_pydatetime")
+                    else datetime.fromisoformat(str(timestamp))
+                )
                 stock_data = MarketDataPoint(
                     symbol=symbol.upper(),
-                    timestamp=(
-                        timestamp.to_pydatetime()
-                        if hasattr(timestamp, "to_pydatetime")
-                        else timestamp
-                    ),
+                    timestamp=cast(datetime, ts),
                     open_price=Decimal(str(float(row["Open"]))),
                     close_price=Decimal(str(float(row["Close"]))),
                     high_price=Decimal(str(float(row["High"]))),
@@ -575,8 +577,8 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 prop = getattr(ticker, property_name)
                 # If it's a property, access it; if it's a method, call it
                 if callable(prop):
-                    return prop()
-                return prop
+                    return cast(DataFrame, prop())
+                return cast(DataFrame, prop)
 
             statement_df: DataFrame = await loop.run_in_executor(None, _get_statement)
 
