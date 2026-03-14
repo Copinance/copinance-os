@@ -27,9 +27,10 @@ from copinanceos.domain.ports.tools import (
     ToolParameter,
     ToolSchema,
 )
-from copinanceos.domain.ports.workflows import WorkflowExecutor
+from copinanceos.domain.ports.workflows import JobRunner, WorkflowExecutor
 
 __all__ = [
+    "JobRunner",
     # Repositories
     "ResearchProfileRepository",
     "StockRepository",

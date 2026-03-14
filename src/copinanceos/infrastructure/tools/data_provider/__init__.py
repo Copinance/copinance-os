@@ -12,8 +12,9 @@ from copinanceos.infrastructure.tools.data_provider.fundamental_data import (
 )
 from copinanceos.infrastructure.tools.data_provider.market_data import (
     MarketDataGetHistoricalDataTool,
+    MarketDataGetOptionsChainTool,
     MarketDataGetQuoteTool,
-    MarketDataSearchStocksTool,
+    MarketDataSearchInstrumentsTool,
 )
 from copinanceos.infrastructure.tools.data_provider.registry import (
     DataProviderToolRegistry,
@@ -26,7 +27,8 @@ __all__ = [
     # Market data tools
     "MarketDataGetQuoteTool",
     "MarketDataGetHistoricalDataTool",
-    "MarketDataSearchStocksTool",
+    "MarketDataSearchInstrumentsTool",
+    "MarketDataGetOptionsChainTool",
     # Fundamental data tools
     "FundamentalDataGetFundamentalsTool",
     "FundamentalDataGetFinancialStatementsTool",

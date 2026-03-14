@@ -4,21 +4,19 @@ import json
 from pathlib import Path
 from uuid import UUID
 
+from copinanceos.infrastructure.persistence import PERSISTENCE_SCHEMA_VERSION, get_state_dir
 from copinanceos.infrastructure.repositories.storage.factory import create_storage
 from copinanceos.infrastructure.repositories.storage.file import JsonFileStorage
 
 
 def _get_config_path() -> Path:
     """Get the path to the config file."""
-    # Use same base path as storage
     storage = create_storage()
-    # Access _base_path which exists on JsonFileStorage implementation
     if isinstance(storage, JsonFileStorage):
-        base_path = storage._base_path
+        state_dir = get_state_dir(storage._root_path)
     else:
-        base_path = Path(".copinance")
-    base_path.mkdir(parents=True, exist_ok=True)
-    return base_path / "config.json"
+        state_dir = get_state_dir(Path(".copinance"))
+    return state_dir / "app.json"
 
 
 class CurrentProfile:
@@ -37,6 +35,8 @@ class CurrentProfile:
         try:
             with open(config_file) as f:
                 config = json.load(f)
+                if config.get("schema_version") != PERSISTENCE_SCHEMA_VERSION:
+                    return None
                 current_id = config.get("current_profile_id")
                 if current_id:
                     return UUID(current_id)
@@ -64,6 +64,7 @@ class CurrentProfile:
             config.pop("current_profile_id", None)
         else:
             config["current_profile_id"] = str(profile_id)
+        config["schema_version"] = PERSISTENCE_SCHEMA_VERSION
 
         with open(config_file, "w") as f:
             json.dump(config, f, indent=2)

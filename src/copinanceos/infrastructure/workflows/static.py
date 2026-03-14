@@ -1,4 +1,4 @@
-"""Static workflow executor implementation."""
+"""Market instrument workflow executor implementation."""
 
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -9,125 +9,231 @@ from copinanceos.application.use_cases.fundamentals import (
     ResearchStockFundamentalsRequest,
     ResearchStockFundamentalsUseCase,
 )
-from copinanceos.application.use_cases.stock import GetStockRequest, GetStockUseCase
+from copinanceos.application.use_cases.market import GetInstrumentRequest, GetInstrumentUseCase
 from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType, OptionSide
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
 logger = structlog.get_logger(__name__)
 
 
-class StaticWorkflowExecutor(BaseWorkflowExecutor):
-    """Executor for static/predefined workflows.
-
-    This executor performs a consistent, predefined sequence of analysis steps:
-    1. Fetch stock information
-    2. Get current market quote
-    3. Retrieve historical price data (timeframe-dependent)
-    4. Get fundamental data
-    5. Calculate key metrics and trends
-    6. Generate analysis summary
-
-    The workflow adapts to the job timeframe:
-    - Short-term: Focus on recent price movements and technical indicators
-    - Mid-term: Focus on quarterly fundamentals and price trends
-    - Long-term: Focus on annual fundamentals and long-term trends
-    """
+class MarketInstrumentWorkflowExecutor(BaseWorkflowExecutor):
+    """Executor for predefined equity and options workflows."""
 
     def __init__(
         self,
-        get_stock_use_case: GetStockUseCase | None = None,
+        get_instrument_use_case: GetInstrumentUseCase | None = None,
         market_data_provider: MarketDataProvider | None = None,
         fundamentals_use_case: ResearchStockFundamentalsUseCase | None = None,
     ) -> None:
-        """Initialize static workflow executor.
-
-        Args:
-            get_stock_use_case: Use case for getting stock information
-            market_data_provider: Provider for market data (quotes, historical)
-            fundamentals_use_case: Use case for stock fundamentals
-        """
-        self._get_stock_use_case = get_stock_use_case
+        self._get_instrument_use_case = get_instrument_use_case
         self._market_data_provider = market_data_provider
         self._fundamentals_use_case = fundamentals_use_case
 
     async def _execute_workflow(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
-        """
-        Execute a static workflow with predefined analysis steps.
+        if not job.instrument_symbol:
+            raise ValueError("instrument_symbol is required for market instrument workflows")
 
-        Args:
-            job: The job to execute
-            context: Execution context and parameters
+        symbol = job.instrument_symbol.upper()
+        market_type = job.market_type or MarketType.EQUITY
 
-        Returns:
-            Results dictionary containing comprehensive analysis
-        """
-        if not job.stock_symbol:
-            raise ValueError("stock_symbol is required for stock workflow execution")
-        symbol = job.stock_symbol.upper()
-        timeframe = job.timeframe
+        if market_type == MarketType.OPTIONS:
+            return await self._execute_options_workflow(symbol, job.timeframe, context)
+        return await self._execute_equity_workflow(symbol, job.timeframe)
 
-        results: dict[str, Any] = {
-            "analysis_type": "comprehensive_static",
+    async def _execute_equity_workflow(
+        self,
+        symbol: str,
+        timeframe: JobTimeframe,
+    ) -> dict[str, Any]:
+        instrument = await self._get_instrument_info(symbol)
+        quote = await self._get_market_quote(symbol)
+        historical_data = await self._get_historical_data(symbol, timeframe)
+        fundamentals = await self._get_fundamentals(symbol, timeframe)
+        analysis = await self._calculate_equity_analysis(
+            symbol,
+            quote,
+            historical_data,
+            fundamentals,
+            timeframe,
+        )
+
+        return {
+            "workflow_type": MarketType.EQUITY.value,
+            "analysis_type": "instrument_static",
+            "market_type": MarketType.EQUITY.value,
+            "instrument": instrument,
+            "current_quote": quote,
+            "historical_data": historical_data,
+            "fundamentals": fundamentals,
+            "analysis": analysis,
+            "summary": self._generate_equity_summary(
+                instrument,
+                quote,
+                analysis,
+                timeframe,
+            ),
         }
 
-        # Step 1: Get stock information
-        stock_info = await self._get_stock_info(symbol)
-        results["stock_info"] = stock_info
+    async def _execute_options_workflow(
+        self,
+        symbol: str,
+        timeframe: JobTimeframe,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not self._market_data_provider:
+            raise ValueError("MarketDataProvider not available for options workflow execution")
 
-        # Step 2: Get current market quote
+        expiration_date = context.get("expiration_date")
+        requested_side = context.get("option_side", OptionSide.ALL.value)
+        side = OptionSide(requested_side)
+
         quote = await self._get_market_quote(symbol)
-        results["current_quote"] = quote
-
-        # Step 3: Get historical price data (timeframe-dependent)
-        historical_data = await self._get_historical_data(symbol, timeframe)
-        results["historical_data"] = historical_data
-
-        # Step 4: Get fundamental data
-        fundamentals = await self._get_fundamentals(symbol, timeframe)
-        results["fundamentals"] = fundamentals
-
-        # Step 5: Calculate key metrics and trends
-        analysis = await self._calculate_analysis(
-            symbol, quote, historical_data, fundamentals, timeframe
+        options_chain = await self._market_data_provider.get_options_chain(
+            underlying_symbol=symbol,
+            expiration_date=expiration_date,
         )
-        results["analysis"] = analysis
 
-        # Step 6: Generate summary
-        summary = self._generate_summary(stock_info, quote, fundamentals, analysis, timeframe)
-        results["summary"] = summary
+        if side == OptionSide.CALL:
+            selected_contracts = options_chain.calls
+        elif side == OptionSide.PUT:
+            selected_contracts = options_chain.puts
+        else:
+            selected_contracts = [*options_chain.calls, *options_chain.puts]
 
-        return results
+        underlying_price = float(options_chain.underlying_price or 0)
+        total_open_interest = sum(contract.open_interest or 0 for contract in selected_contracts)
+        total_volume = sum(contract.volume or 0 for contract in selected_contracts)
+        iv_values = [
+            float(contract.implied_volatility)
+            for contract in selected_contracts
+            if contract.implied_volatility is not None
+        ]
+        atm_contract = None
+        if underlying_price > 0 and selected_contracts:
+            atm_contract = min(
+                selected_contracts,
+                key=lambda contract: abs(float(contract.strike) - underlying_price),
+            )
 
-    async def _get_stock_info(self, symbol: str) -> dict[str, Any]:
-        """Get stock information."""
-        if not self._get_stock_use_case:
-            logger.warning("GetStockUseCase not available, skipping stock info")
-            return {"symbol": symbol, "note": "Stock info not available"}
+        analysis = {
+            "symbol": symbol,
+            "timeframe": timeframe.value,
+            "expiration_date": options_chain.expiration_date.isoformat(),
+            "side": side.value,
+            "contracts_analyzed": len(selected_contracts),
+            "metrics": {
+                "underlying_price": (
+                    str(options_chain.underlying_price)
+                    if options_chain.underlying_price is not None
+                    else None
+                ),
+                "total_open_interest": total_open_interest,
+                "total_volume": total_volume,
+                "average_implied_volatility": (
+                    str(sum(iv_values) / len(iv_values)) if iv_values else None
+                ),
+                "put_call_open_interest_ratio": self._safe_ratio(
+                    sum(contract.open_interest or 0 for contract in options_chain.puts),
+                    sum(contract.open_interest or 0 for contract in options_chain.calls),
+                ),
+            },
+            "at_the_money_contract": (
+                {
+                    "contract_symbol": atm_contract.contract_symbol,
+                    "side": atm_contract.side.value,
+                    "strike": str(atm_contract.strike),
+                    "last_price": (
+                        str(atm_contract.last_price)
+                        if atm_contract.last_price is not None
+                        else None
+                    ),
+                    "implied_volatility": (
+                        str(atm_contract.implied_volatility)
+                        if atm_contract.implied_volatility is not None
+                        else None
+                    ),
+                    "open_interest": atm_contract.open_interest,
+                    "volume": atm_contract.volume,
+                }
+                if atm_contract
+                else None
+            ),
+        }
+
+        contracts_preview = [
+            {
+                "contract_symbol": contract.contract_symbol,
+                "side": contract.side.value,
+                "strike": str(contract.strike),
+                "last_price": str(contract.last_price) if contract.last_price is not None else None,
+                "bid": str(contract.bid) if contract.bid is not None else None,
+                "ask": str(contract.ask) if contract.ask is not None else None,
+                "volume": contract.volume,
+                "open_interest": contract.open_interest,
+                "implied_volatility": (
+                    str(contract.implied_volatility)
+                    if contract.implied_volatility is not None
+                    else None
+                ),
+                "in_the_money": contract.in_the_money,
+            }
+            for contract in selected_contracts[:10]
+        ]
+
+        return {
+            "workflow_type": MarketType.OPTIONS.value,
+            "analysis_type": "instrument_static",
+            "market_type": MarketType.OPTIONS.value,
+            "current_quote": quote,
+            "options_chain": {
+                "underlying_symbol": options_chain.underlying_symbol,
+                "expiration_date": options_chain.expiration_date.isoformat(),
+                "available_expirations": [
+                    expiration.isoformat() for expiration in options_chain.available_expirations
+                ],
+                "underlying_price": (
+                    str(options_chain.underlying_price)
+                    if options_chain.underlying_price is not None
+                    else None
+                ),
+                "currency": options_chain.currency,
+                "calls_count": len(options_chain.calls),
+                "puts_count": len(options_chain.puts),
+                "contracts_preview": contracts_preview,
+                "metadata": options_chain.metadata,
+            },
+            "analysis": analysis,
+            "summary": self._generate_options_summary(symbol, analysis),
+        }
+
+    async def _get_instrument_info(self, symbol: str) -> dict[str, Any]:
+        if not self._get_instrument_use_case:
+            logger.warning("GetInstrumentUseCase not available, skipping instrument info")
+            return {"symbol": symbol, "note": "Instrument info not available"}
 
         try:
-            request = GetStockRequest(symbol=symbol)
-            response = await self._get_stock_use_case.execute(request)
-
-            if response.stock:
+            response = await self._get_instrument_use_case.execute(
+                GetInstrumentRequest(symbol=symbol)
+            )
+            if response.instrument:
+                instrument = response.instrument
                 return {
-                    "symbol": response.stock.symbol,
-                    "name": response.stock.name,
-                    "exchange": response.stock.exchange,
-                    "sector": response.stock.sector,
-                    "industry": response.stock.industry,
-                    "market_cap": (
-                        str(response.stock.market_cap) if response.stock.market_cap else None
-                    ),
-                    "currency": response.stock.currency,
+                    "symbol": instrument.symbol,
+                    "name": instrument.name,
+                    "exchange": instrument.exchange,
+                    "sector": instrument.sector,
+                    "industry": instrument.industry,
+                    "market_cap": str(instrument.market_cap) if instrument.market_cap else None,
+                    "currency": instrument.currency,
                 }
-            return {"symbol": symbol, "note": "Stock not found in repository"}
+            return {"symbol": symbol, "note": "Instrument not found in repository"}
         except Exception as e:
-            logger.warning("Failed to get stock info", symbol=symbol, error=str(e))
+            logger.warning("Failed to get instrument info", symbol=symbol, error=str(e))
             return {"symbol": symbol, "error": str(e)}
 
     async def _get_market_quote(self, symbol: str) -> dict[str, Any]:
-        """Get current market quote."""
         if not self._market_data_provider:
             logger.warning("MarketDataProvider not available, skipping quote")
             return {"symbol": symbol, "note": "Quote not available"}
@@ -152,34 +258,34 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
             return {"symbol": symbol, "error": str(e)}
 
     async def _get_historical_data(self, symbol: str, timeframe: JobTimeframe) -> dict[str, Any]:
-        """Get historical price data based on timeframe."""
         if not self._market_data_provider:
             logger.warning("MarketDataProvider not available, skipping historical data")
             return {"symbol": symbol, "note": "Historical data not available"}
 
         try:
-            # Determine date range based on timeframe
             end_date = datetime.now(UTC)
             if timeframe == JobTimeframe.SHORT_TERM:
-                start_date = end_date - timedelta(days=30)  # 30 days
+                start_date = end_date - timedelta(days=30)
                 interval = "1d"
             elif timeframe == JobTimeframe.MID_TERM:
-                start_date = end_date - timedelta(days=180)  # 6 months
+                start_date = end_date - timedelta(days=180)
                 interval = "1d"
-            else:  # LONG_TERM
-                start_date = end_date - timedelta(days=365 * 2)  # 2 years
+            else:
+                start_date = end_date - timedelta(days=365 * 2)
                 interval = "1wk"
 
             historical = await self._market_data_provider.get_historical_data(
-                symbol, start_date, end_date, interval
+                symbol,
+                start_date,
+                end_date,
+                interval,
             )
 
             if not historical:
                 return {"symbol": symbol, "data_points": 0, "note": "No historical data available"}
 
-            # Calculate price statistics
-            prices = [float(d.close_price) for d in historical if d.close_price]
-            volumes = [d.volume for d in historical if d.volume]
+            prices = [float(point.close_price) for point in historical if point.close_price]
+            volumes = [point.volume for point in historical if point.volume]
 
             price_stats = {}
             if prices:
@@ -216,30 +322,29 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
             return {"symbol": symbol, "error": str(e)}
 
     async def _get_fundamentals(self, symbol: str, timeframe: JobTimeframe) -> dict[str, Any]:
-        """Get fundamental data based on timeframe."""
         if not self._fundamentals_use_case:
             logger.warning("FundamentalsUseCase not available, skipping fundamentals")
             return {"symbol": symbol, "note": "Fundamentals not available"}
 
         try:
-            # Determine periods and period type based on timeframe
             if timeframe == JobTimeframe.SHORT_TERM:
-                periods = 4  # Last 4 quarters
+                periods = 4
                 period_type = "quarterly"
             elif timeframe == JobTimeframe.MID_TERM:
-                periods = 8  # Last 8 quarters (2 years)
+                periods = 8
                 period_type = "quarterly"
-            else:  # LONG_TERM
-                periods = 5  # Last 5 years
+            else:
+                periods = 5
                 period_type = "annual"
 
-            request = ResearchStockFundamentalsRequest(
-                symbol=symbol, periods=periods, period_type=period_type
+            response = await self._fundamentals_use_case.execute(
+                ResearchStockFundamentalsRequest(
+                    symbol=symbol,
+                    periods=periods,
+                    period_type=period_type,
+                )
             )
-            response = await self._fundamentals_use_case.execute(request)
             fundamentals = response.fundamentals
-
-            # Extract comprehensive fundamental data including full financial statements
             fundamentals_dict: dict[str, Any] = {
                 "symbol": fundamentals.symbol,
                 "company_name": fundamentals.company_name,
@@ -258,266 +363,25 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
                 ),
                 "shares_outstanding": fundamentals.shares_outstanding,
                 "float_shares": fundamentals.float_shares,
-                "income_statements_count": len(fundamentals.income_statements),
-                "balance_sheets_count": len(fundamentals.balance_sheets),
-                "cash_flow_statements_count": len(fundamentals.cash_flow_statements),
                 "metadata": fundamentals.metadata,
             }
-
-            # Add ratios if available
             if fundamentals.ratios:
                 ratios_dict: dict[str, Any] = {}
                 for field_name, field_value in fundamentals.ratios.model_dump().items():
-                    if field_value is not None:
-                        # Keep metadata as dict, convert other fields to string
-                        if field_name == "metadata" and isinstance(field_value, dict):
-                            ratios_dict[field_name] = field_value
-                        else:
-                            ratios_dict[field_name] = str(field_value)
+                    if field_value is None:
+                        continue
+                    ratios_dict[field_name] = (
+                        field_value
+                        if field_name == "metadata" and isinstance(field_value, dict)
+                        else str(field_value)
+                    )
                 fundamentals_dict["ratios"] = ratios_dict
-
-            # Add most recent financial statement summaries (full details)
-            if fundamentals.income_statements:
-                latest_income = fundamentals.income_statements[0]
-                fundamentals_dict["latest_income_statement"] = {
-                    "period": latest_income.period.period_end_date.isoformat(),
-                    "period_type": latest_income.period.period_type,
-                    "fiscal_year": latest_income.period.fiscal_year,
-                    "fiscal_quarter": latest_income.period.fiscal_quarter,
-                    "total_revenue": (
-                        str(latest_income.total_revenue) if latest_income.total_revenue else None
-                    ),
-                    "cost_of_revenue": (
-                        str(latest_income.cost_of_revenue)
-                        if latest_income.cost_of_revenue
-                        else None
-                    ),
-                    "gross_profit": (
-                        str(latest_income.gross_profit) if latest_income.gross_profit else None
-                    ),
-                    "operating_expenses": (
-                        str(latest_income.operating_expenses)
-                        if latest_income.operating_expenses
-                        else None
-                    ),
-                    "operating_income": (
-                        str(latest_income.operating_income)
-                        if latest_income.operating_income
-                        else None
-                    ),
-                    "interest_expense": (
-                        str(latest_income.interest_expense)
-                        if latest_income.interest_expense
-                        else None
-                    ),
-                    "income_before_tax": (
-                        str(latest_income.income_before_tax)
-                        if latest_income.income_before_tax
-                        else None
-                    ),
-                    "income_tax_expense": (
-                        str(latest_income.income_tax_expense)
-                        if latest_income.income_tax_expense
-                        else None
-                    ),
-                    "net_income": (
-                        str(latest_income.net_income) if latest_income.net_income else None
-                    ),
-                    "earnings_per_share": (
-                        str(latest_income.earnings_per_share)
-                        if latest_income.earnings_per_share
-                        else None
-                    ),
-                    "diluted_eps": (
-                        str(latest_income.diluted_eps) if latest_income.diluted_eps else None
-                    ),
-                    "shares_outstanding": latest_income.shares_outstanding,
-                    "diluted_shares": latest_income.diluted_shares,
-                    "metadata": latest_income.metadata,
-                }
-
-            if fundamentals.balance_sheets:
-                latest_balance = fundamentals.balance_sheets[0]
-                fundamentals_dict["latest_balance_sheet"] = {
-                    "period": latest_balance.period.period_end_date.isoformat(),
-                    "period_type": latest_balance.period.period_type,
-                    "fiscal_year": latest_balance.period.fiscal_year,
-                    "fiscal_quarter": latest_balance.period.fiscal_quarter,
-                    # Assets
-                    "cash_and_cash_equivalents": (
-                        str(latest_balance.cash_and_cash_equivalents)
-                        if latest_balance.cash_and_cash_equivalents
-                        else None
-                    ),
-                    "short_term_investments": (
-                        str(latest_balance.short_term_investments)
-                        if latest_balance.short_term_investments
-                        else None
-                    ),
-                    "accounts_receivable": (
-                        str(latest_balance.accounts_receivable)
-                        if latest_balance.accounts_receivable
-                        else None
-                    ),
-                    "inventory": (
-                        str(latest_balance.inventory) if latest_balance.inventory else None
-                    ),
-                    "current_assets": (
-                        str(latest_balance.current_assets)
-                        if latest_balance.current_assets
-                        else None
-                    ),
-                    "property_plant_equipment": (
-                        str(latest_balance.property_plant_equipment)
-                        if latest_balance.property_plant_equipment
-                        else None
-                    ),
-                    "long_term_investments": (
-                        str(latest_balance.long_term_investments)
-                        if latest_balance.long_term_investments
-                        else None
-                    ),
-                    "total_assets": (
-                        str(latest_balance.total_assets) if latest_balance.total_assets else None
-                    ),
-                    # Liabilities
-                    "accounts_payable": (
-                        str(latest_balance.accounts_payable)
-                        if latest_balance.accounts_payable
-                        else None
-                    ),
-                    "short_term_debt": (
-                        str(latest_balance.short_term_debt)
-                        if latest_balance.short_term_debt
-                        else None
-                    ),
-                    "current_liabilities": (
-                        str(latest_balance.current_liabilities)
-                        if latest_balance.current_liabilities
-                        else None
-                    ),
-                    "long_term_debt": (
-                        str(latest_balance.long_term_debt)
-                        if latest_balance.long_term_debt
-                        else None
-                    ),
-                    "total_liabilities": (
-                        str(latest_balance.total_liabilities)
-                        if latest_balance.total_liabilities
-                        else None
-                    ),
-                    # Equity
-                    "common_stock": (
-                        str(latest_balance.common_stock) if latest_balance.common_stock else None
-                    ),
-                    "retained_earnings": (
-                        str(latest_balance.retained_earnings)
-                        if latest_balance.retained_earnings
-                        else None
-                    ),
-                    "total_equity": (
-                        str(latest_balance.total_equity) if latest_balance.total_equity else None
-                    ),
-                    "total_liabilities_and_equity": (
-                        str(latest_balance.total_liabilities_and_equity)
-                        if latest_balance.total_liabilities_and_equity
-                        else None
-                    ),
-                    "metadata": latest_balance.metadata,
-                }
-
-            if fundamentals.cash_flow_statements:
-                latest_cashflow = fundamentals.cash_flow_statements[0]
-                fundamentals_dict["latest_cash_flow_statement"] = {
-                    "period": latest_cashflow.period.period_end_date.isoformat(),
-                    "period_type": latest_cashflow.period.period_type,
-                    "fiscal_year": latest_cashflow.period.fiscal_year,
-                    "fiscal_quarter": latest_cashflow.period.fiscal_quarter,
-                    # Operating Activities
-                    "net_income": (
-                        str(latest_cashflow.net_income) if latest_cashflow.net_income else None
-                    ),
-                    "depreciation_amortization": (
-                        str(latest_cashflow.depreciation_amortization)
-                        if latest_cashflow.depreciation_amortization
-                        else None
-                    ),
-                    "stock_based_compensation": (
-                        str(latest_cashflow.stock_based_compensation)
-                        if latest_cashflow.stock_based_compensation
-                        else None
-                    ),
-                    "changes_in_working_capital": (
-                        str(latest_cashflow.changes_in_working_capital)
-                        if latest_cashflow.changes_in_working_capital
-                        else None
-                    ),
-                    "operating_cash_flow": (
-                        str(latest_cashflow.operating_cash_flow)
-                        if latest_cashflow.operating_cash_flow
-                        else None
-                    ),
-                    # Investing Activities
-                    "capital_expenditures": (
-                        str(latest_cashflow.capital_expenditures)
-                        if latest_cashflow.capital_expenditures
-                        else None
-                    ),
-                    "investments": (
-                        str(latest_cashflow.investments) if latest_cashflow.investments else None
-                    ),
-                    "investing_cash_flow": (
-                        str(latest_cashflow.investing_cash_flow)
-                        if latest_cashflow.investing_cash_flow
-                        else None
-                    ),
-                    # Financing Activities
-                    "debt_issued": (
-                        str(latest_cashflow.debt_issued) if latest_cashflow.debt_issued else None
-                    ),
-                    "debt_repaid": (
-                        str(latest_cashflow.debt_repaid) if latest_cashflow.debt_repaid else None
-                    ),
-                    "dividends_paid": (
-                        str(latest_cashflow.dividends_paid)
-                        if latest_cashflow.dividends_paid
-                        else None
-                    ),
-                    "share_repurchases": (
-                        str(latest_cashflow.share_repurchases)
-                        if latest_cashflow.share_repurchases
-                        else None
-                    ),
-                    "share_issuance": (
-                        str(latest_cashflow.share_issuance)
-                        if latest_cashflow.share_issuance
-                        else None
-                    ),
-                    "financing_cash_flow": (
-                        str(latest_cashflow.financing_cash_flow)
-                        if latest_cashflow.financing_cash_flow
-                        else None
-                    ),
-                    # Net Change
-                    "net_change_in_cash": (
-                        str(latest_cashflow.net_change_in_cash)
-                        if latest_cashflow.net_change_in_cash
-                        else None
-                    ),
-                    "free_cash_flow": (
-                        str(latest_cashflow.free_cash_flow)
-                        if latest_cashflow.free_cash_flow
-                        else None
-                    ),
-                    "metadata": latest_cashflow.metadata,
-                }
-
             return fundamentals_dict
         except Exception as e:
             logger.warning("Failed to get fundamentals", symbol=symbol, error=str(e))
             return {"symbol": symbol, "error": str(e)}
 
-    async def _calculate_analysis(
+    async def _calculate_equity_analysis(
         self,
         symbol: str,
         quote: dict[str, Any],
@@ -525,16 +389,14 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
         fundamentals: dict[str, Any],
         timeframe: JobTimeframe,
     ) -> dict[str, Any]:
-        """Calculate key metrics and trends."""
         analysis: dict[str, Any] = {
             "symbol": symbol,
             "timeframe": timeframe.value,
             "metrics": {},
             "trends": {},
-            "assessments": {},
+            "assessments": [],
         }
 
-        # Price trend analysis
         if historical_data.get("price_statistics"):
             price_stats = historical_data["price_statistics"]
             price_change_pct = float(price_stats.get("price_change_pct", 0))
@@ -544,7 +406,6 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
                 "change_pct": str(price_change_pct),
             }
 
-        # Valuation metrics from fundamentals
         if fundamentals.get("ratios"):
             ratios = fundamentals["ratios"]
             analysis["metrics"]["valuation"] = {
@@ -553,10 +414,6 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
                 "ps_ratio": ratios.get("price_to_sales"),
                 "ev_ebitda": ratios.get("enterprise_value_to_ebitda"),
             }
-
-        # Profitability metrics
-        if fundamentals.get("ratios"):
-            ratios = fundamentals["ratios"]
             analysis["metrics"]["profitability"] = {
                 "gross_margin": ratios.get("gross_margin"),
                 "operating_margin": ratios.get("operating_margin"),
@@ -564,145 +421,67 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
                 "roe": ratios.get("return_on_equity"),
                 "roa": ratios.get("return_on_assets"),
             }
-
-        # Financial health metrics
-        if fundamentals.get("ratios"):
-            ratios = fundamentals["ratios"]
             analysis["metrics"]["financial_health"] = {
                 "current_ratio": ratios.get("current_ratio"),
                 "quick_ratio": ratios.get("quick_ratio"),
                 "debt_to_equity": ratios.get("debt_to_equity"),
                 "interest_coverage": ratios.get("interest_coverage"),
             }
-
-        # Growth metrics
-        if fundamentals.get("ratios"):
-            ratios = fundamentals["ratios"]
             analysis["metrics"]["growth"] = {
                 "revenue_growth": ratios.get("revenue_growth"),
                 "earnings_growth": ratios.get("earnings_growth"),
                 "fcf_growth": ratios.get("free_cash_flow_growth"),
             }
 
-        # Basic assessments
-        assessments = []
-        if quote.get("current_price"):
+        assessments = analysis["assessments"]
+        if quote.get("current_price") and historical_data.get("price_statistics"):
             current_price = float(quote["current_price"])
-            if historical_data.get("price_statistics"):
-                period_high = float(historical_data["price_statistics"].get("period_high", 0))
-                period_low = float(historical_data["price_statistics"].get("period_low", 0))
-                if period_high > 0:
-                    price_position = (current_price - period_low) / (period_high - period_low)
-                    if price_position > 0.8:
-                        assessments.append("Trading near period high")
-                    elif price_position < 0.2:
-                        assessments.append("Trading near period low")
+            period_high = float(historical_data["price_statistics"].get("period_high", 0))
+            period_low = float(historical_data["price_statistics"].get("period_low", 0))
+            if period_high > period_low:
+                price_position = (current_price - period_low) / (period_high - period_low)
+                if price_position > 0.8:
+                    assessments.append("Trading near the upper end of the selected range")
+                elif price_position < 0.2:
+                    assessments.append("Trading near the lower end of the selected range")
 
-        if fundamentals.get("ratios", {}).get("current_ratio"):
-            current_ratio = float(fundamentals["ratios"]["current_ratio"])
-            if current_ratio < 1.0:
-                assessments.append("Current ratio below 1.0 - potential liquidity concern")
-            elif current_ratio > 2.0:
-                assessments.append("Strong current ratio - good liquidity position")
-
-        analysis["assessments"] = assessments
+        current_ratio = fundamentals.get("ratios", {}).get("current_ratio")
+        if current_ratio:
+            current_ratio_value = float(current_ratio)
+            if current_ratio_value < 1.0:
+                assessments.append("Liquidity is tight based on the current ratio")
+            elif current_ratio_value > 2.0:
+                assessments.append("Liquidity looks strong based on the current ratio")
 
         return analysis
 
-    def _generate_summary(
+    def _generate_equity_summary(
         self,
-        stock_info: dict[str, Any],
+        instrument: dict[str, Any],
         quote: dict[str, Any],
-        fundamentals: dict[str, Any],
         analysis: dict[str, Any],
         timeframe: JobTimeframe,
     ) -> dict[str, Any]:
-        """Generate analysis summary."""
         summary_parts = []
-
-        # Company overview
-        if stock_info.get("name"):
-            summary_parts.append(f"Company: {stock_info['name']}")
-        if stock_info.get("sector"):
-            summary_parts.append(f"Sector: {stock_info['sector']}")
-
-        # Current price
+        if instrument.get("name"):
+            summary_parts.append(f"Instrument: {instrument['name']}")
+        if instrument.get("sector"):
+            summary_parts.append(f"Sector: {instrument['sector']}")
         if quote.get("current_price"):
-            price_change = ""
-            if quote.get("previous_close"):
-                prev_close = float(quote["previous_close"])
-                curr_price = float(quote["current_price"])
-                change = curr_price - prev_close
-                change_pct = (change / prev_close * 100) if prev_close > 0 else 0
-                price_change = f" ({change:+.2f}, {change_pct:+.2f}%)"
-            summary_parts.append(f"Current Price: {quote['current_price']}{price_change}")
-
-        # Price trend
+            summary_parts.append(f"Current Price: {quote['current_price']}")
         if analysis.get("trends", {}).get("price_trend"):
             trend = analysis["trends"]["price_trend"]
-            direction = "up" if trend["direction"] == "up" else "down"
             summary_parts.append(
-                f"Price Trend ({timeframe.value}): {direction} {trend['magnitude']:.2f}%"
+                f"Price Trend ({timeframe.value}): {trend['direction']} {trend['magnitude']:.2f}%"
             )
-
-        # Key metrics
-        if analysis.get("metrics", {}).get("valuation", {}).get("pe_ratio"):
-            pe = analysis["metrics"]["valuation"]["pe_ratio"]
-            summary_parts.append(f"P/E Ratio: {pe}")
-
-        if analysis.get("metrics", {}).get("profitability", {}).get("roe"):
-            roe = analysis["metrics"]["profitability"]["roe"]
+        pe_ratio = analysis.get("metrics", {}).get("valuation", {}).get("pe_ratio")
+        if pe_ratio:
+            summary_parts.append(f"P/E Ratio: {pe_ratio}")
+        roe = analysis.get("metrics", {}).get("profitability", {}).get("roe")
+        if roe:
             summary_parts.append(f"ROE: {roe}%")
-
-        # Assessments
-        if analysis.get("assessments"):
-            summary_parts.append("Key Observations:")
-            for assessment in analysis["assessments"]:
-                summary_parts.append(f"  - {assessment}")
-
-        # Analysis Methodology
-        summary_parts.append("")
-        summary_parts.append("Analysis Methodology:")
-        summary_parts.append(
-            "  - Price Trends: (current_price - period_start_price) / period_start_price * 100"
-        )
-        summary_parts.append("  - Valuation Metrics:")
-        summary_parts.append("    • P/E Ratio: current_price / earnings_per_share")
-        summary_parts.append("    • P/B Ratio: current_price / (total_equity / shares_outstanding)")
-        summary_parts.append(
-            "    • P/S Ratio: current_price / (total_revenue / shares_outstanding)"
-        )
-        summary_parts.append(
-            "    • EV/EBITDA: enterprise_value / (operating_income + depreciation)"
-        )
-        summary_parts.append("  - Profitability:")
-        summary_parts.append("    • Gross Margin: (gross_profit / total_revenue) * 100")
-        summary_parts.append("    • Operating Margin: (operating_income / total_revenue) * 100")
-        summary_parts.append("    • Net Margin: (net_income / total_revenue) * 100")
-        summary_parts.append("    • ROE: (net_income / total_equity) * 100")
-        summary_parts.append("    • ROA: (net_income / total_assets) * 100")
-        summary_parts.append("  - Financial Health:")
-        summary_parts.append("    • Current Ratio: current_assets / current_liabilities")
-        summary_parts.append("    • Quick Ratio: (cash + receivables) / current_liabilities")
-        summary_parts.append(
-            "    • Debt to Equity: (short_term_debt + long_term_debt) / total_equity"
-        )
-        summary_parts.append("    • Interest Coverage: operating_income / interest_expense")
-        summary_parts.append("  - Growth Metrics:")
-        summary_parts.append(
-            "    • Revenue Growth: ((current_revenue - previous_revenue) / previous_revenue) * 100"
-        )
-        summary_parts.append(
-            "    • Earnings Growth: ((current_earnings - previous_earnings) / abs(previous_earnings)) * 100"
-        )
-        summary_parts.append(
-            "    • FCF Growth: ((current_fcf - previous_fcf) / abs(previous_fcf)) * 100"
-        )
-        summary_parts.append("  - Assessments:")
-        summary_parts.append(
-            "    • Price Position: (current_price - period_low) / (period_high - period_low)"
-        )
-        summary_parts.append("    • Liquidity: Current Ratio < 1.0 (concern), > 2.0 (strong)")
+        for assessment in analysis.get("assessments", []):
+            summary_parts.append(f"- {assessment}")
 
         return {
             "text": "\n".join(summary_parts),
@@ -710,16 +489,40 @@ class StaticWorkflowExecutor(BaseWorkflowExecutor):
             "analysis_date": datetime.now(UTC).isoformat(),
         }
 
-    async def validate(self, job: Job) -> bool:
-        """Validate if this executor can handle the given job.
+    def _generate_options_summary(self, symbol: str, analysis: dict[str, Any]) -> dict[str, Any]:
+        metrics = analysis["metrics"]
+        summary_parts = [
+            f"Options snapshot for {symbol}",
+            f"Expiration: {analysis['expiration_date']}",
+            f"Contracts analyzed: {analysis['contracts_analyzed']}",
+        ]
+        if metrics.get("underlying_price"):
+            summary_parts.append(f"Underlying Price: {metrics['underlying_price']}")
+        if metrics.get("put_call_open_interest_ratio"):
+            summary_parts.append(
+                f"Put/Call Open Interest Ratio: {metrics['put_call_open_interest_ratio']}"
+            )
+        if metrics.get("average_implied_volatility"):
+            summary_parts.append(
+                f"Average Implied Volatility: {metrics['average_implied_volatility']}"
+            )
+        return {
+            "text": "\n".join(summary_parts),
+            "timeframe": analysis["timeframe"],
+            "analysis_date": datetime.now(UTC).isoformat(),
+        }
 
-        Supports "stock" workflow type, which includes comprehensive
-        fundamentals data along with market data and analysis.
-        """
+    def _safe_ratio(self, numerator: int, denominator: int) -> str | None:
+        if denominator <= 0:
+            return None
+        return str(numerator / denominator)
+
+    async def validate(self, job: Job) -> bool:
         return (
-            job.workflow_type == "stock" and job.scope == JobScope.STOCK and bool(job.stock_symbol)
+            job.scope == JobScope.INSTRUMENT
+            and job.workflow_type in {MarketType.EQUITY.value, MarketType.OPTIONS.value}
+            and bool(job.instrument_symbol)
         )
 
     def get_workflow_type(self) -> str:
-        """Get the workflow type identifier."""
-        return "stock"
+        return "instrument"

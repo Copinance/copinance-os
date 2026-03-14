@@ -1,19 +1,17 @@
-"""Unit tests for Stock domain model."""
+"""Unit tests for equity and market domain models."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
-from copinanceos.domain.models.stock import Stock, StockData
+from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.domain.models.stock import Stock
 
 
 @pytest.mark.unit
 class TestStockModel:
-    """Test Stock domain model."""
-
     def test_create_stock(self) -> None:
-        """Test creating a stock."""
         stock = Stock(
             symbol="AAPL",
             name="Apple Inc.",
@@ -26,9 +24,8 @@ class TestStockModel:
         assert stock.exchange == "NASDAQ"
         assert stock.sector == "Technology"
 
-    def test_stock_data_value_object(self) -> None:
-        """Test StockData value object."""
-        data = StockData(
+    def test_market_data_point_value_object(self) -> None:
+        data = MarketDataPoint(
             symbol="AAPL",
             timestamp=datetime.now(UTC),
             open_price=Decimal("150.00"),

@@ -16,7 +16,7 @@ Select the appropriate interface from `copinanceos.domain.ports.data_providers`:
 
 ```python
 from copinanceos.domain.ports.data_providers import MarketDataProvider
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import MarketDataPoint, OptionsChain
 from datetime import datetime
 from typing import Any
 import httpx
@@ -64,22 +64,28 @@ class AlphaVantageProvider(MarketDataProvider):
         start_date: datetime,
         end_date: datetime,
         interval: str = "1d",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         """Get historical data."""
         # Implementation here
-        # Convert API response to list[StockData]
+        # Convert API response to list[MarketDataPoint]
         return []
 
     async def get_intraday_data(
         self,
         symbol: str,
         interval: str = "1min",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         """Get intraday data."""
         return []
 
-    async def search_stocks(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Search for stocks."""
+    async def search_instruments(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Search for instruments."""
+        return []
+
+    async def get_options_chain(
+        self, underlying_symbol: str, expiration_date: str | None = None
+    ) -> OptionsChain:
+        """Get an options chain."""
         return []
 ```
 
@@ -160,7 +166,7 @@ class MyCustomWorkflow(BaseWorkflowExecutor):
 
 ### 2. Register in Container
 
-Add to workflow executors factory or override in container.
+Add your executor to the workflow executors factory or override in the container. Jobs are run via the `JobRunner` port (default implementation finds an executor and runs it); you can override `container.job_runner` with your own implementation for custom orchestration (e.g. queues, retries).
 
 ## Best Practices
 
@@ -177,5 +183,4 @@ See `src/copinanceos/domain/ports/` for all available interfaces:
 - `analyzers.py` - Analyzer interfaces
 - `strategies.py` - Strategy interfaces
 - `repositories.py` - Repository interfaces
-- `workflows.py` - Workflow interfaces
-
+- `workflows.py` - JobRunner (run a job) and WorkflowExecutor (execute workflow logic) interfaces

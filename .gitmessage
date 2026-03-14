@@ -31,9 +31,9 @@
 #
 # Examples:
 #   feat: add sentiment analysis workflow
-#   fix: correct stock search case sensitivity
+#   fix: correct market search case sensitivity
 #   docs: update API documentation
-#   test: add tests for research orchestrator
+#   test: add tests for workflow executor
 #   refactor: simplify repository interface
 #   chore: update dependencies
 #

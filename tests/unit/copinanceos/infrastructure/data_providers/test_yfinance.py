@@ -14,7 +14,7 @@ from copinanceos.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import MarketDataPoint
 from copinanceos.infrastructure.data_providers.yfinance import (
     YFinanceFundamentalProvider,
     YFinanceMarketProvider,
@@ -223,7 +223,7 @@ class TestYFinanceMarketProvider:
             result = await provider.get_historical_data("AAPL", start_date, end_date)
 
             assert len(result) == 1
-            assert isinstance(result[0], StockData)
+            assert isinstance(result[0], MarketDataPoint)
             assert result[0].symbol == "AAPL"
             assert result[0].open_price == Decimal("100.0")
             assert result[0].close_price == Decimal("101.0")
@@ -320,7 +320,7 @@ class TestYFinanceMarketProvider:
             result = await provider.get_intraday_data("AAPL", interval="1min")
 
             assert len(result) == 1
-            assert isinstance(result[0], StockData)
+            assert isinstance(result[0], MarketDataPoint)
             assert result[0].symbol == "AAPL"
             assert "intraday" in result[0].metadata["data_type"]
 
@@ -360,7 +360,7 @@ class TestYFinanceMarketProvider:
             mock_get_loop.return_value = mock_loop
 
             provider = YFinanceMarketProvider()
-            result = await provider.search_stocks("Apple", limit=10)
+            result = await provider.search_instruments("Apple", limit=10)
 
             assert len(result) == 2
             assert result[0]["symbol"] == "AAPL"
@@ -368,8 +368,8 @@ class TestYFinanceMarketProvider:
             assert result[1]["symbol"] == "MSFT"
 
     @pytest.mark.asyncio
-    async def test_search_stocks_no_results(self) -> None:
-        """Test searching stocks with no results."""
+    async def test_search_instruments_no_results(self) -> None:
+        """Test searching instruments with no results."""
         with (
             patch("copinanceos.infrastructure.data_providers.yfinance.YFINANCE_AVAILABLE", True),
             patch("asyncio.get_event_loop") as mock_get_loop,
@@ -383,14 +383,14 @@ class TestYFinanceMarketProvider:
             mock_get_loop.return_value = mock_loop
 
             provider = YFinanceMarketProvider()
-            result = await provider.search_stocks("NONEXISTENT", limit=10)
+            result = await provider.search_instruments("NONEXISTENT", limit=10)
 
             assert result == []
             mock_logger.debug.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_search_stocks_filters_by_quote_type(self) -> None:
-        """Test that search_stocks filters out non-equity types."""
+    async def test_search_instruments_filters_by_quote_type(self) -> None:
+        """Test that search_instruments filters out non-equity types."""
         with (
             patch("copinanceos.infrastructure.data_providers.yfinance.YFINANCE_AVAILABLE", True),
             patch("asyncio.get_event_loop") as mock_get_loop,
@@ -416,14 +416,14 @@ class TestYFinanceMarketProvider:
             mock_get_loop.return_value = mock_loop
 
             provider = YFinanceMarketProvider()
-            result = await provider.search_stocks("test", limit=10)
+            result = await provider.search_instruments("test", limit=10)
 
             assert len(result) == 1
             assert result[0]["symbol"] == "AAPL"
 
     @pytest.mark.asyncio
-    async def test_search_stocks_handles_exception(self) -> None:
-        """Test search_stocks handles exceptions gracefully."""
+    async def test_search_instruments_handles_exception(self) -> None:
+        """Test search_instruments handles exceptions gracefully."""
         with (
             patch("copinanceos.infrastructure.data_providers.yfinance.YFINANCE_AVAILABLE", True),
             patch("asyncio.get_event_loop") as mock_get_loop,
@@ -434,7 +434,7 @@ class TestYFinanceMarketProvider:
             mock_get_loop.return_value = mock_loop
 
             provider = YFinanceMarketProvider()
-            result = await provider.search_stocks("test", limit=10)
+            result = await provider.search_instruments("test", limit=10)
 
             assert result == []
             mock_logger.warning.assert_called_once()

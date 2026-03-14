@@ -11,4 +11,3 @@ export default {
     href: "https://github.com/copinance/copinance-os/discussions"
   }
 }
-

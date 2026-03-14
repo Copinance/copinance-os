@@ -141,7 +141,7 @@ Copinance OS aims to adapt:
 * explanation
 * guidance
 
-Research shows AI-assisted investing tools reduce emotionally driven sell-offs by 27% in new users [[9]](#references). 
+Research shows AI-assisted investing tools reduce emotionally driven sell-offs by 27% in new users [[9]](#references).
 
 Structured, explainable support works.
 
@@ -164,8 +164,8 @@ The ecosystem is rich:
 
 * [**AlpacaTradingAgent**](https://github.com/huygiatrng/AlpacaTradingAgent)
 * **[TradingAgents](https://github.com/TauricResearch/TradingAgents)**
-* [**TradingAgents-crypto**](https://github.com/auronsun/TradingAgents-crypto) 
-* [**OpenBB Terminal**](https://openbb.co/) 
+* [**TradingAgents-crypto**](https://github.com/auronsun/TradingAgents-crypto)
+* [**OpenBB Terminal**](https://openbb.co/)
 * [**QuantConnect**](https://www.quantconnect.com/)
 * [**FinRL**](https://github.com/AI4Finance-Foundation/FinRL)
 
@@ -263,4 +263,3 @@ If you believe clarity is power —you’re already part of it.
 8. [Dorado. *Navigating Time Poverty in Investment Decision-Making*. 2024.](https://dorado.com.au/navigating-time-poverty-in-investment-decision-making/)
 
 9. [Behavioural Insights Team & Ontario Securities Commission. *AI and Retail Investing*. 2024.](https://www.osc.ca/en/investors/investor-research-and-reports/artificial-intelligence-and-retail-investing)
-

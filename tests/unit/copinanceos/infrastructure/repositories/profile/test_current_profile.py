@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 
 from copinanceos.domain.ports.storage import Storage
+from copinanceos.infrastructure.persistence import PERSISTENCE_SCHEMA_VERSION
 from copinanceos.infrastructure.repositories.profile.current_profile import (
     CurrentProfile,
     _get_config_path,
@@ -27,7 +28,9 @@ def temp_storage_path() -> Path:
 @pytest.fixture
 def config_file_path(temp_storage_path: Path) -> Path:
     """Provide a config file path in temp directory."""
-    return temp_storage_path / "config.json"
+    path = temp_storage_path / "state" / "v2" / "app.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 @pytest.mark.unit
@@ -156,7 +159,10 @@ class TestCurrentProfile:
         config_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write config with invalid UUID
-        config = {"current_profile_id": "not-a-valid-uuid"}
+        config = {
+            "schema_version": PERSISTENCE_SCHEMA_VERSION,
+            "current_profile_id": "not-a-valid-uuid",
+        }
         config_file_path.write_text(json.dumps(config))
 
         # Mock the config path
@@ -176,7 +182,7 @@ class TestCurrentProfile:
         config_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write empty config
-        config_file_path.write_text(json.dumps({}))
+        config_file_path.write_text(json.dumps({"schema_version": PERSISTENCE_SCHEMA_VERSION}))
 
         # Mock the config path
         with patch(
@@ -194,7 +200,11 @@ class TestCurrentProfile:
         config_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write config with other keys
-        config = {"other_key": "value", "another_key": 123}
+        config = {
+            "schema_version": PERSISTENCE_SCHEMA_VERSION,
+            "other_key": "value",
+            "another_key": 123,
+        }
         config_file_path.write_text(json.dumps(config))
 
         # Mock the config path
@@ -213,7 +223,11 @@ class TestCurrentProfile:
         config_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write config with other keys
-        original_config = {"other_key": "value", "another_key": 123}
+        original_config = {
+            "schema_version": PERSISTENCE_SCHEMA_VERSION,
+            "other_key": "value",
+            "another_key": 123,
+        }
         config_file_path.write_text(json.dumps(original_config))
 
         profile_id = uuid4()
@@ -233,6 +247,7 @@ class TestCurrentProfile:
             # Verify other keys are preserved
             with open(config_file_path) as f:
                 updated_config = json.load(f)
+                assert updated_config["schema_version"] == PERSISTENCE_SCHEMA_VERSION
                 assert updated_config["other_key"] == "value"
                 assert updated_config["another_key"] == 123
                 assert updated_config["current_profile_id"] == str(profile_id)
@@ -243,6 +258,7 @@ class TestCurrentProfile:
 
         profile_id = uuid4()
         original_config = {
+            "schema_version": PERSISTENCE_SCHEMA_VERSION,
             "current_profile_id": str(profile_id),
             "other_key": "value",
             "another_key": 123,
@@ -264,6 +280,7 @@ class TestCurrentProfile:
             # Verify other keys are preserved
             with open(config_file_path) as f:
                 updated_config = json.load(f)
+                assert updated_config["schema_version"] == PERSISTENCE_SCHEMA_VERSION
                 assert updated_config["other_key"] == "value"
                 assert updated_config["another_key"] == 123
                 assert "current_profile_id" not in updated_config
@@ -278,8 +295,8 @@ class TestCurrentProfile:
             config_path = _get_config_path()
 
             # Should use storage's base path
-            assert config_path.parent == temp_storage_path
-            assert config_path.name == "config.json"
+            assert config_path.parent == temp_storage_path / "state" / "v2"
+            assert config_path.name == "app.json"
             # Directory should be created
             assert temp_storage_path.exists()
             assert temp_storage_path.is_dir()
@@ -297,8 +314,8 @@ class TestCurrentProfile:
             config_path = _get_config_path()
 
             # Should fall back to default path
-            assert config_path.parent == Path(".copinance")
-            assert config_path.name == "config.json"
+            assert config_path.parent == Path(".copinance") / "state" / "v2"
+            assert config_path.name == "app.json"
 
     def test_get_config_path_creates_directory(self, temp_storage_path: Path) -> None:
         """Test that _get_config_path creates directory if it doesn't exist."""
@@ -316,7 +333,7 @@ class TestCurrentProfile:
             # Directory should be created
             assert temp_storage_path.exists()
             assert temp_storage_path.is_dir()
-            assert config_path.parent == temp_storage_path
+            assert config_path.parent == temp_storage_path / "state" / "v2"
 
     def test_set_current_profile_id_creates_file(self, config_file_path: Path) -> None:
         """Test that set_current_profile_id creates config file if it doesn't exist."""
@@ -347,7 +364,7 @@ class TestCurrentProfile:
 
         # Write config that might cause KeyError in some edge cases
         # This tests the KeyError handling in the except clause
-        config = {}  # Empty dict, but file exists
+        config = {"schema_version": PERSISTENCE_SCHEMA_VERSION}
         config_file_path.write_text(json.dumps(config))
 
         # Mock the config path
@@ -405,5 +422,5 @@ class TestCurrentProfile:
 
             assert retrieved_id == profile_id
             # Verify file was created
-            config_file = temp_storage_path / "config.json"
+            config_file = temp_storage_path / "state" / "v2" / "app.json"
             assert config_file.exists()

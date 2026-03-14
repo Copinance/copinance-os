@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from math import log
 from typing import Any
 
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MarketDataProvider

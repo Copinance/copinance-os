@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 class CacheEntry(BaseModel):
     """Cache entry with metadata."""
 
+    schema_version: str = Field(..., description="Persistence schema version")
     data: Any = Field(..., description="Cached data")
     cached_at: datetime = Field(..., description="Timestamp when data was cached")
     tool_name: str = Field(..., description="Name of the tool that generated this data")

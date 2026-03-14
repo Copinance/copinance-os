@@ -30,7 +30,7 @@ class TestCacheCLI:
         mock_cache_manager.clear.assert_called_once_with(None)
         mock_console.print.assert_called_once()
         call_args = mock_console.print.call_args[0][0]
-        assert "Cleared 5 cache entries" in call_args
+        assert "Cleared 5" in call_args and "cache" in call_args.lower()
 
     @patch("copinanceos.cli.cache.container.cache_manager")
     @patch("copinanceos.cli.cache.console")
@@ -44,57 +44,57 @@ class TestCacheCLI:
         mock_cache_manager_provider.return_value = mock_cache_manager
 
         # Execute
-        clear_cache(tool_name="get_quote")
+        clear_cache(tool_name="get_market_quote")
 
         # Verify
         mock_cache_manager_provider.assert_called_once()
-        mock_cache_manager.clear.assert_called_once_with("get_quote")
+        mock_cache_manager.clear.assert_called_once_with("get_market_quote")
         mock_console.print.assert_called_once()
         call_args = mock_console.print.call_args[0][0]
-        assert "Cleared 3 cache entries for tool: get_quote" in call_args
+        assert "Cleared 3 cache entries for tool: get_market_quote" in call_args
 
     @patch("copinanceos.cli.cache.container.cache_manager")
     @patch("copinanceos.cli.cache.console")
-    def test_refresh_cache_with_symbol(
+    def test_refresh_cache_with_args(
         self, mock_console: MagicMock, mock_cache_manager_provider: MagicMock
     ) -> None:
-        """Test refresh cache command with symbol."""
+        """Test refresh cache command with cache key args."""
         # Setup mocks
         mock_cache_manager = AsyncMock()
         mock_cache_manager.delete = AsyncMock(return_value=True)
         mock_cache_manager_provider.return_value = mock_cache_manager
 
         # Execute
-        refresh_cache(tool_name="get_quote", symbol="AAPL")
+        refresh_cache(tool_name="get_market_quote", args=["symbol=AAPL"])
 
         # Verify
         mock_cache_manager_provider.assert_called_once()
-        mock_cache_manager.delete.assert_called_once_with("get_quote", symbol="AAPL")
+        mock_cache_manager.delete.assert_called_once_with("get_market_quote", symbol="AAPL")
         mock_console.print.assert_called_once()
         call_args = mock_console.print.call_args[0][0]
-        assert "Refreshed cache for get_quote" in call_args
-        assert "symbol: AAPL" in call_args
+        assert "Refreshed cache for get_market_quote" in call_args
+        assert "symbol=AAPL" in call_args
 
     @patch("copinanceos.cli.cache.container.cache_manager")
     @patch("copinanceos.cli.cache.console")
-    def test_refresh_cache_without_symbol(
+    def test_refresh_cache_without_args(
         self, mock_console: MagicMock, mock_cache_manager_provider: MagicMock
     ) -> None:
-        """Test refresh cache command without symbol."""
+        """Test refresh cache command without args."""
         # Setup mocks
         mock_cache_manager = AsyncMock()
         mock_cache_manager.delete = AsyncMock(return_value=True)
         mock_cache_manager_provider.return_value = mock_cache_manager
 
         # Execute
-        refresh_cache(tool_name="get_quote", symbol=None)
+        refresh_cache(tool_name="get_market_quote", args=[])
 
         # Verify
         mock_cache_manager_provider.assert_called_once()
-        mock_cache_manager.delete.assert_called_once_with("get_quote")
+        mock_cache_manager.delete.assert_called_once_with("get_market_quote")
         mock_console.print.assert_called_once()
         call_args = mock_console.print.call_args[0][0]
-        assert "Refreshed cache for get_quote" in call_args
+        assert "Refreshed cache for get_market_quote" in call_args
 
     @patch("copinanceos.cli.cache.container.cache_manager")
     @patch("copinanceos.cli.cache.console")
@@ -108,14 +108,14 @@ class TestCacheCLI:
         mock_cache_manager_provider.return_value = mock_cache_manager
 
         # Execute
-        refresh_cache(tool_name="get_quote", symbol="AAPL")
+        refresh_cache(tool_name="get_market_quote", args=["symbol=AAPL"])
 
         # Verify
         mock_cache_manager_provider.assert_called_once()
-        mock_cache_manager.delete.assert_called_once_with("get_quote", symbol="AAPL")
+        mock_cache_manager.delete.assert_called_once_with("get_market_quote", symbol="AAPL")
         mock_console.print.assert_called_once()
         call_args = mock_console.print.call_args[0][0]
-        assert "No cache entry found for get_quote" in call_args
+        assert "No cache entry found for get_market_quote" in call_args
 
     @patch("copinanceos.cli.cache.container.cache_manager")
     @patch("copinanceos.cli.cache.console")

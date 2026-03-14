@@ -360,9 +360,9 @@ async def get_macro_data(category: str):
 ```python
 # Multi-step investment analysis
 async def comprehensive_research(symbol: str):
-    # 1. Get individual stock analysis
-    stock_analysis = await stock_tool.execute(symbol=symbol)
-    
+    # 1. Get individual instrument analysis
+    instrument_analysis = await instrument_tool.execute(symbol=symbol)
+
     # 2. Get macro economic context
     macro_analysis = await macro_tool.execute(
         include_rates=True,
@@ -370,9 +370,9 @@ async def comprehensive_research(symbol: str):
         include_labor=True,
         include_consumer=True
     )
-    
+
     # 3. Combine for investment recommendation
-    return generate_recommendation(stock_analysis, macro_analysis)
+    return generate_recommendation(instrument_analysis, macro_analysis)
 ```
 
 ## Best Practices

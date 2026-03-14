@@ -3,4 +3,3 @@ export default {
   "analysis": "Analysis Tools",
   "data-providers": "Data Provider Tools"
 }
-

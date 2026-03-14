@@ -1,24 +1,10 @@
-"""Stock domain models."""
+"""Equity-specific domain models."""
 
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import Field
 
-from copinanceos.domain.models.base import Entity, ValueObject
-
-
-class StockData(ValueObject):
-    """Value object representing stock market data at a point in time."""
-
-    symbol: str = Field(..., description="Stock ticker symbol")
-    timestamp: datetime = Field(..., description="Data timestamp")
-    open_price: Decimal = Field(..., description="Opening price")
-    close_price: Decimal = Field(..., description="Closing price")
-    high_price: Decimal = Field(..., description="Highest price")
-    low_price: Decimal = Field(..., description="Lowest price")
-    volume: int = Field(..., description="Trading volume")
-    metadata: dict[str, str] = Field(default_factory=dict, description="Additional metadata")
+from copinanceos.domain.models.base import Entity
 
 
 class Stock(Entity):

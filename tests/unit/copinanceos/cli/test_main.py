@@ -10,8 +10,8 @@ from copinanceos.cli import (
     app,
     ask_app,
     cache_app,
+    market_app,
     profile_app,
-    stock_app,
     version,
 )
 
@@ -51,7 +51,7 @@ class TestMainCLI:
         # Verify app is a Typer instance
         assert app is not None
         # Verify sub-commands are registered
-        # The app should have stock, profile, analyze, ask, cache sub-commands
+        # The app should have market, profile, analyze, ask, cache sub-commands
         assert hasattr(app, "registered_commands") or hasattr(app, "commands")
 
 
@@ -59,12 +59,12 @@ class TestMainCLI:
 class TestCLIIntegration:
     """Test CLI integration and command registration."""
 
-    def test_stock_app_registered(self) -> None:
-        """Test that stock app is registered."""
+    def test_market_app_registered(self) -> None:
+        """Test that market app is registered."""
 
-        # Verify stock_app exists
-        assert stock_app is not None
-        # The app should have stock commands registered
+        # Verify market_app exists
+        assert market_app is not None
+        # The app should have market commands registered
         # This is a structural test to ensure the app is properly configured
         assert app is not None
 

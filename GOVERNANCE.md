@@ -4,7 +4,7 @@ This document outlines the governance model for the Copinance OS project.
 
 ## Project Mission
 
-Copinance OS aims to democratize financial research by providing an open-source, extensible framework that makes institutional-grade stock research accessible to everyone, regardless of their financial resources or technical expertise.
+Copinance OS aims to democratize financial research by providing an open-source, extensible framework that makes institutional-grade market research accessible to everyone, regardless of their financial resources or technical expertise.
 
 See our [MANIFESTO.md](MANIFESTO.md) for the complete vision.
 

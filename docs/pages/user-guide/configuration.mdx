@@ -82,7 +82,7 @@ export COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 ### 3. Verify
 
 ```bash
-copinance ask "What is the current price?" --symbol AAPL
+copinance ask "What is the current price?" --instrument AAPL
 ```
 
 If configured correctly, you'll see AI analysis. If not, check:
@@ -263,7 +263,7 @@ export COPINANCEOS_OLLAMA_MODEL=llama2
 ### 3. Verify
 
 ```bash
-copinance ask "What is the current price?" --symbol AAPL
+copinance ask "What is the current price?" --instrument AAPL
 ```
 
 ### Per-Workflow Provider Configuration
@@ -298,7 +298,7 @@ llm_config = LLMConfig(
 container = get_container(llm_config=llm_config)
 
 # Use the container
-use_case = container.get_stock_use_case()
+use_case = container.get_instrument_use_case()
 # ... integrate into your application
 ```
 
@@ -364,4 +364,3 @@ This allows you to:
 - **Flexibility**: Different configurations for different parts of your application
 - **Testability**: Easy to mock and test with different configurations
 - **Type Safety**: Full type checking support with dataclasses
-

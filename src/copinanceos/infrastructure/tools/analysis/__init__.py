@@ -1,6 +1,6 @@
-"""Analysis tools for stock research.
+"""Analysis tools for market research.
 
-This module provides tools for analyzing stock data, including market regime detection,
+This module provides tools for analyzing market data, including market regime detection,
 technical analysis, and other analytical functions.
 """
 

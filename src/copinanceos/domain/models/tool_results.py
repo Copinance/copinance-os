@@ -16,4 +16,4 @@ class ToolResult(BaseModel, Generic[T]):
     success: bool = Field(..., description="Whether tool execution succeeded")
     data: T | None = Field(default=None, description="Tool execution result data")
     error: str | None = Field(default=None, description="Error message if execution failed")
-    metadata: Any = Field(default_factory=dict, description="Additional metadata")
+    metadata: Any = Field(default_factory=lambda: {}, description="Additional metadata")

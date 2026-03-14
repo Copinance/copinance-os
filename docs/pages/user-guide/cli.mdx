@@ -2,6 +2,17 @@
 
 Complete guide to using the Copinance OS command-line interface.
 
+## Command Overview
+
+| Command | Description |
+|--------|-------------|
+| `copinance version` | Show version |
+| `copinance market` | Market data (search, quote, history, options) |
+| `copinance profile` | Research profiles (create, list, get, current, set-current, delete) |
+| `copinance analyze` | One-off analysis (market equity/options, macro) |
+| `copinance ask` | Agentic Q&A (instrument or market-wide) |
+| `copinance cache` | Cache management (clear, refresh, info) |
+
 ## Running Commands
 
 **After installation:**
@@ -14,20 +25,70 @@ copinance <command>
 python -m copinanceos.cli <command>
 ```
 
-## Stock Commands
-
-### Search Stocks
-
-Search for stocks by symbol or company name.
+## Version
 
 ```bash
-copinance stock search "Apple"
-copinance stock search "AAPL" --limit 5
+copinance version
+```
+
+## Market Commands
+
+### Search Instruments
+
+Search market instruments by symbol or display name.
+
+```bash
+copinance market search "Apple"
+copinance market search "AAPL" --limit 5 --mode symbol
 ```
 
 **Options:**
-- `--limit <number>`: Maximum results (default: 10)
-- `--type <type>`: Search type - `auto`, `symbol`, or `general`
+- `--limit <number>`: Maximum results (default: `10`)
+- `--mode <mode>`: Search mode - `auto`, `symbol`, or `general`
+
+### Current Quote
+
+Fetch the latest market quote for an instrument. Uses the same cache as agent tools.
+
+```bash
+copinance market quote AAPL
+copinance market quote SPY --no-cache
+```
+
+**Options:**
+- `--no-cache`: Bypass cache and fetch fresh data
+
+### Historical Data
+
+Fetch historical OHLCV data for an instrument and date range. Uses the same cache as agent tools.
+
+```bash
+copinance market history AAPL --start 2026-01-01 --end 2026-03-14
+copinance market history SPY --start 2026-03-01 --end 2026-03-14 --interval 1h --limit 0
+```
+
+**Options:**
+- `--start <date>`: Start date in `YYYY-MM-DD`
+- `--end <date>`: End date in `YYYY-MM-DD`
+- `--interval <interval>`: One of `1d`, `1wk`, `1mo`, `1h`, `5m`, `15m`, `30m`, `60m`
+- `--limit <number>`: Maximum rows to display (default: `0` = show all)
+- `--no-cache`: Bypass cache and fetch fresh data
+
+### Options Chain Snapshot
+
+Fetch an options chain for an underlying symbol. Uses the same cache as agent tools; with `--side all`, calls and puts are interleaved so a small limit shows both.
+
+```bash
+copinance market options AAPL
+copinance market options AAPL --expiration 2026-06-19 --side call
+copinance market options MSTR --side all --limit 20 --no-cache
+```
+
+**Options:**
+- `--expiration <date>`: Expiration date in `YYYY-MM-DD`
+- `--side <side>`: `call`, `put`, or `all`
+- `--limit <number>`: Maximum contracts to show (default: `0` = show all)
+- `--no-cache`: Bypass cache and fetch fresh data
 
 ## Profile Commands
 
@@ -61,15 +122,11 @@ copinance profile get <profile-id>
 copinance profile current
 ```
 
-Shows the currently active profile (if any).
-
 ### Set Current Profile
 
 ```bash
 copinance profile set-current <profile-id>
 ```
-
-Set a profile as the current default. Omit the profile ID to clear the current profile.
 
 ### Delete Profile
 
@@ -79,21 +136,37 @@ copinance profile delete <profile-id> --force
 
 ## Analyze Commands
 
-Run one-off analysis. Results are saved under `.copinance/results/`; profiles and cache live under `.copinance`.
+Run one-off analysis. Results are saved under `.copinance/results/v2/`; profiles, cache, and state live under versioned subdirectories inside `.copinance`.
 
-### Analyze a Stock
+### Analyze an Equity
+
+Run a predefined equity analysis (instrument info, quote, history, fundamentals, summary).
 
 ```bash
-copinance analyze stock AAPL --timeframe mid_term
+copinance analyze market equity AAPL --timeframe mid_term
+copinance analyze market equity AAPL --timeframe long_term --profile-id <id>
 ```
 
 **Options:**
-- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
-- `--profile-id <id>`: Profile ID for context (optional)
+- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
+- `--profile-id <id>`: Profile ID for context
+
+### Analyze Options
+
+Run a predefined options analysis (underlying quote, options chain summary, open interest, volume, implied volatility).
+
+```bash
+copinance analyze market options AAPL
+copinance analyze market options AAPL --expiration 2026-06-19 --side put --timeframe short_term
+```
+
+**Options:**
+- `--expiration <date>`: Optional expiration date (YYYY-MM-DD)
+- `--side <side>`: `call`, `put`, or `all`
+- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
+- `--profile-id <id>`: Profile ID for context
 
 ### Macro + Market Regime
-
-Run the combined macro + market regime workflow to get a comprehensive view of market conditions.
 
 ```bash
 copinance analyze macro
@@ -101,98 +174,104 @@ copinance analyze macro --market-index QQQ --lookback-days 90
 ```
 
 **Options:**
-- `--market-index <symbol>`: Anchor market index (`SPY`, `QQQ`, `DIA`, `IWM`) (default: `SPY`)
-- `--lookback-days <days>`: Lookback window (default: `252`)
-- `--include-*` / `--no-include-*`: Toggle indicator groups (VIX, breadth, sectors, rates, credit, commodities, labor, housing, manufacturing, consumer, global, advanced)
+- `--market-index <symbol>`: Anchor market index (`SPY`, `QQQ`, `DIA`, `IWM`)
+- `--lookback-days <days>`: Lookback window
+- `--include-*` / `--no-include-*`: Toggle indicator groups
 
 ## Ask (Agentic)
 
-Ask questions using the agent workflow.
+Ask questions using the agent workflow. The agent can use tools (quotes, historical data, options chain, fundamentals, macro indicators) to answer. Requires LLM configuration (see [Configuration](configuration)).
 
-**Stock-specific:**
+**Usage:** Pass the question with `-q` / `--question` (quote long text). Options can be in any order.
+
+**Equity (instrument):**
 ```bash
-copinance ask "What are the key risks for this stock?" --symbol AAPL
+copinance ask -q "What are the key risks for this equity?" -i AAPL
+copinance ask --question "Summarize recent price action and fundamentals." -i AAPL --timeframe short_term
 ```
 
-**Market-wide (no symbol):**
+**Options (instrument):** Ask about specific stock options data. Use `--market-type options` and optionally `--expiration` and `--side` so the agent gets options context and can fetch the options chain.
+
 ```bash
-copinance ask "What is the current market sentiment and which sectors are leading?"
-copinance ask "What is the current VIX level and market fear sentiment?" --market-index SPY
+copinance ask -q "What's the put/call open interest for AAPL?" -i AAPL --market-type options
+copinance ask -q "Summarize AAPL options for June 2026" -i AAPL --market-type options --expiration 2026-06-19
+copinance ask -q "What are the most active calls?" -i AAPL --market-type options --side call
+copinance ask -q "What does options data say about pricing and sentiment?" -i MSTR --market-type options --expiration 2026-06-19
+```
+
+**Market-wide:**
+```bash
+copinance ask -q "What is the current market sentiment and which sectors are leading?"
+copinance ask -q "What is the current VIX level and market fear sentiment?" -m SPY
+copinance ask -q "How are rates and credit spreads trending?" -m SPY
 ```
 
 **Options:**
-- `--symbol <symbol>` / `-s <symbol>`: Stock symbol (omit for market-wide)
-- `--market-index <symbol>` / `-m <symbol>`: Anchor index for market-wide questions (default: `SPY`)
-- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
-- `--profile-id <id>`: Profile ID for context (optional)
+- `--question` / `-q`: Question text (required). Quote long questions.
+- `--instrument <symbol>` / `-i <symbol>`: Instrument symbol (omit for market-wide)
+- `--market-type <type>`: `equity` or `options` (for instrument questions)
+- `--expiration <date>`: Optional options expiration hint (YYYY-MM-DD)
+- `--side <side>`: Optional options side hint: `call`, `put`, or `all`
+- `--market-index <symbol>` / `-m <symbol>`: Anchor index for market-wide questions (default: SPY)
+- `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
+- `--profile-id <id>`: Profile ID for context
+- `--show-prompt`: Also display the prompt used for the question (system and user parts) before the answer.
 
-**Note:**
-- Requires LLM provider configuration (Gemini API key or Ollama setup) - see [Configuration](configuration)
-
-## Examples
-
-### Basic Workflow
-
+**Example with prompt visible:**
 ```bash
-# 1. Search for a stock
-copinance stock search "Apple"
-
-# 2. Create a profile
-copinance profile create --literacy intermediate --name "Trader"
-
-# 3. Run a stock analysis (one-off)
-copinance analyze stock AAPL --timeframe mid_term
+copinance ask -q "What does options data say about pricing?" -i MSTR --market-type options --show-prompt
 ```
 
 ## Cache Commands
 
-Copinance OS includes a built-in caching system to reduce API calls and improve performance.
+Copinance OS caches tool results (quotes, history, options chain, etc.) and stores instrument data. Cache reduces API calls and speeds up repeated requests.
 
 ### Clear Cache
 
-Clear cached tool data:
+Clears cached tool data and stored instrument/market data (e.g. under `.copinance/cache/` and `.copinance/data/`). Does not clear profiles or workflow results.
 
 ```bash
-# Clear all cache
 copinance cache clear
-
-# Clear cache for a specific tool
-copinance cache clear --tool <tool-name>
+copinance cache clear --tool get_market_quote
+copinance cache clear --tool get_options_chain
 ```
+
+**Options:**
+- `--tool <name>`: Clear cache for a specific tool only (e.g. `get_market_quote`, `get_historical_market_data`, `get_options_chain`)
 
 ### Refresh Cache
 
-Refresh (delete) cache for a specific tool to force fresh data on next call:
+Delete a specific cache entry so the next call fetches fresh data.
 
 ```bash
-# Refresh cache for a tool
-copinance cache refresh <tool-name>
-
-# Refresh cache for a tool with a specific symbol
-copinance cache refresh <tool-name> --symbol AAPL
+copinance cache refresh get_market_quote --arg symbol=AAPL
+copinance cache refresh get_options_chain --arg underlying_symbol=SPY --arg expiration_date=2026-06-19
+copinance cache refresh get_historical_market_data --arg symbol=AAPL --arg start_date=2026-01-01 --arg end_date=2026-03-14 --arg interval=1d
 ```
 
-### Cache Information
+**Options:**
+- `--arg key=value`: Cache parameter (repeat for multiple). Must match the tool’s cache key (e.g. `symbol`, `underlying_symbol`, `expiration_date`).
 
-View cache configuration and status:
+### Cache Information
 
 ```bash
 copinance cache info
 ```
 
-This shows:
-- Cache backend type
-- Cache directory location (under `.copinance/cache`)
+Shows backend, tool cache directory, and stored data directory.
 
-All CLI data (profiles, cache, stock search cache, and workflow results in `.copinance/results/`) is stored under the `.copinance` folder in the current directory (or path set by `COPINANCEOS_STORAGE_PATH`).
+---
+
+All CLI data is stored under the `.copinance` folder (or `COPINANCEOS_STORAGE_PATH`) using versioned subdirectories: `data/v2`, `cache/v2`, `results/v2`, `state/v2`.
 
 ## Getting Help
 
 ```bash
 copinance --help
+copinance version
+copinance market --help
+copinance profile --help
 copinance analyze --help
 copinance ask --help
-copinance profile --help
 copinance cache --help
 ```
-

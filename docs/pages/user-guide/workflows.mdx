@@ -1,231 +1,127 @@
 # Workflows
 
-Copinance OS supports multiple types of workflows for stock research.
+Copinance OS supports multiple workflow types for market research.
 
-## Static Workflows
+## Static Instrument Workflows
 
 Static workflows follow a predefined analysis pipeline with consistent steps.
 
-### What It Does
+### Equity Workflow
 
-1. Fetches stock information
-2. Gets current market quote
-3. Retrieves historical price data (timeframe-dependent)
-4. Gets fundamental data
+What it does:
+1. Fetches instrument information
+2. Gets the current quote
+3. Retrieves historical price data
+4. Gets equity fundamentals
 5. Calculates key metrics and trends
-6. Generates analysis summary
+6. Generates a summary
 
-### When to Use
-
-- ✅ Consistent, repeatable analysis
-- ✅ No API key required
-- ✅ Fast execution
-- ✅ Comprehensive coverage
-
-### Example
+Example:
 
 ```bash
-copinance analyze stock AAPL --timeframe mid_term
+copinance analyze market equity AAPL --timeframe mid_term
+```
+
+### Options Workflow
+
+What it does:
+1. Fetches the current underlying quote
+2. Loads the options chain for the selected expiration
+3. Summarizes open interest, volume, and implied volatility
+4. Highlights the at-the-money contract
+
+Example:
+
+```bash
+copinance analyze market options AAPL --expiration 2026-06-19
 ```
 
 ## Agentic Workflows
 
-Agentic workflows use AI to dynamically analyze stocks based on your questions.
+Agentic workflows use AI to dynamically analyze market instruments or the market based on your questions. The agent can use tools (quotes, historical data, options chain, fundamentals, macro indicators) to answer.
 
-### What It Does
-
-1. Understands your question
-2. Selects appropriate tools (data providers)
-3. Gathers relevant data
-4. Analyzes and synthesizes information
-5. Provides tailored answer adapted to your financial literacy level
-
-### When to Use
-
-- ✅ Custom questions and analysis
-- ✅ Adaptive to specific needs
-- ✅ Natural language interaction
-- ✅ Personalized responses based on financial literacy level
-- ⚠️ Requires Gemini API key
-
-### Example
-
+**Equity:**
 ```bash
-copinance ask "What are the key financial risks?" --symbol AAPL
+copinance ask -q "What are the key financial risks?" -i AAPL
 ```
 
-### Setup Required
+**Options:** Ask about specific stock options data; use `--market-type options` and optionally `--expiration` and `--side` so the agent gets options context and can fetch the options chain.
+```bash
+copinance ask -q "How is the options chain positioned?" -i AAPL --market-type options
+copinance ask -q "What's the put/call open interest for AAPL?" -i AAPL --market-type options --expiration 2026-06-19
+copinance ask -q "What are the most active calls?" -i AAPL --market-type options --side call
+```
 
-See [Configuration](configuration) for setting up Gemini API key.
+**Market-wide:**
+```bash
+copinance ask -q "What is the current market sentiment?" -m SPY
+```
+
+See [CLI Reference - Ask](cli#ask-agentic) for all options. Use `--show-prompt` to display the system and user prompt used for the question before the answer.
 
 ## Timeframes
 
-Both workflow types adapt to the timeframe:
+Both static and agentic workflows adapt to the timeframe:
 
 ### Short-term
-- **Focus**: Recent price movements, technical indicators
-- **Data**: Last 30 days, daily intervals
-- **Use case**: Trading decisions
+- **Focus**: Recent price movements, short-dated options context, technical indicators
+- **Data**: Last 30 days
 
 ### Mid-term
 - **Focus**: Quarterly fundamentals, price trends
-- **Data**: Last 6 months, daily intervals
-- **Use case**: Swing trading
+- **Data**: Last 6 months
 
 ### Long-term
 - **Focus**: Annual fundamentals, long-term trends
-- **Data**: Last 2 years, weekly intervals
-- **Use case**: Investment decisions
-
-## Fundamentals Workflows
-
-Fundamentals workflows focus specifically on fundamental analysis and financial metrics.
-
-### What It Does
-
-1. Retrieves comprehensive fundamental data
-2. Analyzes financial statements
-3. Calculates key financial ratios
-4. Provides fundamental metrics and trends
-
-### When to Use
-
-- ✅ Deep fundamental analysis
-- ✅ Financial statement review
-- ✅ Ratio analysis
-- ✅ No API key required
-
-### Example
-
-```bash
-copinance analyze stock AAPL --timeframe long_term
-```
-
-## Choosing a Workflow
-
-**Use Static if:**
-- You want consistent, comprehensive analysis
-- You don't have an API key
-- You need fast results
-
-**Use Agentic if:**
-- You have specific questions
-- You want adaptive analysis
-- You have an API key configured
-
-**Use Fundamentals if:**
-- You need detailed financial analysis
-- You want to focus on financial statements and ratios
-- You don't need AI-powered insights
+- **Data**: Last 2 years
 
 ## One-off Execution
 
-All workflow runs are one-off: `copinance analyze` and `copinance ask` run workflows without persisting jobs. Each run saves results to `.copinance/results/` as JSON. Profiles and cached tool data also live under `.copinance`. Use `copinance cache clear` to clear cached tool data.
+All workflow runs are one-off: `copinance analyze` and `copinance ask` run workflows without persisting jobs. Each run saves results to `.copinance/results/v2/` as versioned JSON envelopes. Profiles and cached tool data also live under versioned subdirectories in `.copinance`.
 
 ### Example Workflows
 
 ```bash
-# Stock analysis (one-off)
-copinance analyze stock AAPL --timeframe mid_term
+# Equity analysis
+copinance analyze market equity AAPL --timeframe mid_term
 
-# Macro regime (one-off)
+# Options analysis
+copinance analyze market options AAPL --expiration 2026-06-19
+
+# Macro regime
 copinance analyze macro --market-index SPY
 
-# Agentic Q&A (one-off)
-copinance ask "What are the key risks?" --symbol AAPL
+# Agentic Q&A (equity)
+copinance ask -q "What are the key risks?" -i AAPL
+
+# Agentic Q&A (options)
+copinance ask -q "Summarize AAPL options for June 2026" -i AAPL --market-type options --expiration 2026-06-19
 ```
 
 ## Macro Regime Workflow
 
-The macro regime workflow combines market regime indicators with macroeconomic data to provide a comprehensive view of market conditions. Use the dedicated CLI command for easy access.
+The macro regime workflow combines market regime indicators with macroeconomic data to provide a comprehensive view of market conditions.
 
 ### Quick Start
 
 ```bash
-# Full analysis with defaults
 copinance analyze macro
 ```
 
 ### Customization
 
-**Market Index:**
-Choose which market index to analyze:
 ```bash
-copinance analyze macro --market-index SPY    # S&P 500 (default)
-copinance analyze macro --market-index QQQ    # Nasdaq 100
-copinance analyze macro --market-index DIA    # Dow Jones
-copinance analyze macro --market-index IWM    # Russell 2000
+copinance analyze macro --market-index QQQ --lookback-days 90
+copinance analyze macro --no-include-vix --no-include-market-breadth --no-include-sector-rotation
 ```
 
-**Lookback Period:**
-Adjust the analysis window:
-```bash
-copinance analyze macro --lookback-days 90    # 3 months
-copinance analyze macro --lookback-days 252   # 1 year (default)
-copinance analyze macro --lookback-days 504   # 2 years
-```
+### Data Sources
 
-**Indicator Selection:**
-All indicator groups are on by default. Use `--no-include-<name>` to exclude any category. Available: `vix`, `market-breadth`, `sector-rotation`, `rates`, `credit`, `commodities`, `labor`, `housing`, `manufacturing`, `consumer`, `global`, `advanced`.
-
-```bash
-# Macro-only: exclude market/volatility/sector to focus on economic indicators
-copinance analyze macro \
-  --no-include-vix \
-  --no-include-market-breadth \
-  --no-include-sector-rotation
-
-# Only market regime indicators (exclude macro categories)
-copinance analyze macro \
-  --no-include-rates \
-  --no-include-credit \
-  --no-include-commodities
-```
-
-### What It Analyzes
-
-**Market Regime Indicators:**
-- **VIX**: Volatility index measuring market fear
-- **Market Breadth**: Advancing vs declining stocks
-- **Sector Rotation**: Which sectors are leading/lagging
-
-**Macro Indicators:**
-- **Rates**: 10Y Treasury yields, yield curve analysis
-- **Credit**: Credit spreads (HYG, LQD)
-- **Commodities**: Energy prices (oil, natural gas)
-- **Labor, Housing, Manufacturing, Consumer, Global**: Employment, housing, PMI, consumer sentiment, and global indicators (when enabled)
-- **Advanced**: Leading Economic Index (LEI), Federal Reserve balance sheet, and CDS proxies (HYG, LQD) for credit risk—uses FRED when available, else yfinance
-
-**Data Sources:**
-- Macro indicators prefer FRED API (if `COPINANCEOS_FRED_API_KEY` configured) for true yields/spreads
-- Falls back to yfinance proxies if FRED unavailable
-- Market regime indicators use yfinance
-
-### Use Cases
-
-- **Market Regime Detection**: Identify bull/bear markets, volatility regimes
-- **Macro Environment**: Understand interest rate environment, credit conditions
-- **Sector Analysis**: See which sectors are rotating in/out of favor
-- **Risk Assessment**: Combine volatility (VIX) with credit spreads for risk-on/risk-off signals
-
-### Examples
-
-```bash
-# Quick market check
-copinance analyze macro --lookback-days 90
-
-# Deep dive on Nasdaq
-copinance analyze macro --market-index QQQ --lookback-days 504
-
-# Focus on macro conditions
-copinance analyze macro \
-  --no-include-vix \
-  --no-include-market-breadth \
-  --no-include-sector-rotation
-```
+- Macro indicators prefer FRED API when configured
+- Fallback proxies use yfinance where needed
+- Market regime indicators use yfinance market data
 
 ## Next Steps
 
 - [CLI Reference](cli) - Command details
 - [Configuration](configuration) - Setting up API keys
-

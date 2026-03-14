@@ -1,6 +1,7 @@
-"""Stock repository implementation."""
+"""Equity instrument repository implementation."""
 
-from copinanceos.domain.models.stock import Stock, StockData
+from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.domain.models.stock import Stock
 from copinanceos.domain.ports.repositories import StockRepository
 from copinanceos.domain.ports.storage import Storage
 from copinanceos.infrastructure.repositories.storage.factory import create_storage
@@ -24,9 +25,8 @@ class StockRepositoryImpl(StockRepository):
         if storage is None:
             storage = create_storage()
         self._storage = storage
-        self._stocks = self._storage.get_collection("stocks", Stock)
-        # Stock data is stored separately as it's a list per symbol
-        self._stock_data: dict[str, list[StockData]] = {}
+        self._stocks = self._storage.get_collection("market/instruments/equities", Stock)
+        self._market_data: dict[str, list[MarketDataPoint]] = {}
 
     async def get_by_symbol(self, symbol: str) -> Stock | None:
         """Get stock by symbol."""
@@ -38,7 +38,7 @@ class StockRepositoryImpl(StockRepository):
         return None
 
     async def search(self, query: str, limit: int = 10) -> list[Stock]:
-        """Search stocks by query."""
+        """Search equity instruments by query."""
         query_lower = query.lower()
         results = [
             stock
@@ -48,12 +48,12 @@ class StockRepositoryImpl(StockRepository):
         return results[:limit]
 
     async def save(self, stock: Stock) -> Stock:
-        """Save or update stock."""
+        """Save or update equity instrument."""
         self._stocks[stock.id] = stock
-        self._storage.save("stocks")
+        self._storage.save("market/instruments/equities")
         return stock
 
-    async def get_stock_data(self, symbol: str, limit: int = 100) -> list[StockData]:
-        """Get historical stock data."""
-        data = self._stock_data.get(symbol.upper(), [])
+    async def get_market_data(self, symbol: str, limit: int = 100) -> list[MarketDataPoint]:
+        """Get historical market data."""
+        data = self._market_data.get(symbol.upper(), [])
         return data[:limit]

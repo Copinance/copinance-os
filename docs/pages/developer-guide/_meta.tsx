@@ -3,4 +3,3 @@ export default {
   "extending": "Extending",
   "testing": "Testing"
 }
-

@@ -8,58 +8,111 @@ from uuid import UUID
 import typer
 from rich.console import Console
 
-from copinanceos.application.use_cases.workflow import RunWorkflowRequest
 from copinanceos.cli.error_handler import handle_cli_error
 from copinanceos.cli.profile_context import ensure_profile_with_literacy
 from copinanceos.cli.utils import async_command, save_workflow_results
-from copinanceos.domain.models.job import JobScope, JobTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType, OptionSide
 from copinanceos.infrastructure.config import get_settings
 from copinanceos.infrastructure.containers import container
 
-analyze_app = typer.Typer(help="Run one-off analysis (results saved to .copinance/results/)")
+analyze_app = typer.Typer(
+    help="Run one-off analysis (results saved under the versioned results directory)"
+)
+market_analyze_app = typer.Typer(help="Analyze a market instrument")
+analyze_app.add_typer(market_analyze_app, name="market")
 console = Console()
 
 
-@analyze_app.command("stock")
+def _print_workflow_response(response: Any) -> None:
+    if response.success and response.results:
+        console.print("\n✓ Completed", style="bold green")
+        saved = save_workflow_results(response.results, get_settings().storage_path)
+        if saved:
+            console.print(f"Results saved to [cyan]{saved}[/cyan]")
+        console.print("\n[bold]Results:[/bold]")
+        for key, value in response.results.items():
+            if key not in {"analysis", "tool_calls"}:
+                console.print(f"  {key}: {value}")
+    elif not response.success:
+        console.print("\n✗ Failed", style="bold red")
+        console.print(f"Error: {response.error_message}")
+    else:
+        console.print("\n✓ Completed", style="bold green")
+
+
+@market_analyze_app.command("equity")
 @async_command
-async def analyze_stock(
-    symbol: str = typer.Argument(..., help="Stock symbol"),
+async def analyze_equity(
+    symbol: str = typer.Argument(..., help="Equity symbol"),
     timeframe: JobTimeframe = typer.Option(JobTimeframe.MID_TERM, help="Analysis timeframe"),
     profile_id: UUID | None = typer.Option(None, help="Profile ID for context (optional)"),
 ) -> None:
-    """Run the static stock workflow. Results are saved to .copinance/results/."""
+    """Run the static equity workflow."""
     final_profile_id = await ensure_profile_with_literacy(profile_id)
-
-    use_case = container.run_workflow_use_case()
+    job = Job(
+        scope=JobScope.INSTRUMENT,
+        market_type=MarketType.EQUITY,
+        instrument_symbol=symbol,
+        market_index=None,
+        timeframe=timeframe,
+        workflow_type=MarketType.EQUITY.value,
+        profile_id=final_profile_id,
+        error_message=None,
+    )
     try:
-        with console.status("[bold blue]Analyzing stock..."):
-            response = await use_case.execute(
-                RunWorkflowRequest(
-                    scope=JobScope.STOCK,
-                    stock_symbol=symbol,
-                    market_index=None,
-                    timeframe=timeframe,
-                    workflow_type="stock",
-                    profile_id=final_profile_id,
-                    context={},
-                )
-            )
-        if response.success and response.results:
-            console.print("\n✓ Completed", style="bold green")
-            saved = save_workflow_results(response.results, get_settings().storage_path)
-            if saved:
-                console.print(f"Results saved to [cyan]{saved}[/cyan]")
-            console.print("\n[bold]Results:[/bold]")
-            for key, value in response.results.items():
-                if key not in {"analysis", "tool_calls"}:
-                    console.print(f"  {key}: {value}")
-        elif not response.success:
-            console.print("\n✗ Failed", style="bold red")
-            console.print(f"Error: {response.error_message}")
-        else:
-            console.print("\n✓ Completed", style="bold green")
+        with console.status("[bold blue]Analyzing equity..."):
+            runner = container.job_runner()
+            response = await runner.run(job, {})
+        _print_workflow_response(response)
     except Exception as e:
-        handle_cli_error(e, context={"symbol": symbol, "workflow": "stock"})
+        handle_cli_error(e, context={"instrument_symbol": symbol, "workflow": "equity"})
+
+
+@market_analyze_app.command("options")
+@async_command
+async def analyze_options(
+    underlying_symbol: str = typer.Argument(..., help="Underlying symbol"),
+    expiration_date: str | None = typer.Option(
+        None,
+        "--expiration",
+        help="Optional expiration date in YYYY-MM-DD format",
+    ),
+    option_side: OptionSide = typer.Option(
+        OptionSide.ALL,
+        "--side",
+        help="Options side to analyze",
+    ),
+    timeframe: JobTimeframe = typer.Option(JobTimeframe.SHORT_TERM, help="Analysis timeframe"),
+    profile_id: UUID | None = typer.Option(None, help="Profile ID for context (optional)"),
+) -> None:
+    """Run the static options workflow."""
+    final_profile_id = await ensure_profile_with_literacy(profile_id)
+    job = Job(
+        scope=JobScope.INSTRUMENT,
+        market_type=MarketType.OPTIONS,
+        instrument_symbol=underlying_symbol,
+        market_index=None,
+        timeframe=timeframe,
+        workflow_type=MarketType.OPTIONS.value,
+        profile_id=final_profile_id,
+        error_message=None,
+    )
+    context = {"expiration_date": expiration_date, "option_side": option_side.value}
+    try:
+        with console.status("[bold blue]Analyzing options market..."):
+            runner = container.job_runner()
+            response = await runner.run(job, context)
+        _print_workflow_response(response)
+    except Exception as e:
+        handle_cli_error(
+            e,
+            context={
+                "instrument_symbol": underlying_symbol,
+                "workflow": "options",
+                "expiration_date": expiration_date,
+            },
+        )
 
 
 @analyze_app.command("macro")
@@ -138,7 +191,7 @@ async def analyze_macro(
         help="Include advanced indicators",
     ),
 ) -> None:
-    """Run the macro + market regime workflow. Results are saved to .copinance/results/."""
+    """Run the macro + market regime workflow."""
     context: dict[str, Any] = {
         "market_index": market_index.upper(),
         "lookback_days": lookback_days,
@@ -156,32 +209,20 @@ async def analyze_macro(
         "include_advanced": include_advanced,
     }
 
-    use_case = container.run_workflow_use_case()
+    job = Job(
+        scope=JobScope.MARKET,
+        market_type=None,
+        instrument_symbol=None,
+        market_index=market_index,
+        timeframe=JobTimeframe.MID_TERM,
+        workflow_type="macro",
+        profile_id=None,
+        error_message=None,
+    )
     try:
         with console.status("[bold blue]Running macro analysis..."):
-            response = await use_case.execute(
-                RunWorkflowRequest(
-                    scope=JobScope.MARKET,
-                    stock_symbol=None,
-                    market_index=market_index,
-                    timeframe=JobTimeframe.MID_TERM,
-                    workflow_type="macro",
-                    profile_id=None,
-                    context=context,
-                )
-            )
-        if response.success and response.results:
-            console.print("\n✓ Completed", style="bold green")
-            saved = save_workflow_results(response.results, get_settings().storage_path)
-            if saved:
-                console.print(f"Results saved to [cyan]{saved}[/cyan]")
-            console.print("\n[bold]Results:[/bold]")
-            for key, value in response.results.items():
-                console.print(f"  {key}: {value}")
-        elif not response.success:
-            console.print("\n✗ Failed", style="bold red")
-            console.print(f"Error: {response.error_message}")
-        else:
-            console.print("\n✓ Completed", style="bold green")
+            runner = container.job_runner()
+            response = await runner.run(job, context)
+        _print_workflow_response(response)
     except Exception as e:
         handle_cli_error(e, context={"workflow": "macro", "market_index": market_index})
