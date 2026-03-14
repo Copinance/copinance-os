@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import MarketDataPoint, OptionsChain
 from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
     MacroRegimeIndicatorsTool,
 )
@@ -35,11 +35,16 @@ class _StubMarketProvider:
     async def get_quote(self, symbol: str) -> dict[str, Any]:
         return {"symbol": symbol}
 
-    async def get_intraday_data(self, symbol: str, interval: str = "1min") -> list[StockData]:
+    async def get_intraday_data(self, symbol: str, interval: str = "1min") -> list[MarketDataPoint]:
         return []
 
-    async def search_stocks(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def search_instruments(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         return []
+
+    async def get_options_chain(
+        self, underlying_symbol: str, expiration_date: str | None = None
+    ) -> OptionsChain:
+        raise RuntimeError("Options not used in this test")
 
     async def get_historical_data(
         self,
@@ -47,12 +52,12 @@ class _StubMarketProvider:
         start_date: datetime,
         end_date: datetime,
         interval: str = "1d",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         # Provide minimal proxy data for ^TNX and USO; anything else empty.
         ts = datetime(2025, 1, 5, tzinfo=UTC)
 
-        def _mk(close: Decimal) -> StockData:
-            return StockData(
+        def _mk(close: Decimal) -> MarketDataPoint:
+            return MarketDataPoint(
                 symbol=symbol,
                 timestamp=ts,
                 open_price=close,

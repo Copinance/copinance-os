@@ -28,7 +28,10 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
-    log_format: str = Field(default="json", description="Log format (json or console)")
+    log_format: str = Field(
+        default="console",
+        description="Log format (json or console). Console uses compact level tags for CLI.",
+    )
 
     # Workflow settings
     default_workflow_timeout: int = Field(
@@ -43,7 +46,7 @@ class Settings(BaseSettings):
     )
     storage_path: str = Field(
         default=".copinance",
-        description="Base path for file storage backend. Only used when storage_type is 'file'.",
+        description="Persistence root path. Versioned data/cache/results/state directories are created under this root when storage_type is 'file'.",
     )
 
     # Macroeconomic data (e.g., FRED)

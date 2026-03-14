@@ -43,13 +43,16 @@ Test individual components in isolation:
 ```python
 import pytest
 from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
+from copinanceos.domain.models.market import MarketType
 
 def test_job_creation():
     job = Job(
-        scope=JobScope.STOCK,
-        stock_symbol="AAPL",
+        scope=JobScope.INSTRUMENT,
+        market_type=MarketType.EQUITY,
+        instrument_symbol="AAPL",
+        market_index=None,
         timeframe=JobTimeframe.MID_TERM,
-        workflow_type="stock",
+        workflow_type="equity",
     )
     assert job.status == JobStatus.PENDING
 ```
@@ -107,4 +110,3 @@ async def test_integration_example():
 3. **Async**: Use `pytest-asyncio` for async tests
 4. **Coverage**: Aim for high test coverage
 5. **Naming**: Use descriptive test names
-

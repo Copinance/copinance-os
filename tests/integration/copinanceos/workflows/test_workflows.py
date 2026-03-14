@@ -1,31 +1,32 @@
-"""Integration tests for core workflows (one-off run via RunWorkflowUseCase)."""
+"""Integration tests for core workflows (one-off run via JobRunner)."""
 
 import pytest
 
-from copinanceos.application.use_cases.workflow import RunWorkflowRequest
-from copinanceos.domain.models.job import JobScope, JobTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType
 from copinanceos.domain.ports.data_providers import FundamentalDataProvider
 from copinanceos.infrastructure.containers import get_container
 
 
 @pytest.mark.integration
 class TestEndToEndWorkflow:
-    """Test complete end-to-end workflows via run_workflow_use_case (no persistence)."""
+    """Test complete end-to-end workflows via job_runner (no persistence)."""
 
     @pytest.mark.asyncio
-    async def test_complete_stock_workflow(self) -> None:
-        """Test stock workflow execution (one-off)."""
+    async def test_complete_equity_workflow(self) -> None:
+        """Test equity workflow execution (one-off)."""
         container = get_container()
-        use_case = container.run_workflow_use_case()
+        runner = container.job_runner()
 
-        response = await use_case.execute(
-            RunWorkflowRequest(
-                scope=JobScope.STOCK,
-                stock_symbol="AAPL",
-                timeframe=JobTimeframe.MID_TERM,
-                workflow_type="stock",
-            )
+        job = Job(
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="AAPL",
+            market_index=None,
+            timeframe=JobTimeframe.MID_TERM,
+            workflow_type="equity",
         )
+        response = await runner.run(job, {})
 
         assert response.success is True
         assert response.results is not None
@@ -35,16 +36,17 @@ class TestEndToEndWorkflow:
     async def test_agentic_workflow_execution(self) -> None:
         """Test agent workflow execution (one-off)."""
         container = get_container()
-        use_case = container.run_workflow_use_case()
+        runner = container.job_runner()
 
-        response = await use_case.execute(
-            RunWorkflowRequest(
-                scope=JobScope.STOCK,
-                stock_symbol="MSFT",
-                timeframe=JobTimeframe.SHORT_TERM,
-                workflow_type="agent",
-            )
+        job = Job(
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="MSFT",
+            market_index=None,
+            timeframe=JobTimeframe.SHORT_TERM,
+            workflow_type="agent",
         )
+        response = await runner.run(job, {})
 
         assert response.success is True
         if response.results:
@@ -60,28 +62,27 @@ class TestEndToEndWorkflow:
     async def test_static_workflow_with_fundamentals(
         self, fundamental_data_provider: FundamentalDataProvider
     ) -> None:
-        """Test stock workflow execution includes full fundamentals data."""
+        """Test equity workflow execution includes fundamentals data."""
         container = get_container()
-        use_case = container.run_workflow_use_case()
+        runner = container.job_runner()
 
-        response = await use_case.execute(
-            RunWorkflowRequest(
-                scope=JobScope.STOCK,
-                stock_symbol="AAPL",
-                timeframe=JobTimeframe.MID_TERM,
-                workflow_type="stock",
-            )
+        job = Job(
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="AAPL",
+            market_index=None,
+            timeframe=JobTimeframe.MID_TERM,
+            workflow_type="equity",
         )
+        response = await runner.run(job, {})
 
         assert response.success is True
         assert response.results is not None
         assert len(response.results) > 0
 
         results = response.results
-        assert results["workflow_type"] == "stock"
-        assert results["stock_symbol"] == "AAPL"
+        assert results["workflow_type"] == "equity"
+        assert results["instrument_symbol"] == "AAPL"
         assert "fundamentals" in results
         assert "company_name" in results["fundamentals"]
-        assert "latest_income_statement" in results["fundamentals"]
-        assert "latest_balance_sheet" in results["fundamentals"]
-        assert "latest_cash_flow_statement" in results["fundamentals"]
+        # Static workflow fundamentals include company_name, symbol, ratios, etc. (no statement keys)

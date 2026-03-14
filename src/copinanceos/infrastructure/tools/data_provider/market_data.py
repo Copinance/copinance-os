@@ -5,6 +5,7 @@ from typing import Any
 
 import structlog
 
+from copinanceos.domain.models.market import OptionSide
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.domain.ports.tools import ToolSchema
@@ -15,7 +16,7 @@ logger = structlog.get_logger(__name__)
 
 
 class MarketDataGetQuoteTool(BaseDataProviderTool[MarketDataProvider]):
-    """Tool for getting current stock quote."""
+    """Tool for getting a current market quote."""
 
     def __init__(
         self,
@@ -23,25 +24,15 @@ class MarketDataGetQuoteTool(BaseDataProviderTool[MarketDataProvider]):
         cache_manager: CacheManager | None = None,
         use_cache: bool = True,
     ) -> None:
-        """Initialize tool with market data provider.
-
-        Args:
-            provider: Market data provider instance
-            cache_manager: Optional cache manager for caching tool results
-            use_cache: Whether to use caching (default: True if cache_manager is provided)
-        """
         super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
 
     def get_name(self) -> str:
-        """Get tool name."""
-        return "get_stock_quote"
+        return "get_market_quote"
 
     def get_description(self) -> str:
-        """Get tool description."""
-        return "Get current stock quote including price, volume, and market data for a given stock symbol."
+        return "Get the current quote for a market instrument."
 
     def get_schema(self) -> ToolSchema:
-        """Get tool schema."""
         return self._build_schema(
             name=self.get_name(),
             description=self.get_description(),
@@ -49,43 +40,33 @@ class MarketDataGetQuoteTool(BaseDataProviderTool[MarketDataProvider]):
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Instrument symbol (e.g., 'AAPL', 'MSFT', 'SPY')",
                     }
                 },
                 "required": ["symbol"],
             },
             returns={
                 "type": "object",
-                "description": "Stock quote with price, volume, and other market data",
+                "description": "Instrument quote with price, volume, and reference market data",
             },
         )
 
     async def execute(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
-        """Execute tool to get stock quote."""
         return await self._execute_with_cache(force_refresh=force_refresh, **kwargs)
 
     async def _execute_impl(self, **kwargs: Any) -> ToolResult:
-        """Execute tool implementation."""
         try:
             validated = self.validate_parameters(**kwargs)
             symbol = validated["symbol"]
-
             quote = await self._provider.get_quote(symbol)
-
-            return self._create_success_result(
-                data=quote,
-                metadata={"symbol": symbol},
-            )
+            return self._create_success_result(data=quote, metadata={"symbol": symbol})
         except Exception as e:
-            logger.error("Failed to get stock quote", error=str(e), symbol=kwargs.get("symbol"))
-            return self._create_error_result(
-                error=e,
-                metadata={"symbol": kwargs.get("symbol")},
-            )
+            logger.error("Failed to get market quote", error=str(e), symbol=kwargs.get("symbol"))
+            return self._create_error_result(error=e, metadata={"symbol": kwargs.get("symbol")})
 
 
 class MarketDataGetHistoricalDataTool(BaseDataProviderTool[MarketDataProvider]):
-    """Tool for getting historical stock data."""
+    """Tool for getting historical market data."""
 
     def __init__(
         self,
@@ -93,25 +74,15 @@ class MarketDataGetHistoricalDataTool(BaseDataProviderTool[MarketDataProvider]):
         cache_manager: CacheManager | None = None,
         use_cache: bool = True,
     ) -> None:
-        """Initialize tool with market data provider.
-
-        Args:
-            provider: Market data provider instance
-            cache_manager: Optional cache manager for caching tool results
-            use_cache: Whether to use caching (default: True if cache_manager is provided)
-        """
         super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
 
     def get_name(self) -> str:
-        """Get tool name."""
-        return "get_historical_stock_data"
+        return "get_historical_market_data"
 
     def get_description(self) -> str:
-        """Get tool description."""
-        return "Get historical stock price data (OHLCV) for a given symbol and date range."
+        return "Get historical OHLCV market data for a symbol and date range."
 
     def get_schema(self) -> ToolSchema:
-        """Get tool schema."""
         return self._build_schema(
             name=self.get_name(),
             description=self.get_description(),
@@ -119,7 +90,7 @@ class MarketDataGetHistoricalDataTool(BaseDataProviderTool[MarketDataProvider]):
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Instrument symbol (e.g., 'AAPL', 'SPY')",
                     },
                     "start_date": {
                         "type": "string",
@@ -131,7 +102,7 @@ class MarketDataGetHistoricalDataTool(BaseDataProviderTool[MarketDataProvider]):
                     },
                     "interval": {
                         "type": "string",
-                        "description": "Data interval (1d, 1wk, 1mo, etc.)",
+                        "description": "Data interval",
                         "enum": ["1d", "1wk", "1mo", "1h", "5m", "15m", "30m", "60m"],
                         "default": "1d",
                     },
@@ -140,33 +111,27 @@ class MarketDataGetHistoricalDataTool(BaseDataProviderTool[MarketDataProvider]):
             },
             returns={
                 "type": "array",
-                "description": "Array of historical stock data points",
+                "description": "Array of historical market data points",
             },
         )
 
     async def execute(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
-        """Execute tool to get historical data."""
         return await self._execute_with_cache(force_refresh=force_refresh, **kwargs)
 
     async def _execute_impl(self, **kwargs: Any) -> ToolResult:
-        """Execute tool implementation."""
         try:
             validated = self.validate_parameters(**kwargs)
             symbol = validated["symbol"]
             start_date = datetime.fromisoformat(validated["start_date"])
             end_date = datetime.fromisoformat(validated["end_date"])
             interval = validated.get("interval", "1d")
-
             historical_data = await self._provider.get_historical_data(
                 symbol=symbol,
                 start_date=start_date,
                 end_date=end_date,
                 interval=interval,
             )
-
-            # Convert to serializable format
             data = self._serialize_data(historical_data)
-
             return self._create_success_result(
                 data=data,
                 metadata={
@@ -179,18 +144,15 @@ class MarketDataGetHistoricalDataTool(BaseDataProviderTool[MarketDataProvider]):
             )
         except Exception as e:
             logger.error(
-                "Failed to get historical data",
+                "Failed to get historical market data",
                 error=str(e),
                 symbol=kwargs.get("symbol"),
             )
-            return self._create_error_result(
-                error=e,
-                metadata={"symbol": kwargs.get("symbol")},
-            )
+            return self._create_error_result(error=e, metadata={"symbol": kwargs.get("symbol")})
 
 
-class MarketDataSearchStocksTool(BaseDataProviderTool[MarketDataProvider]):
-    """Tool for searching stocks."""
+class MarketDataSearchInstrumentsTool(BaseDataProviderTool[MarketDataProvider]):
+    """Tool for searching market instruments."""
 
     def __init__(
         self,
@@ -198,25 +160,15 @@ class MarketDataSearchStocksTool(BaseDataProviderTool[MarketDataProvider]):
         cache_manager: CacheManager | None = None,
         use_cache: bool = True,
     ) -> None:
-        """Initialize tool with market data provider.
-
-        Args:
-            provider: Market data provider instance
-            cache_manager: Optional cache manager for caching tool results
-            use_cache: Whether to use caching (default: True if cache_manager is provided)
-        """
         super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
 
     def get_name(self) -> str:
-        """Get tool name."""
-        return "search_stocks"
+        return "search_market_instruments"
 
     def get_description(self) -> str:
-        """Get tool description."""
-        return "Search for stocks by symbol or company name."
+        return "Search market instruments by symbol or name."
 
     def get_schema(self) -> ToolSchema:
-        """Get tool schema."""
         return self._build_schema(
             name=self.get_name(),
             description=self.get_description(),
@@ -224,7 +176,7 @@ class MarketDataSearchStocksTool(BaseDataProviderTool[MarketDataProvider]):
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query (symbol or company name)",
+                        "description": "Search query (symbol or display name)",
                     },
                     "limit": {
                         "type": "integer",
@@ -236,34 +188,110 @@ class MarketDataSearchStocksTool(BaseDataProviderTool[MarketDataProvider]):
             },
             returns={
                 "type": "array",
-                "description": "List of matching stocks with symbol, name, exchange, etc.",
+                "description": "List of matching instruments with symbol, name, exchange, etc.",
             },
         )
 
     async def execute(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
-        """Execute tool to search stocks."""
         return await self._execute_with_cache(force_refresh=force_refresh, **kwargs)
 
     async def _execute_impl(self, **kwargs: Any) -> ToolResult:
-        """Execute tool implementation."""
         try:
             validated = self.validate_parameters(**kwargs)
             query = validated["query"]
             limit = validated.get("limit", 10)
-
-            results = await self._provider.search_stocks(query=query, limit=limit)
-
+            results = await self._provider.search_instruments(query=query, limit=limit)
             return self._create_success_result(
                 data=results,
+                metadata={"query": query, "limit": limit, "results_count": len(results)},
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to search market instruments",
+                error=str(e),
+                query=kwargs.get("query"),
+            )
+            return self._create_error_result(error=e, metadata={"query": kwargs.get("query")})
+
+
+class MarketDataGetOptionsChainTool(BaseDataProviderTool[MarketDataProvider]):
+    """Tool for getting an options chain."""
+
+    def __init__(
+        self,
+        provider: MarketDataProvider,
+        cache_manager: CacheManager | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
+
+    def get_name(self) -> str:
+        return "get_options_chain"
+
+    def get_description(self) -> str:
+        return "Get an options chain for an underlying instrument."
+
+    def get_schema(self) -> ToolSchema:
+        return self._build_schema(
+            name=self.get_name(),
+            description=self.get_description(),
+            parameters={
+                "properties": {
+                    "underlying_symbol": {
+                        "type": "string",
+                        "description": "Underlying instrument symbol (e.g., 'AAPL', 'SPY')",
+                    },
+                    "expiration_date": {
+                        "type": "string",
+                        "description": "Optional expiration date in YYYY-MM-DD format",
+                    },
+                    "option_side": {
+                        "type": "string",
+                        "description": "Optional side filter",
+                        "enum": [OptionSide.CALL.value, OptionSide.PUT.value, OptionSide.ALL.value],
+                        "default": OptionSide.ALL.value,
+                    },
+                },
+                "required": ["underlying_symbol"],
+            },
+            returns={
+                "type": "object",
+                "description": "Options chain including calls, puts, expirations, and underlying price",
+            },
+        )
+
+    async def execute(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
+        return await self._execute_with_cache(force_refresh=force_refresh, **kwargs)
+
+    async def _execute_impl(self, **kwargs: Any) -> ToolResult:
+        try:
+            validated = self.validate_parameters(**kwargs)
+            underlying_symbol = validated["underlying_symbol"]
+            option_side = OptionSide(validated.get("option_side", OptionSide.ALL.value))
+            options_chain = await self._provider.get_options_chain(
+                underlying_symbol=underlying_symbol,
+                expiration_date=validated.get("expiration_date"),
+            )
+            data = self._serialize_data(options_chain)
+            if option_side == OptionSide.CALL:
+                data["puts"] = []
+            elif option_side == OptionSide.PUT:
+                data["calls"] = []
+            return self._create_success_result(
+                data=data,
                 metadata={
-                    "query": query,
-                    "limit": limit,
-                    "results_count": len(results),
+                    "underlying_symbol": underlying_symbol,
+                    "expiration_date": validated.get("expiration_date"),
+                    "option_side": option_side.value,
                 },
             )
         except Exception as e:
-            logger.error("Failed to search stocks", error=str(e), query=kwargs.get("query"))
+            logger.error(
+                "Failed to get options chain",
+                error=str(e),
+                underlying_symbol=kwargs.get("underlying_symbol"),
+            )
             return self._create_error_result(
                 error=e,
-                metadata={"query": kwargs.get("query")},
+                metadata={"underlying_symbol": kwargs.get("underlying_symbol")},
             )

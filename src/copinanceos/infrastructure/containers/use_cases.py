@@ -2,8 +2,14 @@
 
 from dependency_injector import providers
 
+from copinanceos.application.run_job import DefaultJobRunner
 from copinanceos.application.use_cases.fundamentals import (
     ResearchStockFundamentalsUseCase,
+)
+from copinanceos.application.use_cases.market import (
+    GetInstrumentUseCase,
+    GetMarketDataUseCase,
+    SearchInstrumentsUseCase,
 )
 from copinanceos.application.use_cases.profile import (
     CreateProfileUseCase,
@@ -13,12 +19,6 @@ from copinanceos.application.use_cases.profile import (
     ListProfilesUseCase,
     SetCurrentProfileUseCase,
 )
-from copinanceos.application.use_cases.stock import (
-    GetStockDataUseCase,
-    GetStockUseCase,
-    SearchStocksUseCase,
-)
-from copinanceos.application.use_cases.workflow import RunWorkflowUseCase
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.factories import WorkflowExecutorFactory
 
@@ -51,21 +51,21 @@ def configure_use_cases(
     Returns:
         Dictionary of use case providers
     """
-    # Stock use cases
-    get_stock_use_case = providers.Factory(
-        GetStockUseCase,
-        stock_repository=stock_repository,
+    # Market instrument use cases
+    get_instrument_use_case = providers.Factory(
+        GetInstrumentUseCase,
+        instrument_repository=stock_repository,
     )
 
-    search_stocks_use_case = providers.Factory(
-        SearchStocksUseCase,
-        stock_repository=stock_repository,
+    search_instruments_use_case = providers.Factory(
+        SearchInstrumentsUseCase,
+        instrument_repository=stock_repository,
         market_data_provider=market_data_provider,
     )
 
-    get_stock_data_use_case = providers.Factory(
-        GetStockDataUseCase,
-        stock_repository=stock_repository,
+    get_market_data_use_case = providers.Factory(
+        GetMarketDataUseCase,
+        instrument_repository=stock_repository,
     )
 
     # Profile use cases
@@ -115,7 +115,7 @@ def configure_use_cases(
     # Workflow executors (defined after use cases to reference them)
     workflow_executors = providers.Singleton(
         WorkflowExecutorFactory.create_all,
-        get_stock_use_case=get_stock_use_case,
+        get_instrument_use_case=get_instrument_use_case,
         market_data_provider=market_data_provider,
         macro_data_provider=macro_data_provider,
         fundamentals_use_case=research_stock_fundamentals_use_case,
@@ -125,17 +125,17 @@ def configure_use_cases(
         llm_config=llm_config,
     )
 
-    # One-off workflow run (no persistence) for analyze/ask
-    run_workflow_use_case = providers.Factory(
-        RunWorkflowUseCase,
+    # Default job runner (optional; consumers can replace with their own JobRunner)
+    job_runner = providers.Factory(
+        DefaultJobRunner,
         profile_repository=research_profile_repository,
         workflow_executors=workflow_executors,
     )
 
     return {
-        "get_stock_use_case": get_stock_use_case,
-        "search_stocks_use_case": search_stocks_use_case,
-        "get_stock_data_use_case": get_stock_data_use_case,
+        "get_instrument_use_case": get_instrument_use_case,
+        "search_instruments_use_case": search_instruments_use_case,
+        "get_market_data_use_case": get_market_data_use_case,
         "create_profile_use_case": create_profile_use_case,
         "get_current_profile_use_case": get_current_profile_use_case,
         "set_current_profile_use_case": set_current_profile_use_case,
@@ -144,5 +144,5 @@ def configure_use_cases(
         "list_profiles_use_case": list_profiles_use_case,
         "research_stock_fundamentals_use_case": research_stock_fundamentals_use_case,
         "workflow_executors": workflow_executors,
-        "run_workflow_use_case": run_workflow_use_case,
+        "job_runner": job_runner,
     }

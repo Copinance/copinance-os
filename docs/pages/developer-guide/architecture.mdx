@@ -44,9 +44,9 @@ Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear 
 - **Validation**: Domain validation rules
 
 ### Application Layer
-- **Use cases**: Business operations (RunWorkflow, CreateProfile, etc.)
+- **Use cases**: Business operations (CreateProfile, GetInstrument, etc.)
+- **Default job runner**: Optional implementation of `JobRunner`; consumers can replace it for custom orchestration (queues, retries, routing)
 - **Orchestration**: Coordinates domain objects and infrastructure
-- **Request/Response models**: Type-safe input/output
 
 ### Infrastructure Layer
 - **Implementations**: Concrete implementations of domain ports
@@ -75,20 +75,20 @@ class StockRepositoryImpl(StockRepository):
         # Implementation using storage backend
 ```
 
-### Use Case Pattern
-Encapsulates business operations:
+### Job Runner (optional)
+Running a job is the consumer’s responsibility; the library provides a default implementation you can replace:
 ```python
-class RunWorkflowUseCase(UseCase[RunWorkflowRequest, RunWorkflowResponse]):
-    async def execute(self, request: RunWorkflowRequest) -> RunWorkflowResponse:
-        # Business logic here
+class JobRunner(ABC):
+    async def run(self, job: Job, context: dict[str, Any]) -> RunJobResult:
+        # Find executor, build context, execute
 ```
 
 ### Dependency Injection
 Manages dependencies through container:
 ```python
-# Container configuration
-container = Container()
-use_case = container.run_workflow_use_case()
+# Default job runner (replaceable)
+runner = container.job_runner()
+result = await runner.run(job, context)
 ```
 
 ## Extension Points
@@ -100,6 +100,7 @@ The architecture provides 22 port interfaces for extension:
 - **6 Strategy interfaces**: Screening, Due Diligence, Valuation, Risk, Thematic, Monitoring
 - **4 Tool interfaces**: Tool, ToolParameter, ToolSchema, ToolResult
 - **2 Repository interfaces**: Stock, ResearchProfile
+- **Job runner**: JobRunner (default implementation provided; replace for custom orchestration)
 - **1 Workflow interface**: WorkflowExecutor
 - **2 Storage interfaces**: CacheBackend, Storage
 
@@ -111,4 +112,3 @@ See [Extending](extending) for how to implement these.
 - ✅ **Flexibility**: Swap implementations without changing business logic
 - ✅ **Maintainability**: Clear separation of concerns
 - ✅ **Extensibility**: Easy to add new features
-

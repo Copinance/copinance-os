@@ -3,7 +3,18 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from copinanceos.domain.models.job import Job
+from copinanceos.domain.models.job import Job, RunJobResult
+
+
+class JobRunner(ABC):
+    """Port for running a single job. Consumers can use the library's default
+    implementation or provide their own (e.g. queue-based, custom routing).
+    """
+
+    @abstractmethod
+    async def run(self, job: Job, context: dict[str, Any]) -> RunJobResult:
+        """Run the job with the given context. Returns success, results, and optional error."""
+        pass
 
 
 class WorkflowExecutor(ABC):

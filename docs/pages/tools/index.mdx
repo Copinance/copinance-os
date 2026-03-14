@@ -1,6 +1,6 @@
 # Tools Overview
 
-Copinance OS provides a comprehensive suite of tools for stock research and analysis. Tools are executable functions that can be used in workflows, especially agent workflows where AI agents can dynamically select and use tools to answer questions.
+Copinance OS provides a comprehensive suite of tools for market research and analysis. Tools are executable functions that can be used in workflows, especially agent workflows where AI agents can dynamically select and use tools to answer questions.
 
 ## Tool Categories
 
@@ -14,7 +14,7 @@ Advanced analytical functions for market regime detection, technical analysis, a
 ### Data Provider Tools
 Tools that wrap data provider methods, making them accessible to AI agents and workflows.
 
-- **Market Data Tools**: Get quotes, historical prices, search stocks
+- **Market Data Tools**: Get quotes, historical prices, search instruments, inspect options chains
 - **Fundamental Data Tools**: Access financial statements, SEC filings, fundamentals
 - See [Overview](/tools/data-providers) for details
 
@@ -25,7 +25,7 @@ Tools that wrap data provider methods, making them accessible to AI agents and w
 Tools are automatically available when using agent workflows:
 
 ```bash
-copinance ask "What is the current market trend?" --symbol AAPL
+copinance ask "What is the current market trend?" --instrument AAPL
 ```
 
 The AI agent will automatically select and use the appropriate tools to answer your question.
@@ -76,4 +76,3 @@ All tools implement the `Tool` interface, which provides:
 - [API Reference](../api-reference/data-providers) - Data provider interfaces
 - [Workflows](../user-guide/workflows) - Using tools in workflows
 - [Developer Guide](../developer-guide/extending) - Creating custom tools
-

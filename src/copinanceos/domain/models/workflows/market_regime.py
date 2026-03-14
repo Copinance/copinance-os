@@ -179,8 +179,11 @@ class VolatilityRegimeData(BaseModel):
 class MarketCyclesData(BaseModel):
     """Market cycles detection result data."""
 
-    current_phase: Literal["accumulation", "markup", "distribution", "markdown"] = Field(
-        ..., description="Current market cycle phase"
+    current_phase: Literal["accumulation", "markup", "distribution", "markdown", "transition"] = (
+        Field(
+            ...,
+            description="Current market cycle phase (transition = unclear or insufficient data)",
+        )
     )
     phase_description: str = Field(..., description="Human-readable phase description")
     price_position_pct: float = Field(..., description="Price position within cycle (percentage)")
@@ -188,8 +191,12 @@ class MarketCyclesData(BaseModel):
     current_price: float = Field(..., description="Current price")
     ma_20: float = Field(..., description="20-day moving average")
     ma_50: float = Field(..., description="50-day moving average")
-    recent_trend: Literal["up", "down", "sideways"] = Field(..., description="Recent price trend")
-    longer_trend: Literal["up", "down", "sideways"] = Field(..., description="Longer-term trend")
+    recent_trend: Literal["up", "down", "sideways", "neutral"] = Field(
+        ..., description="Recent price trend (neutral when insufficient data)"
+    )
+    longer_trend: Literal["up", "down", "sideways", "neutral"] = Field(
+        ..., description="Longer-term trend (neutral when insufficient data)"
+    )
     potential_regime_change: bool = Field(..., description="Whether regime change is signaled")
     ma_short_period_used: int = Field(..., description="Short MA period actually used")
     ma_long_period_used: int = Field(..., description="Long MA period actually used")

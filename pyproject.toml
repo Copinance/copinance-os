@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "copinance-os"
 version = "0.1.0"
-description = "Open-source stock research platform and framework with agent AI and stock/macro workflows"
+description = "Open-source market research platform and framework with agent AI and instrument/macro workflows"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "Copinance OS Contributors"}
 ]
-keywords = ["stock", "research", "finance", "trading", "ai", "agents", "workflow"]
+keywords = ["market", "research", "finance", "trading", "options", "ai", "workflow"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",
@@ -27,6 +27,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.2.2",
     "pandas>=2.3.3",
     "numpy>=1.26.0,<3.0",
     "structlog>=25.5.0",
@@ -47,6 +48,7 @@ dev = [
     "black>=25.12.0",
     "ruff>=0.14.10",
     "mypy>=1.19.1",
+    "pandas-stubs>=2.2.0",
     "pre-commit>=4.5.1",
 ]
 
@@ -95,6 +97,11 @@ filterwarnings = [
     "ignore:.*unclosed.*:ResourceWarning",
     # Suppress event loop deprecation warnings in test fixtures
     "ignore:There is no current event loop:DeprecationWarning",
+    # Third-party: google-genai uses _UnionGenericAlias (deprecated in 3.14, removal 3.17)
+    "ignore:_UnionGenericAlias is deprecated:DeprecationWarning",
+    "ignore:.*_UnionGenericAlias.*:DeprecationWarning",
+    # Unittest mock: unawaited coroutine when AsyncMock is used as return value and code does not await
+    "ignore:coroutine.*was never awaited:RuntimeWarning",
 ]
 markers = [
     "unit: Unit tests",
@@ -185,7 +192,7 @@ disable_error_code = ["unused-ignore"]
 [[tool.mypy.overrides]]
 module = [
     "copinanceos.infrastructure.data_providers.yfinance",
-    "copinanceos.application.use_cases.stock",
+    "copinanceos.application.use_cases.market",
 ]
 disable_error_code = ["unused-ignore"]
 

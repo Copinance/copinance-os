@@ -8,10 +8,17 @@ from copinanceos.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
-from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
+from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe, RunJobResult
 from copinanceos.domain.models.macro import MacroDataPoint
+from copinanceos.domain.models.market import (
+    MarketDataPoint,
+    MarketType,
+    OptionContract,
+    OptionsChain,
+    OptionSide,
+)
 from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
-from copinanceos.domain.models.stock import Stock, StockData
+from copinanceos.domain.models.stock import Stock
 from copinanceos.domain.models.tool_results import (
     ToolResult,
 )
@@ -43,10 +50,15 @@ __all__ = [
     "JobScope",
     "JobStatus",
     "JobTimeframe",
+    "RunJobResult",
     "ResearchProfile",
     "FinancialLiteracy",
     "Stock",
-    "StockData",
+    "MarketType",
+    "OptionSide",
+    "MarketDataPoint",
+    "OptionContract",
+    "OptionsChain",
     "MacroDataPoint",
     "StockFundamentals",
     "IncomeStatement",

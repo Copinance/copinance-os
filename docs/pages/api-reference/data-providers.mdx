@@ -4,137 +4,34 @@ Interfaces for implementing custom data providers.
 
 ## MarketDataProvider
 
-Provides market data (quotes, historical prices, intraday data).
+Provides market data for instruments and options.
 
 ### Methods
 
-- `get_quote(symbol: str) -> dict[str, Any]` - Current quote
-- `get_historical_data(symbol, start_date, end_date, interval) -> list[StockData]` - Historical prices
-- `get_intraday_data(symbol, interval) -> list[StockData]` - Intraday data
-- `search_stocks(query, limit) -> list[dict[str, Any]]` - Stock search
-
-### Example Implementation
-
-```python
-from copinanceos.domain.ports.data_providers import MarketDataProvider
-
-class MyMarketProvider(MarketDataProvider):
-    async def get_quote(self, symbol: str) -> dict[str, Any]:
-        # Implementation
-        pass
-```
+- `get_quote(symbol: str) -> dict[str, Any]`
+- `get_historical_data(symbol, start_date, end_date, interval) -> list[MarketDataPoint]`
+- `get_intraday_data(symbol, interval) -> list[MarketDataPoint]`
+- `search_instruments(query, limit) -> list[dict[str, Any]]`
+- `get_options_chain(underlying_symbol, expiration_date=None) -> OptionsChain`
 
 ## FundamentalDataProvider
 
-Provides fundamental data (financial statements, SEC filings, ratios).
+Provides equity fundamentals.
 
 ### Methods
 
-- `get_financial_statements(symbol, statement_type, period) -> dict[str, Any]` - Financial statements
-- `get_sec_filings(symbol, filing_types, limit) -> list[dict[str, Any]]` - SEC filings
-- `get_detailed_fundamentals(symbol, periods, period_type) -> StockFundamentals` - Comprehensive fundamentals
-
-### Example Implementation
-
-```python
-from copinanceos.domain.ports.data_providers import FundamentalDataProvider
-
-class MyFundamentalProvider(FundamentalDataProvider):
-    async def get_financial_statements(
-        self, symbol: str, statement_type: str, period: str = "annual"
-    ) -> dict[str, Any]:
-        # Implementation
-        pass
-```
+- `get_financial_statements(symbol, statement_type, period) -> dict[str, Any]`
+- `get_sec_filings(symbol, filing_types, limit) -> list[dict[str, Any]]`
+- `get_detailed_fundamentals(symbol, periods, period_type) -> StockFundamentals`
 
 ## AlternativeDataProvider
 
-Provides alternative data (sentiment, web traffic, satellite imagery).
-
-### Methods
-
-- `get_sentiment_data(symbol, sources, lookback_days) -> dict[str, Any]` - Sentiment analysis
-- `get_web_traffic_metrics(symbol, start_date, end_date) -> dict[str, Any]` - Web traffic
-- `get_satellite_imagery_insights(symbol, locations) -> dict[str, Any]` - Satellite data
-- `get_supply_chain_data(symbol) -> dict[str, Any]` - Supply chain data
-- `get_transaction_data(symbol, start_date, end_date) -> dict[str, Any]` - Transaction data
+Provides sentiment, web traffic, satellite imagery, and other alternative data.
 
 ## MacroeconomicDataProvider
 
-Provides macroeconomic time-series data (e.g., FRED, Bloomberg, Quandl).
-
-### Methods
-
-- `get_time_series(series_id, start_date, end_date, frequency=None) -> list[MacroDataPoint]` - Get macroeconomic time series data
-  - **series_id**: Provider-specific series identifier (e.g., FRED series like "DGS10" for 10Y Treasury)
-  - **start_date/end_date**: Date range for data
-  - **frequency**: Optional frequency override ("d", "w", "m")
-
-### Supported Economic Indicators
-
-The system supports comprehensive macroeconomic analysis across 9 categories:
-
-#### Interest Rates & Yield Curve
-- Treasury yields: DGS10 (10Y), DGS2 (2Y), DGS3MO (3M)
-- Real yields: DFII10 (10Y Real)
-- Inflation expectations: T10YIE (10Y Breakeven)
-- Yield spreads: T10Y2Y, T10Y3M (recession indicators)
-
-#### Credit Spreads & Risk Premiums
-- High-yield spreads: BAMLH0A0HYM2 (HY OAS)
-- Investment grade spreads: BAMLC0A0CM (IG OAS)
-- Credit quality differential analysis
-
-#### Commodities & Energy
-- WTI Crude Oil: DCOILWTICO
-- Energy impulse analysis and trends
-
-#### Labor Market Indicators
-- Unemployment rate: UNRATE
-- Non-farm payrolls: PAYEMS
-- JOLTS data: JTSJOL, JTSHIR, JTSSEP, JTSQUR
-
-#### Housing Market Data
-- Home sales: HSN1F (new), EXHOSLUSM495S (existing)
-- Price indices: CSUSHPISA, SPCS10RSA, USSTHPI
-- Construction: HOUST (starts), PERMIT (permits)
-
-#### Manufacturing Activity
-- Industrial production: INDPRO, IPMAN
-- Capacity utilization: TCU
-- Durable goods orders: NEWORDER, AMTMTI
-
-#### Consumer Spending & Confidence
-- Retail sales: RRSFS with MoM changes
-- Consumer confidence: UMCSENT
-- Personal income/consumption/saving: PI, PCEC, PSAVERT
-
-#### Global Market Indicators
-- FX rates: EUR/USD, USD/JPY, GBP/USD, etc.
-- Emerging markets: VWO, EEM ETFs
-- USD strength analysis
-
-#### Advanced Economic Indicators
-- Federal Reserve balance sheet: WALCL
-- Leading Economic Index: USSLIND
-- CDS spread proxies
-
-## Base Interface
-
-All providers inherit from `DataProvider`:
-
-```python
-class DataProvider(ABC):
-    @abstractmethod
-    async def is_available(self) -> bool:
-        """Check if provider is available."""
-
-    @abstractmethod
-    def get_provider_name(self) -> str:
-        """Get provider name."""
-```
+Provides macroeconomic time-series data such as FRED series.
 
 ## Implementation Guide
 
-See [Extending](../developer-guide/extending) for detailed implementation guide.
-
+See [Extending](../developer-guide/extending) for a practical implementation example.

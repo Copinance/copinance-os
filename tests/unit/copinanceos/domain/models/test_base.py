@@ -8,7 +8,8 @@ import pytest
 from pydantic import Field, ValidationError
 
 from copinanceos.domain.models.base import Entity, ValueObject
-from copinanceos.domain.models.stock import Stock, StockData
+from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.domain.models.stock import Stock
 
 
 # Sample entity class for direct testing - must be defined at module level
@@ -165,9 +166,9 @@ class SampleValueObjectClass:
         with pytest.raises(ValidationError):
             value_obj.value = "updated"  # type: ignore
 
-    def test_value_object_immutability_through_stock_data(self) -> None:
-        """Test value object immutability through StockData model."""
-        stock_data = StockData(
+    def test_value_object_immutability_through_market_data(self) -> None:
+        """Test value object immutability through MarketDataPoint model."""
+        stock_data = MarketDataPoint(
             symbol="AAPL",
             timestamp=datetime.now(UTC),
             open_price=Decimal("150.00"),
@@ -243,9 +244,9 @@ class TestBaseModelsIntegration:
         stock_set = {stock}
         assert stock in stock_set
 
-    def test_value_object_immutability_through_stock_data(self) -> None:
-        """Test value object immutability through StockData model."""
-        stock_data = StockData(
+    def test_value_object_immutability_through_market_data(self) -> None:
+        """Test value object immutability through MarketDataPoint model."""
+        stock_data = MarketDataPoint(
             symbol="AAPL",
             timestamp=datetime.now(UTC),
             open_price=Decimal("150.00"),

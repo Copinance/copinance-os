@@ -62,7 +62,7 @@ from datetime import datetime, timedelta
 from math import log
 from typing import Any
 
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 import structlog
 
 from copinanceos.domain.models.tool_results import ToolResult

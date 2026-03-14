@@ -37,7 +37,7 @@ class GeminiProvider(LLMProvider):
 
         # Direct instantiation
         provider = GeminiProvider(api_key="your-api-key")
-        response = await provider.generate_text("Analyze this stock...")
+        response = await provider.generate_text("Analyze this instrument...")
 
         # Using LLMConfig (recommended for library integration)
         from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
@@ -647,7 +647,7 @@ class GeminiProvider(LLMProvider):
                             if has_invalid_params:
                                 warning_msg = (
                                     "Tool was called with invalid parameters (e.g., UNKNOWN_COMPANY_SYMBOL). "
-                                    "Please use the correct stock symbol from the original question. "
+                                    "Please use the correct instrument symbol from the original question. "
                                 )
                             if is_empty_result:
                                 warning_msg += (

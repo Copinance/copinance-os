@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import MarketDataPoint
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.infrastructure.tools.analysis.market_regime.indicators import (
     SECTOR_ETFS,
@@ -20,11 +20,15 @@ def mock_market_data_provider() -> MarketDataProvider:
     """Create a mock market data provider."""
     provider = MagicMock(spec=MarketDataProvider)
     provider.get_provider_name = MagicMock(return_value="test_provider")
+    # Return a plain dict so quote.get("market_cap") etc. are not AsyncMocks (avoids "coroutine never awaited")
+    provider.get_quote = AsyncMock(
+        return_value={"market_cap": 1_000_000_000, "current_price": 100.0}
+    )
     return provider
 
 
 @pytest.fixture
-def sample_vix_data() -> list[StockData]:
+def sample_vix_data() -> list[MarketDataPoint]:
     """Create sample VIX data for testing."""
     base_date = datetime(2024, 1, 1)
     # VIX typically ranges from 10-30, with spikes up to 50+
@@ -33,7 +37,7 @@ def sample_vix_data() -> list[StockData]:
     data = []
     for i, level in enumerate(vix_levels):
         data.append(
-            StockData(
+            MarketDataPoint(
                 symbol="^VIX",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(level - 0.5)),
@@ -47,7 +51,7 @@ def sample_vix_data() -> list[StockData]:
 
 
 @pytest.fixture
-def sample_market_data() -> list[StockData]:
+def sample_market_data() -> list[MarketDataPoint]:
     """Create sample market index data (SPY) for testing."""
     base_date = datetime(2023, 1, 1)
     # Create upward trending market data
@@ -55,7 +59,7 @@ def sample_market_data() -> list[StockData]:
     for i in range(252):
         price = 400.0 + (i * 0.5) + (i % 10) * 0.1
         data.append(
-            StockData(
+            MarketDataPoint(
                 symbol="SPY",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(price - 0.5)),
@@ -69,7 +73,7 @@ def sample_market_data() -> list[StockData]:
 
 
 @pytest.fixture
-def sample_sector_data() -> list[StockData]:
+def sample_sector_data() -> list[MarketDataPoint]:
     """Create sample sector ETF data for testing."""
     base_date = datetime(2023, 1, 1)
     data = []
@@ -77,7 +81,7 @@ def sample_sector_data() -> list[StockData]:
         # Varying sector performance
         price = 100.0 + (i * 0.3) + (i % 20) * 0.2
         data.append(
-            StockData(
+            MarketDataPoint(
                 symbol="XLK",  # Technology sector
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(price - 0.5)),
@@ -130,9 +134,9 @@ class TestMarketRegimeIndicatorsTool:
     async def test_execute_all_indicators(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_vix_data: list[StockData],
-        sample_market_data: list[StockData],
-        sample_sector_data: list[StockData],
+        sample_vix_data: list[MarketDataPoint],
+        sample_market_data: list[MarketDataPoint],
+        sample_sector_data: list[MarketDataPoint],
     ) -> None:
         """Test successful execution with all indicators enabled."""
 
@@ -165,7 +169,7 @@ class TestMarketRegimeIndicatorsTool:
     async def test_execute_vix_only(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_vix_data: list[StockData],
+        sample_vix_data: list[MarketDataPoint],
     ) -> None:
         """Test execution with only VIX indicator."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=sample_vix_data)
@@ -187,8 +191,8 @@ class TestMarketRegimeIndicatorsTool:
     async def test_execute_market_breadth_only(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_market_data: list[StockData],
-        sample_sector_data: list[StockData],
+        sample_market_data: list[MarketDataPoint],
+        sample_sector_data: list[MarketDataPoint],
     ) -> None:
         """Test execution with only market breadth indicator."""
 
@@ -220,8 +224,8 @@ class TestMarketRegimeIndicatorsTool:
     async def test_execute_sector_rotation_only(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_market_data: list[StockData],
-        sample_sector_data: list[StockData],
+        sample_market_data: list[MarketDataPoint],
+        sample_sector_data: list[MarketDataPoint],
     ) -> None:
         """Test execution with only sector rotation indicator."""
 
@@ -253,7 +257,7 @@ class TestMarketRegimeIndicatorsTool:
     async def test_fetch_vix_data_success(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_vix_data: list[StockData],
+        sample_vix_data: list[MarketDataPoint],
     ) -> None:
         """Test successful VIX data fetching."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=sample_vix_data)
@@ -289,7 +293,7 @@ class TestMarketRegimeIndicatorsTool:
         """Test VIX data with high volatility levels."""
         base_date = datetime(2024, 1, 1)
         high_vix_data = [
-            StockData(
+            MarketDataPoint(
                 symbol="^VIX",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal("28.0"),
@@ -314,8 +318,8 @@ class TestMarketRegimeIndicatorsTool:
     async def test_calculate_market_breadth_success(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_market_data: list[StockData],
-        sample_sector_data: list[StockData],
+        sample_market_data: list[MarketDataPoint],
+        sample_sector_data: list[MarketDataPoint],
     ) -> None:
         """Test successful market breadth calculation."""
 
@@ -364,8 +368,8 @@ class TestMarketRegimeIndicatorsTool:
     async def test_calculate_sector_rotation_success(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_market_data: list[StockData],
-        sample_sector_data: list[StockData],
+        sample_market_data: list[MarketDataPoint],
+        sample_sector_data: list[MarketDataPoint],
     ) -> None:
         """Test successful sector rotation calculation."""
 
@@ -439,7 +443,7 @@ class TestMarketRegimeIndicatorsTool:
     async def test_execute_custom_market_index(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_market_data: list[StockData],
+        sample_market_data: list[MarketDataPoint],
     ) -> None:
         """Test execution with custom market index."""
 
@@ -467,7 +471,7 @@ class TestMarketRegimeIndicatorsTool:
     async def test_execute_custom_lookback_days(
         self,
         mock_market_data_provider: MarketDataProvider,
-        sample_vix_data: list[StockData],
+        sample_vix_data: list[MarketDataPoint],
     ) -> None:
         """Test execution with custom lookback days."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=sample_vix_data)

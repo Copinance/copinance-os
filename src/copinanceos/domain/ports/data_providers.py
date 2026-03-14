@@ -6,7 +6,7 @@ from typing import Any
 
 from copinanceos.domain.models.fundamentals import StockFundamentals
 from copinanceos.domain.models.macro import MacroDataPoint
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import MarketDataPoint, OptionsChain
 
 
 class DataProvider(ABC):
@@ -38,7 +38,7 @@ class MarketDataProvider(DataProvider):
         start_date: datetime,
         end_date: datetime,
         interval: str = "1d",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         """Get historical market data."""
         pass
 
@@ -47,21 +47,30 @@ class MarketDataProvider(DataProvider):
         self,
         symbol: str,
         interval: str = "1min",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         """Get intraday market data."""
         pass
 
     @abstractmethod
-    async def search_stocks(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Search for stocks by symbol or company name.
+    async def search_instruments(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Search for market instruments by symbol or display name.
 
         Args:
             query: Search query (can be symbol or company name)
             limit: Maximum number of results to return
 
         Returns:
-            List of stock search results with symbol, name, exchange, etc.
+            List of matching instruments with symbol, name, exchange, etc.
         """
+        pass
+
+    @abstractmethod
+    async def get_options_chain(
+        self,
+        underlying_symbol: str,
+        expiration_date: str | None = None,
+    ) -> OptionsChain:
+        """Get an options chain for an underlying instrument."""
         pass
 
 

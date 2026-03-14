@@ -38,7 +38,9 @@ def temp_profile_config_path() -> Path:
 @pytest.fixture
 def config_file_path(temp_profile_config_path: Path) -> Path:
     """Provide a config file path in temp directory."""
-    return temp_profile_config_path / "config.json"
+    path = temp_profile_config_path / "state" / "v2" / "app.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 @pytest.fixture

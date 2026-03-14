@@ -54,7 +54,7 @@ class TestErrorHandler:
         """Test handling application exceptions."""
         cause = ValueError("Underlying error")
         error = SampleApplicationError("Application error occurred", cause=cause)
-        context = {"command": "analyze stock"}
+        context = {"command": "analyze market equity"}
 
         _handle_application_error(error, context)
 

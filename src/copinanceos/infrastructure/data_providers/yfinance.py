@@ -26,7 +26,7 @@ To use a custom provider, simply implement the MarketDataProvider interface:
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -39,8 +39,8 @@ try:
 except ImportError:
     YFINANCE_AVAILABLE = False
     yf = None
-    DataFrame = None
-    pd = None
+    DataFrame = None  # type: ignore[misc, assignment]
+    pd = None  # type: ignore[assignment]
 
 from copinanceos.domain.models.fundamentals import (
     BalanceSheet,
@@ -50,13 +50,54 @@ from copinanceos.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import (
+    MarketDataPoint,
+    OptionContract,
+    OptionsChain,
+    OptionSide,
+)
 from copinanceos.domain.ports.data_providers import (
     FundamentalDataProvider,
     MarketDataProvider,
 )
 
 logger = structlog.get_logger(__name__)
+
+
+def _safe_decimal(value: Any) -> Decimal | None:
+    """Safely convert provider values to Decimal."""
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            if isinstance(value, float) and (value != value):
+                return None
+            return Decimal(str(value))
+        if isinstance(value, str):
+            if value.lower() in ("nan", "none", "null", ""):
+                return None
+            return Decimal(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return None
+
+
+def _safe_int(value: Any) -> int | None:
+    """Safely convert provider values to int."""
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            if isinstance(value, float) and (value != value):
+                return None
+            return int(value)
+        if isinstance(value, str):
+            if value.lower() in ("nan", "none", "null", ""):
+                return None
+            return int(float(value))
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return None
 
 
 class YFinanceMarketProvider(MarketDataProvider):
@@ -155,7 +196,7 @@ class YFinanceMarketProvider(MarketDataProvider):
         start_date: datetime,
         end_date: datetime,
         interval: str = "1d",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         """Get historical market data.
 
         Args:
@@ -165,7 +206,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             interval: Data interval (1d, 1wk, 1mo, etc.)
 
         Returns:
-            List of StockData objects with OHLCV data
+            List of MarketDataPoint objects with OHLCV data
         """
         try:
             if not YFINANCE_AVAILABLE:
@@ -187,15 +228,16 @@ class YFinanceMarketProvider(MarketDataProvider):
                 )
                 return []
 
-            stock_data_list: list[StockData] = []
+            stock_data_list: list[MarketDataPoint] = []
             for timestamp, row in hist.iterrows():
-                stock_data = StockData(
+                ts = (
+                    timestamp.to_pydatetime()
+                    if hasattr(timestamp, "to_pydatetime")
+                    else datetime.fromisoformat(str(timestamp))
+                )
+                stock_data = MarketDataPoint(
                     symbol=symbol.upper(),
-                    timestamp=(
-                        timestamp.to_pydatetime()
-                        if hasattr(timestamp, "to_pydatetime")
-                        else timestamp
-                    ),
+                    timestamp=cast(datetime, ts),
                     open_price=Decimal(str(float(row["Open"]))),
                     close_price=Decimal(str(float(row["Close"]))),
                     high_price=Decimal(str(float(row["High"]))),
@@ -224,7 +266,7 @@ class YFinanceMarketProvider(MarketDataProvider):
         self,
         symbol: str,
         interval: str = "1min",
-    ) -> list[StockData]:
+    ) -> list[MarketDataPoint]:
         """Get intraday market data.
 
         Args:
@@ -232,7 +274,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             interval: Data interval (1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h)
 
         Returns:
-            List of StockData objects with intraday OHLCV data
+            List of MarketDataPoint objects with intraday OHLCV data
         """
         try:
             if not YFINANCE_AVAILABLE:
@@ -255,15 +297,16 @@ class YFinanceMarketProvider(MarketDataProvider):
                 logger.warning("No intraday data found", symbol=symbol, interval=interval)
                 return []
 
-            stock_data_list: list[StockData] = []
+            stock_data_list: list[MarketDataPoint] = []
             for timestamp, row in hist.iterrows():
-                stock_data = StockData(
+                ts = (
+                    timestamp.to_pydatetime()
+                    if hasattr(timestamp, "to_pydatetime")
+                    else datetime.fromisoformat(str(timestamp))
+                )
+                stock_data = MarketDataPoint(
                     symbol=symbol.upper(),
-                    timestamp=(
-                        timestamp.to_pydatetime()
-                        if hasattr(timestamp, "to_pydatetime")
-                        else timestamp
-                    ),
+                    timestamp=cast(datetime, ts),
                     open_price=Decimal(str(float(row["Open"]))),
                     close_price=Decimal(str(float(row["Close"]))),
                     high_price=Decimal(str(float(row["High"]))),
@@ -290,15 +333,15 @@ class YFinanceMarketProvider(MarketDataProvider):
             logger.error("Failed to fetch intraday data", symbol=symbol, error=str(e))
             raise ValueError(f"Failed to fetch intraday data for {symbol}: {str(e)}") from e
 
-    async def search_stocks(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Search for stocks by symbol or company name using yfinance Search.
+    async def search_instruments(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Search for market instruments by symbol or name using yfinance Search.
 
         Args:
             query: Search query (can be symbol or company name)
             limit: Maximum number of results to return
 
         Returns:
-            List of stock search results with symbol, name, exchange, etc.
+            List of matching market instruments with symbol, name, exchange, etc.
         """
         try:
             if not YFINANCE_AVAILABLE:
@@ -330,7 +373,7 @@ class YFinanceMarketProvider(MarketDataProvider):
                     results.append(result)
 
             logger.info(
-                "Searched stocks",
+                "Searched market instruments",
                 query=query,
                 results_count=len(results),
                 provider=self._provider_name,
@@ -338,8 +381,113 @@ class YFinanceMarketProvider(MarketDataProvider):
             return results
 
         except Exception as e:
-            logger.warning("Failed to search stocks", query=query, error=str(e))
+            logger.warning("Failed to search market instruments", query=query, error=str(e))
             return []
+
+    async def get_options_chain(
+        self,
+        underlying_symbol: str,
+        expiration_date: str | None = None,
+    ) -> OptionsChain:
+        """Get the options chain for an underlying instrument."""
+        try:
+            if not YFINANCE_AVAILABLE:
+                raise ImportError(
+                    "yfinance is not installed. Install it with: pip install yfinance"
+                )
+
+            loop = asyncio.get_event_loop()
+            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(underlying_symbol))
+            available_expirations = await loop.run_in_executor(None, lambda: list(ticker.options))
+
+            if not available_expirations:
+                raise ValueError(f"No listed options available for {underlying_symbol}")
+
+            selected_expiration = expiration_date or available_expirations[0]
+            if selected_expiration not in available_expirations:
+                raise ValueError(
+                    f"Expiration {selected_expiration} is not available for {underlying_symbol}"
+                )
+
+            option_chain = await loop.run_in_executor(
+                None,
+                lambda: ticker.option_chain(selected_expiration),
+            )
+            info = await loop.run_in_executor(None, lambda: ticker.info)
+
+            def _to_contracts(frame: DataFrame, side: OptionSide) -> list[OptionContract]:
+                contracts: list[OptionContract] = []
+                for _, row in frame.iterrows():
+                    expiration = datetime.strptime(selected_expiration, "%Y-%m-%d").date()
+                    contract = OptionContract(
+                        underlying_symbol=underlying_symbol.upper(),
+                        contract_symbol=str(row.get("contractSymbol", "")),
+                        side=side,
+                        strike=_safe_decimal(row.get("strike")) or Decimal("0"),
+                        expiration_date=expiration,
+                        last_price=_safe_decimal(row.get("lastPrice")),
+                        bid=_safe_decimal(row.get("bid")),
+                        ask=_safe_decimal(row.get("ask")),
+                        volume=_safe_int(row.get("volume")),
+                        open_interest=_safe_int(row.get("openInterest")),
+                        implied_volatility=_safe_decimal(row.get("impliedVolatility")),
+                        in_the_money=(
+                            bool(row.get("inTheMoney"))
+                            if row.get("inTheMoney") is not None
+                            else None
+                        ),
+                        currency=info.get("currency", "USD"),
+                        metadata={
+                            "provider": self._provider_name,
+                            "last_trade_date": str(row.get("lastTradeDate", "")),
+                        },
+                    )
+                    contracts.append(contract)
+                return contracts
+
+            underlying_price = _safe_decimal(
+                info.get("currentPrice") or info.get("regularMarketPrice")
+            )
+            if underlying_price is None:
+                fast_info = await loop.run_in_executor(
+                    None, lambda: getattr(ticker, "fast_info", {})
+                )
+                if isinstance(fast_info, dict):
+                    underlying_price = _safe_decimal(
+                        fast_info.get("lastPrice") or fast_info.get("regularMarketPrice")
+                    )
+
+            result = OptionsChain(
+                underlying_symbol=underlying_symbol.upper(),
+                expiration_date=datetime.strptime(selected_expiration, "%Y-%m-%d").date(),
+                available_expirations=[
+                    datetime.strptime(expiration, "%Y-%m-%d").date()
+                    for expiration in available_expirations
+                ],
+                underlying_price=underlying_price,
+                calls=_to_contracts(option_chain.calls, OptionSide.CALL),
+                puts=_to_contracts(option_chain.puts, OptionSide.PUT),
+                currency=info.get("currency", "USD"),
+                metadata={"provider": self._provider_name},
+            )
+            logger.info(
+                "Fetched options chain",
+                underlying_symbol=underlying_symbol,
+                expiration_date=selected_expiration,
+                calls=len(result.calls),
+                puts=len(result.puts),
+                provider=self._provider_name,
+            )
+            return result
+        except Exception as e:
+            logger.error(
+                "Failed to fetch options chain",
+                underlying_symbol=underlying_symbol,
+                error=str(e),
+            )
+            raise ValueError(
+                f"Failed to fetch options chain for {underlying_symbol}: {str(e)}"
+            ) from e
 
 
 class YFinanceFundamentalProvider(FundamentalDataProvider):
@@ -429,8 +577,8 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 prop = getattr(ticker, property_name)
                 # If it's a property, access it; if it's a method, call it
                 if callable(prop):
-                    return prop()
-                return prop
+                    return cast(DataFrame, prop())
+                return cast(DataFrame, prop)
 
             statement_df: DataFrame = await loop.run_in_executor(None, _get_statement)
 

@@ -9,6 +9,7 @@ import structlog
 
 from copinanceos.domain.ports.storage import CacheBackend, CacheEntry
 from copinanceos.infrastructure.cache.local_file_cache import LocalFileCacheBackend
+from copinanceos.infrastructure.persistence import PERSISTENCE_SCHEMA_VERSION
 
 logger = structlog.get_logger(__name__)
 
@@ -50,9 +51,9 @@ class CacheManager:
         # Sort kwargs for consistent key generation
         sorted_params = sorted(kwargs.items())
         params_str = json.dumps(sorted_params, sort_keys=True, default=str)
-        key_data = f"{tool_name}:{params_str}"
+        key_data = f"{PERSISTENCE_SCHEMA_VERSION}:{tool_name}:{params_str}"
         key_hash = hashlib.sha256(key_data.encode()).hexdigest()
-        return f"{tool_name}:{key_hash}"
+        return f"{PERSISTENCE_SCHEMA_VERSION}:{tool_name}:{key_hash}"
 
     async def get(
         self,
@@ -103,6 +104,7 @@ class CacheManager:
         """
         cache_key = self._generate_cache_key(tool_name, **kwargs)
         entry = CacheEntry(
+            schema_version=PERSISTENCE_SCHEMA_VERSION,
             data=data,
             cached_at=datetime.now(UTC),
             tool_name=tool_name,

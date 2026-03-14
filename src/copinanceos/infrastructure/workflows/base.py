@@ -67,7 +67,7 @@ class BaseWorkflowExecutor(WorkflowExecutor):
             Results dictionary containing workflow outputs
         """
         target_symbol = (
-            job.market_index if job.scope == JobScope.MARKET else (job.stock_symbol or None)
+            job.market_index if job.scope == JobScope.MARKET else (job.instrument_symbol or None)
         )
         target_symbol = target_symbol.upper() if isinstance(target_symbol, str) else "N/A"
         timeframe = job.timeframe.value
@@ -150,7 +150,8 @@ class BaseWorkflowExecutor(WorkflowExecutor):
         return {
             "workflow_type": workflow_type,
             "scope": job.scope.value,
-            "stock_symbol": job.stock_symbol,
+            "market_type": job.market_type.value if job.market_type else None,
+            "instrument_symbol": job.instrument_symbol,
             "market_index": job.market_index,
             "timeframe": job.timeframe.value,
             "analysis_type": workflow_type,

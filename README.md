@@ -7,14 +7,14 @@
 [![CI](https://github.com/copinance/copinance-os/actions/workflows/ci.yml/badge.svg)](https://github.com/copinance/copinance-os/actions/workflows/ci.yml)
 [![Docs](https://github.com/copinance/copinance-os/actions/workflows/docs.yml/badge.svg)](https://github.com/copinance/copinance-os/actions/workflows/docs.yml)
 
-Open-source stock research platform and framework with agent AI and stock/macro workflows.
+Open-source market research platform and framework with agent AI and instrument/macro workflows.
 
 **Read [Manifesto](MANIFESTO.md)** to understand my vision for democratizing financial research.
 
 ## Features
 
 - **Adaptive Presentation**: Results can be tailored to financial literacy level (beginner, intermediate, advanced)
-- **Dual Workflow Support**: Deterministic stock/macro analysis and AI-powered agent workflows
+- **Dual Workflow Support**: Deterministic instrument/macro analysis and AI-powered agent workflows
 - **Comprehensive Macro Analysis**: 47+ economic indicators across 9 categories (rates, credit, labor, housing, manufacturing, consumer, global, advanced)
 - **Extensible Framework**: Easy to add new research strategies and data sources
 - **Data Provider Integration**: Built-in yfinance and SEC EDGAR support + easy custom provider integration
@@ -34,8 +34,9 @@ copinanceos/
 ├── domain/              # Core business logic (no dependencies)
 │   ├── models/          # Entities: ResearchProfile, Stock; Job (workflow context only)
 │   └── ports/           # 21 interfaces for extensibility
-├── application/         # Use cases and services
-│   └── use_cases/       # Business operations
+├── application/         # Use cases, default job runner (replaceable)
+│   ├── use_cases/       # Business operations
+│   └── run_job.py       # DefaultJobRunner (optional; implement JobRunner for custom orchestration)
 ├── infrastructure/      # Implementations
 │   ├── repositories/    # Data persistence (in-memory included)
 │   ├── workflows/       # Workflow executors
@@ -48,7 +49,7 @@ copinanceos/
 - Data Provider interfaces (market, alternative, fundamental, macro)
 - Analyzer interfaces (NLP, LLM, vision, quant, graph, portfolio)
 - Strategy interfaces (screening, due diligence, valuation, risk, thematic, monitoring)
-- Core interfaces (repositories, workflows)
+- Core interfaces (repositories, JobRunner, WorkflowExecutor)
 
 See [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture) for details.
 
@@ -102,15 +103,15 @@ python -m copinanceos.cli version
 **Without installation (from project root):**
 ```bash
 # Run directly as a module
-python -m copinanceos.cli analyze stock AAPL --timeframe mid_term
+python3 -m copinanceos.cli analyze market equity AAPL --timeframe mid_term
 python -m copinanceos.cli profile list
-python -m copinanceos.cli stock search "Apple"
+python3 -m copinanceos.cli market search "Apple"
 ```
 
 **After installation:**
 ```bash
 pip install -e .
-copinance analyze stock AAPL --timeframe mid_term
+copinance analyze market equity AAPL --timeframe mid_term
 copinance profile list
 copinance cache info
 ```
@@ -122,12 +123,19 @@ python -m copinanceos.cli profile create --literacy intermediate --name "My Prof
 python -m copinanceos.cli profile list
 python -m copinanceos.cli profile get <profile-id>
 
-# Stock search
-python -m copinanceos.cli stock search "Apple"
+# Instrument search
+python3 -m copinanceos.cli market search "Apple"
+python3 -m copinanceos.cli market quote AAPL
+python3 -m copinanceos.cli market history AAPL --start 2026-01-01 --end 2026-03-14
 
-# One-off analysis (results saved to .copinance/results/)
-python -m copinanceos.cli analyze stock AAPL --timeframe mid_term
-python -m copinanceos.cli ask "What are the key risks?" --symbol AAPL
+# One-off analysis (results saved to .copinance/results/v2/)
+python3 -m copinanceos.cli analyze market equity AAPL --timeframe mid_term
+python3 -m copinanceos.cli analyze market options AAPL --expiration 2026-06-19
+python3 -m copinanceos.cli ask -q "What are the key risks?" -i AAPL
+
+# Ask about options (agent uses options chain tool)
+copinance ask -q "What's the put/call open interest for AAPL?" -i AAPL --market-type options
+copinance ask -q "Summarize AAPL options for June 2026" -i AAPL --market-type options --expiration 2026-06-19
 
 # Macro regime analysis (comprehensive economic indicators)
 copinance analyze macro
@@ -135,6 +143,8 @@ copinance analyze macro --market-index QQQ --lookback-days 180
 copinance analyze macro --include-labor --include-housing --include-consumer
 copinance analyze macro --no-include-vix --no-include-market-breadth
 ```
+
+For a complete CLI reference (all commands and options), see [User Guide - CLI](https://copinance.github.io/copinance-os/user-guide/cli).
 
 ## Testing
 
@@ -215,7 +225,7 @@ Results automatically adapt to financial literacy level:
 - **Intermediate**: Detailed analysis, common indicators
 - **Advanced**: Comprehensive analysis, advanced metrics, technical
 
-When running research commands, the system will prompt you to set your financial literacy level if you don't have a profile, ensuring personalized analysis from the start.
+When running analyze or ask commands, the system will prompt you to set your financial literacy level if you don't have a profile, ensuring personalized analysis from the start.
 
 ### Workflow Types
 
@@ -252,9 +262,21 @@ container = get_container(
     fred_api_key="your-fred-api-key",  # Optional: for high-quality macro data
 )
 
-# Use the container
-use_case = container.get_stock_use_case()
-# ... integrate into your application
+# Run a workflow (default job runner; replace with your own for custom orchestration)
+from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
+from copinanceos.domain.models.market import MarketType
+
+runner = container.job_runner()
+job = Job(
+    scope=JobScope.INSTRUMENT,
+    market_type=MarketType.EQUITY,
+    instrument_symbol="AAPL",
+    market_index=None,
+    timeframe=JobTimeframe.MID_TERM,
+    workflow_type="equity",
+)
+result = await runner.run(job, {})
+# ... use result.success, result.results, result.error_message
 ```
 
 See [Configuration Guide](https://copinance.github.io/copinance-os/user-guide/configuration) for detailed integration examples and [Getting Started](https://copinance.github.io/copinance-os/getting-started/quickstart) for CLI usage.

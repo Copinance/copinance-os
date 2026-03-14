@@ -6,6 +6,7 @@ from typing import Any
 import structlog
 
 from copinanceos.domain.models.job import Job, JobScope
+from copinanceos.domain.models.market import MarketType
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.domain.ports.data_providers import (
     FundamentalDataProvider,
@@ -27,6 +28,9 @@ from copinanceos.infrastructure.tools.analysis.market_regime.indicators import (
 from copinanceos.infrastructure.workflows.base import BaseWorkflowExecutor
 
 logger = structlog.get_logger(__name__)
+
+# Cache key "tool name" for agent prompt cache (same CacheManager, different logical resource)
+AGENT_PROMPT_CACHE_NAME = "agent_prompt"
 
 
 class AgenticWorkflowExecutor(BaseWorkflowExecutor):
@@ -87,15 +91,18 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
                 - iterations: Number of LLM iterations
         """
         is_market_wide = job.scope == JobScope.MARKET
+        market_type = job.market_type or MarketType.EQUITY
         # Use a sensible default symbol for tool examples and prompt context.
         # For market-wide questions, we anchor to a market index (default: SPY).
         symbol = (
             (job.market_index or "SPY").upper()
             if is_market_wide
-            else (job.stock_symbol or "").upper()
+            else (job.instrument_symbol or "").upper()
         )
         if not is_market_wide and not symbol:
-            raise ValueError("stock_symbol is required for agent workflow when scope=stock")
+            raise ValueError(
+                "instrument_symbol is required for agent workflow when scope=instrument"
+            )
 
         results: dict[str, Any] = {}
 
@@ -213,9 +220,20 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
             if symbol and symbol.upper() not in question.upper():
                 enhanced_question = f"Market-wide (anchor index: {symbol}): {question}"
         else:
-            # This helps the LLM know which stock symbol to use in tool calls.
+            # This helps the LLM know which instrument to use in tool calls.
             if symbol.upper() not in question.upper():
-                enhanced_question = f"About {symbol}: {question}"
+                enhanced_question = f"About {market_type.value} instrument {symbol}: {question}"
+
+            if market_type == MarketType.OPTIONS:
+                option_context_parts = []
+                if context.get("expiration_date"):
+                    option_context_parts.append(f"expiration {context['expiration_date']}")
+                if context.get("option_side") and context["option_side"] != "all":
+                    option_context_parts.append(f"side {context['option_side']}")
+                if option_context_parts:
+                    enhanced_question = (
+                        f"{enhanced_question} (options context: {', '.join(option_context_parts)})"
+                    )
 
         # Build tool descriptions and examples
         tools_description, tool_examples = self._build_tool_descriptions(tools, symbol)
@@ -223,14 +241,37 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         # Get financial literacy level
         financial_literacy = context.get("financial_literacy", "intermediate")
 
-        # Load prompts from template using PromptManager
-        system_prompt, user_prompt = self._prompt_manager.get_prompt(
-            "agentic_workflow",
-            question=enhanced_question,
-            tools_description=tools_description,
-            tool_examples=tool_examples,
-            financial_literacy=financial_literacy,
-        )
+        # Load prompts: use cache when available, otherwise render and cache
+        cache_kw = {
+            "prompt_name": "agentic_workflow",
+            "question": enhanced_question,
+            "tools_description": tools_description,
+            "tool_examples": tool_examples,
+            "financial_literacy": financial_literacy,
+        }
+        system_prompt = ""
+        user_prompt = ""
+        if self._cache_manager:
+            entry = await self._cache_manager.get(AGENT_PROMPT_CACHE_NAME, **cache_kw)
+            if entry and isinstance(entry.data, dict):
+                system_prompt = entry.data.get("system_prompt", "") or ""
+                user_prompt = entry.data.get("user_prompt", "") or ""
+                if system_prompt and user_prompt:
+                    logger.debug("Using cached prompts for agentic workflow", symbol=symbol)
+        if not system_prompt or not user_prompt:
+            system_prompt, user_prompt = self._prompt_manager.get_prompt(
+                "agentic_workflow",
+                question=enhanced_question,
+                tools_description=tools_description,
+                tool_examples=tool_examples,
+                financial_literacy=financial_literacy,
+            )
+            if self._cache_manager:
+                await self._cache_manager.set(
+                    AGENT_PROMPT_CACHE_NAME,
+                    {"system_prompt": system_prompt, "user_prompt": user_prompt},
+                    **cache_kw,
+                )
 
         logger.info(
             "Executing agentic workflow with tools",
@@ -255,6 +296,9 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
         results["llm_provider"] = llm_provider.get_provider_name()
         results["llm_model"] = llm_provider.get_model_name()
         results["tools_used"] = [tc.get("tool") for tc in results["tool_calls"]]
+        if context.get("include_prompt"):
+            results["system_prompt"] = system_prompt
+            results["user_prompt"] = user_prompt
 
         logger.info(
             "Agentic workflow completed",
@@ -278,7 +322,7 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
 
         Args:
             tools: List of tools to describe
-            symbol: Stock symbol for example generation
+            symbol: Instrument symbol for example generation
 
         Returns:
             Tuple of (tools_description, tool_examples)
@@ -315,9 +359,13 @@ class AgenticWorkflowExecutor(BaseWorkflowExecutor):
                 # Build example args for required parameters
                 if param_name in required:
                     if param_type == "string":
-                        example_args[param_name] = (
-                            symbol if "symbol" in param_name.lower() else "example"
-                        )
+                        lowered_name = param_name.lower()
+                        if "symbol" in lowered_name:
+                            example_args[param_name] = symbol
+                        elif "date" in lowered_name:
+                            example_args[param_name] = "2026-06-19"
+                        else:
+                            example_args[param_name] = "example"
                     elif param_type == "integer":
                         example_args[param_name] = 5
 

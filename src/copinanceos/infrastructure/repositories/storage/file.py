@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from copinanceos.domain.ports.storage import Storage
+from copinanceos.infrastructure.persistence import PERSISTENCE_SCHEMA_VERSION, get_data_dir
 
 
 class JsonFileStorage(Storage):
@@ -23,8 +24,10 @@ class JsonFileStorage(Storage):
         Args:
             base_path: Base directory for storing JSON files
         """
-        self._base_path = Path(base_path)
-        self._base_path.mkdir(parents=True, exist_ok=True)
+        self._root_path = Path(base_path)
+        self._root_path.mkdir(parents=True, exist_ok=True)
+        self._base_path = self._root_path
+        self._data_path = get_data_dir(self._root_path)
         self._collections: dict[str, dict[UUID, Any]] = {}
         self._file_paths: dict[str, Path] = {}
 
@@ -38,9 +41,13 @@ class JsonFileStorage(Storage):
             Path to JSON file for this collection
         """
         if collection_name not in self._file_paths:
-            # Sanitize collection name for filename
-            safe_name = collection_name.replace("/", "_").replace("\\", "_")
-            self._file_paths[collection_name] = self._base_path / f"{safe_name}.json"
+            normalized = collection_name.replace("\\", "/").strip("/")
+            if not normalized:
+                normalized = "default"
+            parts = [part.replace("..", "_").replace("/", "_") for part in normalized.split("/")]
+            directory = self._data_path.joinpath(*parts[:-1]) if len(parts) > 1 else self._data_path
+            directory.mkdir(parents=True, exist_ok=True)
+            self._file_paths[collection_name] = directory / f"{parts[-1]}.json"
         return self._file_paths[collection_name]
 
     def get_collection(self, collection_name: str, entity_type: type[Any]) -> dict[UUID, Any]:
@@ -70,9 +77,9 @@ class JsonFileStorage(Storage):
             try:
                 with open(file_path) as f:
                     data = json.load(f)
-                    for entity_id_str, entity_data in data.items():
+                    entities = data.get("entities", {})
+                    for entity_id_str, entity_data in entities.items():
                         entity_id = UUID(entity_id_str)
-                        # Pydantic will automatically handle enum and datetime parsing
                         entity = entity_type.model_validate(entity_data)
                         self._collections[collection_name][entity_id] = entity
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as e:
@@ -93,9 +100,14 @@ class JsonFileStorage(Storage):
             return
 
         file_path = self._get_file_path(collection_name)
-        data = {
+        entities = {
             str(entity_id): entity.model_dump(mode="json")
             for entity_id, entity in self._collections[collection_name].items()
+        }
+        data = {
+            "schema_version": PERSISTENCE_SCHEMA_VERSION,
+            "collection_name": collection_name,
+            "entities": entities,
         }
         with open(file_path, "w") as f:
             json.dump(data, f, indent=2)
@@ -124,6 +136,6 @@ class JsonFileStorage(Storage):
                     file_path.unlink()
         else:
             self._collections.clear()
-            for file_path in self._file_paths.values():
+            for file_path in self._data_path.rglob("*.json"):
                 if file_path.exists():
                     file_path.unlink()

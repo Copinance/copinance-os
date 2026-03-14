@@ -16,8 +16,9 @@ from copinanceos.infrastructure.tools.data_provider.fundamental_data import (
 )
 from copinanceos.infrastructure.tools.data_provider.market_data import (
     MarketDataGetHistoricalDataTool,
+    MarketDataGetOptionsChainTool,
     MarketDataGetQuoteTool,
-    MarketDataSearchStocksTool,
+    MarketDataSearchInstrumentsTool,
 )
 from copinanceos.infrastructure.tools.data_provider.provider_selector import (
     MultiProviderSelector,
@@ -42,7 +43,8 @@ def create_market_data_tools(
     return [
         MarketDataGetQuoteTool(provider, cache_manager=cache_manager),
         MarketDataGetHistoricalDataTool(provider, cache_manager=cache_manager),
-        MarketDataSearchStocksTool(provider, cache_manager=cache_manager),
+        MarketDataSearchInstrumentsTool(provider, cache_manager=cache_manager),
+        MarketDataGetOptionsChainTool(provider, cache_manager=cache_manager),
     ]
 
 

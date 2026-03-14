@@ -1,7 +1,7 @@
 name: Documentation
 
 # This workflow builds Nextra documentation and deploys it to GitHub Pages
-# 
+#
 # This workflow requires manual triggering via workflow_dispatch
 # To deploy: Go to Actions > Documentation > Run workflow
 #

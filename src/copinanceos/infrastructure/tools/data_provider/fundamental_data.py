@@ -18,7 +18,7 @@ logger = structlog.get_logger(__name__)
 
 
 class FundamentalDataGetFundamentalsTool(BaseDataProviderTool[FundamentalDataProvider]):
-    """Tool for getting detailed stock fundamentals."""
+    """Tool for getting detailed equity fundamentals."""
 
     def __init__(
         self,
@@ -37,11 +37,11 @@ class FundamentalDataGetFundamentalsTool(BaseDataProviderTool[FundamentalDataPro
 
     def get_name(self) -> str:
         """Get tool name."""
-        return "get_stock_fundamentals"
+        return "get_equity_fundamentals"
 
     def get_description(self) -> str:
         """Get tool description."""
-        return "Get comprehensive fundamental data for a stock including financial statements, ratios, and metrics."
+        return "Get comprehensive fundamental data for an equity including financial statements, ratios, and metrics."
 
     def get_schema(self) -> ToolSchema:
         """Get tool schema."""
@@ -52,7 +52,7 @@ class FundamentalDataGetFundamentalsTool(BaseDataProviderTool[FundamentalDataPro
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Equity ticker symbol (e.g., 'AAPL', 'MSFT')",
                     },
                     "periods": {
                         "type": "integer",
@@ -135,9 +135,7 @@ class FundamentalDataGetFinancialStatementsTool(BaseDataProviderTool[Fundamental
 
     def get_description(self) -> str:
         """Get tool description."""
-        return (
-            "Get financial statements (income statement, balance sheet, or cash flow) for a stock."
-        )
+        return "Get financial statements (income statement, balance sheet, or cash flow) for an equity."
 
     def get_schema(self) -> ToolSchema:
         """Get tool schema."""
@@ -148,7 +146,7 @@ class FundamentalDataGetFinancialStatementsTool(BaseDataProviderTool[Fundamental
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Equity ticker symbol (e.g., 'AAPL', 'MSFT')",
                     },
                     "statement_type": {
                         "type": "string",
@@ -260,7 +258,7 @@ class FundamentalDataGetSECFilingsTool(BaseDataProviderTool[FundamentalDataProvi
     def get_description(self) -> str:
         """Get tool description."""
         return (
-            "Get SEC filings (10-K, 10-Q, 8-K, etc.) for a stock from EDGAR database. "
+            "Get SEC filings (10-K, 10-Q, 8-K, etc.) for an equity from the EDGAR database. "
             "Returns filing metadata including filing dates, report dates, accession numbers, and URLs. "
             "10-K filings are annual reports, 10-Q filings are quarterly reports."
         )
@@ -274,7 +272,7 @@ class FundamentalDataGetSECFilingsTool(BaseDataProviderTool[FundamentalDataProvi
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Equity ticker symbol (e.g., 'AAPL', 'MSFT')",
                     },
                     "filing_types": {
                         "type": "array",

@@ -63,4 +63,3 @@ The documentation is configured for GitHub Pages deployment with the base path `
 - **Theme**: Edit `theme.config.tsx` to customize colors, logo, footer, etc.
 - **Navigation**: Edit `_meta.json` files in `pages/` directories to change the sidebar structure
 - **Styling**: Nextra uses Tailwind CSS - you can add custom styles if needed
-

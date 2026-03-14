@@ -1,4 +1,19 @@
-.PHONY: help venv setup install install-dev test test-unit test-integration coverage lint format type-check clean clean-venv run docs
+.PHONY: help venv setup install install-dev test test-unit test-integration coverage lint format format-check type-check quality fix clean clean-cache clean-cache-data clean-venv clean-docs cli docs docs-serve pre-commit check version
+
+ESC := \033
+RESET := $(ESC)[0m
+BOLD := $(ESC)[1m
+BLUE := $(ESC)[34m
+GREEN := $(ESC)[32m
+YELLOW := $(ESC)[33m
+CYAN := $(ESC)[36m
+
+SETUP_TARGETS := venv setup install install-dev
+QUALITY_TARGETS := lint format format-check type-check fix quality pre-commit
+TEST_TARGETS := test test-unit test-integration coverage check
+DOCS_TARGETS := docs docs-serve
+UTILITY_TARGETS := cli version
+CLEAN_TARGETS := clean clean-cache clean-cache-data clean-venv clean-docs
 
 # Detect Python version and virtual environment
 PYTHON := python3
@@ -25,34 +40,43 @@ else
 endif
 
 help: ## Show this help message
-	@echo "Usage: make [target]"
-	@echo ""
-	@echo "Available targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
+	@printf "$(BOLD)Usage:$(RESET) make [target]\n\n"
+	@printf "$(BOLD)Available targets:$(RESET)\n\n"
+	@print_group() { \
+		title="$$1"; \
+		shift; \
+		printf "$(BOLD)%s$(RESET)\n" "$$title"; \
+		for target in "$$@"; do \
+			desc=$$(awk -F':.*?## ' -v target="$$target" '$$1 == target { print $$2 }' $(MAKEFILE_LIST)); \
+			printf "  $(CYAN)%-20s$(RESET) %s\n" "$$target" "$$desc"; \
+		done; \
+		printf "\n"; \
+	}; \
+	print_group "Setup" $(SETUP_TARGETS); \
+	print_group "Quality" $(QUALITY_TARGETS); \
+	print_group "Testing" $(TEST_TARGETS); \
+	print_group "Docs" $(DOCS_TARGETS); \
+	print_group "Utilities" $(UTILITY_TARGETS); \
+	print_group "Cleanup" $(CLEAN_TARGETS)
 
 venv: ## Create a Python virtual environment
-	@echo "Creating virtual environment..."
+	@printf "$(BLUE)Creating virtual environment...$(RESET)\n"
 	$(PYTHON) -m venv $(VENV)
-	@echo "Virtual environment created at $(VENV)"
-	@echo ""
-	@echo "Activate it with:"
-	@echo "  source $(VENV_BIN)/activate"
-	@echo ""
-	@echo "Or on Windows:"
-	@echo "  $(VENV_BIN)\\activate"
+	@printf "$(GREEN)Virtual environment created at $(VENV)$(RESET)\n\n"
+	@printf "$(BOLD)Activate it with:$(RESET)\n"
+	@printf "  $(CYAN)source $(VENV_BIN)/activate$(RESET)\n\n"
+	@printf "$(BOLD)Or on Windows:$(RESET)\n"
+	@printf "  $(CYAN)$(VENV_BIN)\\\\activate$(RESET)\n"
 
 setup: venv ## Set up development environment (create venv and install dev dependencies)
-	@echo "Installing development dependencies..."
+	@printf "$(BLUE)Installing development dependencies...$(RESET)\n"
 	$(VENV_BIN)/pip install -e ".[dev]"
 	$(VENV_BIN)/pre-commit install
 	$(VENV_BIN)/pre-commit install --hook-type pre-push
-	@echo ""
-	@echo "✓ Setup complete!"
-	@echo ""
-	@echo "Activate the virtual environment with:"
-	@echo "  source $(VENV_BIN)/activate"
-	@echo ""
-	@echo "To build documentation, see docs/README.md"
+	@printf "\n$(GREEN)Setup complete!$(RESET)\n\n"
+	@printf "$(BOLD)Activate the virtual environment with:$(RESET)\n"
+	@printf "  $(CYAN)source $(VENV_BIN)/activate$(RESET)\n\n"
+	@printf "$(YELLOW)To build documentation, see docs/README.md$(RESET)\n"
 
 install: ## Install package in production mode
 	@if [ -d "$(VENV)" ]; then \
@@ -71,16 +95,20 @@ install-dev: ## Install package in development mode with all dependencies
 	fi
 
 test: ## Run all tests
-	$(PYTEST)
+	$(PYTEST) --cov=copinance --cov-report=html --cov-report=term-missing
+	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 test-unit: ## Run unit tests only
-	$(PYTEST) -m unit
+	$(PYTEST) -m unit --cov=copinance --cov-report=html --cov-report=term-missing
+	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 test-integration: ## Run integration tests only
-	$(PYTEST) -m integration
+	$(PYTEST) -m integration --cov=copinance --cov-report=html --cov-report=term-missing
+	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 coverage: ## Run tests with coverage report
 	$(PYTEST) --cov=copinance --cov-report=html --cov-report=term-missing
+	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 lint: ## Run linting checks
 	$(RUFF) check src/ tests/ .pre-commit-hooks/
@@ -99,33 +127,45 @@ quality: lint type-check format-check ## Run all quality checks
 fix: format ## Fix code formatting and auto-fixable linting issues
 	$(RUFF) check src/ tests/ --fix
 
-clean: ## Clean up generated files (keeps venv)
+clean: clean-cache ## Clean up generated files (keeps venv)
 	rm -rf build/
 	rm -rf dist/
-	rm -rf *.egg-info
-	rm -rf .pytest_cache/
 	rm -rf .coverage
+	rm -rf coverage.xml
 	rm -rf htmlcov/
+	find . -type d -name "*.egg-info" -exec rm -rf {} +
+
+clean-cache: ## Remove Python and tool cache files
+	rm -rf .pytest_cache/
 	rm -rf .mypy_cache/
 	rm -rf .ruff_cache/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
+clean-cache-data: ## Remove local CLI cached data
+	rm -rf "$${COPINANCEOS_STORAGE_PATH:-.copinance}"
+
 clean-venv: ## Remove virtual environment
 	rm -rf $(VENV)
-	@echo "Virtual environment removed"
+	@printf "$(YELLOW)Virtual environment removed$(RESET)\n"
 
 cli: ## Show CLI help
 	copinance --help
 
 docs: ## Build documentation with Nextra
-	@echo "Building documentation with Nextra..."
+	@printf "$(BLUE)Building documentation with Nextra...$(RESET)\n"
 	@cd docs && npm install && npm run build
-	@echo "Documentation built in docs/out/"
+	@printf "$(GREEN)Documentation built in docs/out/$(RESET)\n"
 
 docs-serve: ## Serve documentation locally with Nextra
-	@echo "Starting Nextra development server..."
+	@printf "$(BLUE)Starting Nextra development server...$(RESET)\n"
 	@cd docs && npm install && npm run dev
+
+clean-docs: ## Remove generated docs build files and dependencies
+	rm -rf docs/.next
+	rm -rf docs/out
+	rm -rf docs/node_modules
+	@printf "$(YELLOW)Documentation build artifacts removed$(RESET)\n"
 
 pre-commit: ## Run pre-commit hooks on all files
 	pre-commit run --all-files

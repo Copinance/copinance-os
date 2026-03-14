@@ -3,6 +3,7 @@
 import pytest
 
 from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
+from copinanceos.domain.models.market import MarketType
 from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
 
 
@@ -13,15 +14,16 @@ class TestJobModel:
     def test_create_job(self) -> None:
         """Test creating a job."""
         job = Job(
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="stock",
+            workflow_type="equity",
         )
 
-        assert job.stock_symbol == "AAPL"
+        assert job.instrument_symbol == "AAPL"
         assert job.timeframe == JobTimeframe.MID_TERM
-        assert job.workflow_type == "stock"
+        assert job.workflow_type == "equity"
         assert job.status == JobStatus.PENDING
         assert job.profile_id is None
 
@@ -29,10 +31,11 @@ class TestJobModel:
         """Test creating job with a profile."""
         profile = ResearchProfile(financial_literacy=FinancialLiteracy.ADVANCED)
         job = Job(
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
-            workflow_type="stock",
+            workflow_type="equity",
             profile_id=profile.id,
         )
 
@@ -41,10 +44,11 @@ class TestJobModel:
     def test_job_status_transition(self) -> None:
         """Test job status can be updated."""
         job = Job(
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.SHORT_TERM,
-            workflow_type="stock",
+            workflow_type="equity",
         )
 
         assert job.status == JobStatus.PENDING

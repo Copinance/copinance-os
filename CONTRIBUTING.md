@@ -57,7 +57,9 @@ Run tests:
 pytest
 
 # With coverage
-pytest --cov=copinance
+make coverage
+# or: pytest --cov=copinance --cov-report=html --cov-report=term-missing
+# Open report: file://<project-root>/htmlcov/index.html
 
 # Specific markers
 pytest -m unit
@@ -70,7 +72,7 @@ Use clear, descriptive commit messages. A commit message template is available i
 
 ```
 feat: add sentiment analysis workflow
-fix: correct stock search case sensitivity
+fix: correct market search case sensitivity
 docs: update API documentation
 test: add tests for research orchestrator
 refactor: simplify repository interface
@@ -229,9 +231,9 @@ class MyDataProviderTool(BaseDataProviderTool[MarketDataProvider]):
     async def _execute_impl(self, **kwargs: Any) -> ToolResult:
         validated = self.validate_parameters(**kwargs)
         symbol = validated["symbol"]
-        
+
         data = await self._provider.get_custom_data(symbol)
-        
+
         return self._create_success_result(
             data=data,
             metadata={"symbol": symbol},

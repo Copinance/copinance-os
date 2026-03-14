@@ -1,4 +1,4 @@
-"""Stock fundamentals research use cases."""
+"""Stock fundamentals use cases."""
 
 from pydantic import BaseModel, Field
 
@@ -9,7 +9,7 @@ from copinanceos.domain.ports.data_providers import FundamentalDataProvider
 
 
 class ResearchStockFundamentalsRequest(BaseModel):
-    """Request to research stock fundamentals."""
+    """Request for stock fundamentals."""
 
     symbol: str = Field(..., description="Stock symbol to research")
     periods: int = Field(default=5, description="Number of periods to retrieve (e.g., 5 years)")
@@ -43,7 +43,7 @@ class ResearchStockFundamentalsUseCase(
     async def execute(
         self, request: ResearchStockFundamentalsRequest
     ) -> ResearchStockFundamentalsResponse:
-        """Execute the research stock fundamentals use case.
+        """Execute the stock fundamentals use case.
 
         Args:
             request: Request containing symbol and parameters

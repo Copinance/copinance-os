@@ -3,8 +3,9 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from copinanceos.domain.models.market import MarketDataPoint
 from copinanceos.domain.models.research_profile import ResearchProfile
-from copinanceos.domain.models.stock import Stock, StockData
+from copinanceos.domain.models.stock import Stock
 
 
 class ResearchProfileRepository(ABC):
@@ -50,6 +51,6 @@ class StockRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_stock_data(self, symbol: str, limit: int = 100) -> list[StockData]:
-        """Get historical stock data."""
+    async def get_market_data(self, symbol: str, limit: int = 100) -> list[MarketDataPoint]:
+        """Get historical market data."""
         pass

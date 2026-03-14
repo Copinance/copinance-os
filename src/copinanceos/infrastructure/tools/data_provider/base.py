@@ -1,6 +1,7 @@
 """Base classes for data provider tools."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any, Generic, TypeVar
 
 import structlog
@@ -177,7 +178,11 @@ class BaseDataProviderTool(Tool, Generic[TProvider]):
             Serialized data
         """
         if hasattr(data, "model_dump"):
-            return data.model_dump()
+            return self._serialize_data(data.model_dump())
+        if isinstance(data, (datetime, date)):
+            return data.isoformat()
+        if isinstance(data, Decimal):
+            return str(data)
         if isinstance(data, list):
             return [self._serialize_data(item) for item in data]
         if isinstance(data, dict):

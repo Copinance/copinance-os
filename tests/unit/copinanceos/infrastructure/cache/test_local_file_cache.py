@@ -9,6 +9,7 @@ import pytest
 
 from copinanceos.domain.ports.storage import CacheEntry
 from copinanceos.infrastructure.cache.local_file_cache import LocalFileCacheBackend
+from copinanceos.infrastructure.persistence import PERSISTENCE_SCHEMA_VERSION
 
 
 @pytest.mark.unit
@@ -42,11 +43,11 @@ class TestLocalFileCacheBackend:
     def test_init_without_cache_dir(self, mock_create_storage: patch) -> None:
         """Test initialization without cache directory (uses default)."""
         mock_storage = MagicMock()
-        mock_storage._base_path = Path(".copinance")
+        mock_storage._root_path = Path(".copinance")
         mock_create_storage.return_value = mock_storage
 
         backend = LocalFileCacheBackend()
-        assert backend._cache_dir == Path(".copinance") / "cache"
+        assert backend._cache_dir == Path(".copinance") / "cache" / "v2"
 
     def test_get_backend_name(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test getting backend name."""
@@ -55,7 +56,7 @@ class TestLocalFileCacheBackend:
     def test_get_cache_file_path(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test cache file path generation."""
         path = cache_backend._get_cache_file_path("test_key")
-        assert path.parent == cache_backend._cache_dir
+        assert str(path).startswith(str(cache_backend._cache_dir))
         assert path.suffix == ".json"
         # Path should be based on hash of key
         assert len(path.stem) == 64  # SHA256 hex digest length
@@ -68,9 +69,10 @@ class TestLocalFileCacheBackend:
     async def test_set_and_get(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test setting and getting cache entry."""
         entry = CacheEntry(
+            schema_version=PERSISTENCE_SCHEMA_VERSION,
             data={"price": 150.0},
             cached_at=datetime.now(UTC),
-            tool_name="get_quote",
+            tool_name="get_market_quote",
             cache_key="test_key",
         )
 
@@ -86,9 +88,10 @@ class TestLocalFileCacheBackend:
         """Test setting and getting cache entry with metadata."""
         metadata = {"source": "yfinance", "version": "1.0"}
         entry = CacheEntry(
+            schema_version=PERSISTENCE_SCHEMA_VERSION,
             data={"price": 150.0},
             cached_at=datetime.now(UTC),
-            tool_name="get_quote",
+            tool_name="get_market_quote",
             cache_key="test_key",
             metadata=metadata,
         )
@@ -102,9 +105,10 @@ class TestLocalFileCacheBackend:
     async def test_delete_existing(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test deleting existing cache entry."""
         entry = CacheEntry(
+            schema_version=PERSISTENCE_SCHEMA_VERSION,
             data={"price": 150.0},
             cached_at=datetime.now(UTC),
-            tool_name="get_quote",
+            tool_name="get_market_quote",
             cache_key="test_key",
         )
 
@@ -124,6 +128,7 @@ class TestLocalFileCacheBackend:
         # Create multiple entries
         for i in range(3):
             entry = CacheEntry(
+                schema_version=PERSISTENCE_SCHEMA_VERSION,
                 data={"value": i},
                 cached_at=datetime.now(UTC),
                 tool_name=f"tool_{i}",
@@ -143,15 +148,17 @@ class TestLocalFileCacheBackend:
         # Create entries for different tools
         for i in range(3):
             entry = CacheEntry(
+                schema_version=PERSISTENCE_SCHEMA_VERSION,
                 data={"value": i},
                 cached_at=datetime.now(UTC),
-                tool_name="get_quote",
+                tool_name="get_market_quote",
                 cache_key=f"key_{i}",
             )
             await cache_backend.set(f"key_{i}", entry)
 
         # Create entry for different tool
         other_entry = CacheEntry(
+            schema_version=PERSISTENCE_SCHEMA_VERSION,
             data={"value": 999},
             cached_at=datetime.now(UTC),
             tool_name="get_fundamentals",
@@ -159,10 +166,10 @@ class TestLocalFileCacheBackend:
         )
         await cache_backend.set("other_key", other_entry)
 
-        result = await cache_backend.clear("get_quote")
+        result = await cache_backend.clear("get_market_quote")
 
         assert result == 3
-        # Verify get_quote entries are gone
+        # Verify get_market_quote entries are gone
         for i in range(3):
             assert await cache_backend.get(f"key_{i}") is None
         # Verify other tool entry still exists
@@ -171,9 +178,10 @@ class TestLocalFileCacheBackend:
     async def test_exists(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test checking if cache entry exists."""
         entry = CacheEntry(
+            schema_version=PERSISTENCE_SCHEMA_VERSION,
             data={"price": 150.0},
             cached_at=datetime.now(UTC),
-            tool_name="get_quote",
+            tool_name="get_market_quote",
             cache_key="test_key",
         )
 
@@ -197,9 +205,10 @@ class TestLocalFileCacheBackend:
         cache_backend._cache_dir.chmod(0o444)
         try:
             entry = CacheEntry(
+                schema_version=PERSISTENCE_SCHEMA_VERSION,
                 data={"price": 150.0},
                 cached_at=datetime.now(UTC),
-                tool_name="get_quote",
+                tool_name="get_market_quote",
                 cache_key="test_key",
             )
 

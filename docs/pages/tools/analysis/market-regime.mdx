@@ -353,14 +353,14 @@ if result.success:
         print(f"Current VIX: {result.data['vix']['current_vix']}")
         print(f"VIX Regime: {result.data['vix']['regime']}")
         print(f"Market Sentiment: {result.data['vix']['sentiment']}")
-    
+
     # Market breadth
     if result.data.get("market_breadth", {}).get("available"):
         breadth = result.data["market_breadth"]
         print(f"Breadth Ratio: {breadth['breadth_ratio']}%")
         print(f"Breadth Regime: {breadth['regime']}")
         print(f"Sectors Above MA: {breadth['sectors_above_50ma']}/{breadth['total_sectors_analyzed']}")
-    
+
     # Sector rotation
     if result.data.get("sector_rotation", {}).get("available"):
         rotation = result.data["sector_rotation"]
@@ -435,16 +435,16 @@ if result.data.get('parameters_adjusted'):
 
 Tools are automatically available in agent workflows when a market data provider is configured. The LLM will automatically select and use the appropriate tools based on your question.
 
-**Individual Stock Analysis:**
+**Individual Instrument Analysis:**
 ```bash
-# Analyze trend and volatility for a specific stock
-copinance ask "What is the current market trend and volatility regime?" --symbol AAPL
+# Analyze trend and volatility for a specific instrument
+copinance ask "What is the current market trend and volatility regime?" --instrument AAPL
 
 # Analyze market cycles
-copinance ask "What market cycle phase is this stock in?" --symbol TSLA
+copinance ask "What market cycle phase is this instrument in?" --instrument TSLA
 
 # Comprehensive regime analysis
-copinance ask "Analyze the market regime for this stock including trend, volatility, and cycle phases" --symbol MSFT
+copinance ask "Analyze the market regime for this instrument including trend, volatility, and cycle phases" --instrument MSFT
 ```
 
 **Market-Wide Indicators:**
@@ -464,8 +464,8 @@ copinance ask "Which sectors are currently outperforming and what rotation theme
 
 **Combined Analysis:**
 ```bash
-# Combine individual stock and market-wide analysis
-copinance ask "Analyze this stock's regime and compare it to the broader market conditions including VIX and sector rotation" --symbol AAPL
+# Combine individual instrument and market-wide analysis
+copinance ask "Analyze this instrument's regime and compare it to the broader market conditions including VIX and sector rotation" --instrument AAPL
 ```
 
 The LLM will automatically use the appropriate tools (`detect_market_trend`, `detect_volatility_regime`, `detect_market_cycles`, or `get_market_regime_indicators`) based on your question.
@@ -535,7 +535,7 @@ trend_tool = registry.get("detect_market_trend")
 1. **Data Quality**: Ensure sufficient historical data for reliable regime detection
 2. **Multiple Timeframes**: Use different lookback periods to confirm regime signals
 3. **Combined Analysis**: Use all tools together for comprehensive market assessment:
-   - Individual stock tools (trend, volatility, cycles) for stock-specific analysis
+   - Individual instrument tools (trend, volatility, cycles) for instrument-specific analysis
    - Market indicators tool for broader market context
 4. **Confidence Levels**: Pay attention to confidence indicators, especially with limited data
 5. **Regime Transitions**: Monitor `potential_regime_change` signals for early warning of shifts
@@ -586,11 +586,11 @@ from copinanceos.infrastructure.tools.analysis.market_regime.base import (
 class MLRegimeDetectionTool(BaseRegimeDetectionTool):
     def get_detection_method(self) -> str:
         return "machine_learning"
-    
+
     async def _detect_regime(self, symbol: str, **kwargs: Any) -> dict[str, Any]:
         # Your ML-based detection logic
         pass
-    
+
     async def _execute_impl(self, **kwargs: Any) -> ToolResult:
         # Implementation
         pass
@@ -631,7 +631,7 @@ from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
     create_all_regime_tools,
 )
 all_tools = create_all_regime_tools(
-    provider, 
+    provider,
     methods=["rule_based", "statistical"]  # Add more as they're implemented
 )
 # Note: MarketRegimeIndicatorsTool is separate and must be created explicitly
@@ -653,4 +653,3 @@ The structure is designed to accommodate:
 - [API Reference](../../api-reference/data-providers) - Data provider interfaces
 - [Workflows](../../user-guide/workflows) - How to use tools in workflows
 - [Developer Guide](../../developer-guide/extending) - Creating custom tools
-

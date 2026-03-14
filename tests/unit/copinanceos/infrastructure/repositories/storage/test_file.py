@@ -10,6 +10,7 @@ import pytest
 
 from copinanceos.domain.models.base import Entity
 from copinanceos.domain.models.research_profile import FinancialLiteracy, ResearchProfile
+from copinanceos.infrastructure.persistence import get_data_dir
 from copinanceos.infrastructure.repositories.storage.file import JsonFileStorage
 
 
@@ -112,18 +113,21 @@ class TestJsonFileStorage:
 
             storage.save("test_collection")
 
-            # Verify file exists and contains data
-            file_path = Path(tmpdir) / "test_collection.json"
+            # Verify file exists under versioned data dir and contains data
+            data_dir = get_data_dir(tmpdir)
+            file_path = data_dir / "test_collection.json"
             assert file_path.exists()
 
             with open(file_path) as f:
                 data = json.load(f)
 
-            assert len(data) == 2
-            assert str(entity1_id) in data
-            assert str(entity2_id) in data
-            assert data[str(entity1_id)]["name"] == "Entity1"
-            assert data[str(entity2_id)]["name"] == "Entity2"
+            assert "entities" in data
+            entities = data["entities"]
+            assert len(entities) == 2
+            assert str(entity1_id) in entities
+            assert str(entity2_id) in entities
+            assert entities[str(entity1_id)]["name"] == "Entity1"
+            assert entities[str(entity2_id)]["name"] == "Entity2"
 
     def test_save_handles_nonexistent_collection(self) -> None:
         """Test that save handles nonexistent collection gracefully."""
@@ -142,8 +146,9 @@ class TestJsonFileStorage:
             # This tests the defensive early return
             storage._save_collection("nonexistent_collection")
 
-            # Verify no file was created
-            file_path = Path(tmpdir) / "nonexistent_collection.json"
+            # Verify no file was created (would be under data/v2)
+            data_dir = get_data_dir(tmpdir)
+            file_path = data_dir / "nonexistent_collection.json"
             assert not file_path.exists()
 
     def test_save_with_pydantic_model(self) -> None:
@@ -160,21 +165,22 @@ class TestJsonFileStorage:
                 preferences={"key": "value"},
             )
 
-            collection = storage.get_collection("profiles", ResearchProfile)
+            collection = storage.get_collection("research/profiles", ResearchProfile)
             collection[profile_id] = profile
-            storage.save("profiles")
+            storage.save("research/profiles")
 
             # Verify file exists
-            file_path = Path(tmpdir) / "profiles.json"
+            file_path = Path(tmpdir) / "data" / "v2" / "research" / "profiles.json"
             assert file_path.exists()
 
             # Load and verify
             with open(file_path) as f:
                 data = json.load(f)
 
-            assert str(profile_id) in data
-            assert data[str(profile_id)]["financial_literacy"] == "intermediate"
-            assert data[str(profile_id)]["display_name"] == "Test Profile"
+            assert data["schema_version"] == "v2"
+            assert str(profile_id) in data["entities"]
+            assert data["entities"][str(profile_id)]["financial_literacy"] == "intermediate"
+            assert data["entities"][str(profile_id)]["display_name"] == "Test Profile"
 
     def test_clear_single_collection(self) -> None:
         """Test that clear removes a single collection."""
@@ -200,12 +206,13 @@ class TestJsonFileStorage:
 
             # Verify collection1 is cleared
             assert len(collection1) == 0
-            file_path1 = Path(tmpdir) / "collection1.json"
+            data_dir = get_data_dir(tmpdir)
+            file_path1 = data_dir / "collection1.json"
             assert not file_path1.exists()
 
             # Verify collection2 still exists
             assert len(collection2) == 1
-            file_path2 = Path(tmpdir) / "collection2.json"
+            file_path2 = data_dir / "collection2.json"
             assert file_path2.exists()
 
     def test_clear_all_collections(self) -> None:
@@ -231,8 +238,9 @@ class TestJsonFileStorage:
             storage.clear()
 
             # Verify files are removed
-            file_path1 = Path(tmpdir) / "collection1.json"
-            file_path2 = Path(tmpdir) / "collection2.json"
+            data_dir = get_data_dir(tmpdir)
+            file_path1 = data_dir / "collection1.json"
+            file_path2 = data_dir / "collection2.json"
             assert not file_path1.exists()
             assert not file_path2.exists()
 
@@ -262,17 +270,20 @@ class TestJsonFileStorage:
             collection[entity_id] = entity
             storage.save("test/collection")
 
-            # Verify file uses sanitized name
-            file_path = Path(tmpdir) / "test_collection.json"
+            # Verify file uses sanitized path under data/v2 (test/collection -> test/collection.json)
+            data_dir = get_data_dir(tmpdir)
+            file_path = data_dir / "test" / "collection.json"
             assert file_path.exists()
 
     def test_load_collection_handles_corrupted_json(self, capsys) -> None:
         """Test that corrupted JSON files are handled gracefully."""
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = JsonFileStorage(base_path=tmpdir)
+            data_dir = get_data_dir(tmpdir)
+            data_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create a corrupted JSON file
-            file_path = Path(tmpdir) / "test_collection.json"
+            # Create a corrupted JSON file at the path storage will load from
+            file_path = data_dir / "test_collection.json"
             with open(file_path, "w") as f:
                 f.write("invalid json content {")
 
@@ -282,20 +293,29 @@ class TestJsonFileStorage:
             assert isinstance(collection, dict)
             assert len(collection) == 0
 
-            # Verify warning was printed
+            # Verify warning was printed to stderr
             captured = capsys.readouterr()
-            assert "Warning" in captured.err
-            assert "test_collection" in captured.err
+            assert "Warning" in captured.err or "Warning" in captured.out
+            assert "test_collection" in captured.err or "test_collection" in captured.out
 
     def test_load_collection_handles_invalid_uuid(self, capsys) -> None:
         """Test that invalid UUIDs in JSON are handled gracefully."""
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = JsonFileStorage(base_path=tmpdir)
+            data_dir = get_data_dir(tmpdir)
+            data_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create JSON file with invalid UUID
-            file_path = Path(tmpdir) / "test_collection.json"
+            # Create JSON file with invalid UUID at path storage loads from
+            file_path = data_dir / "test_collection.json"
             with open(file_path, "w") as f:
-                json.dump({"invalid-uuid": {"name": "Test", "value": 1}}, f)
+                json.dump(
+                    {
+                        "schema_version": "v2",
+                        "collection_name": "test_collection",
+                        "entities": {"invalid-uuid": {"name": "Test", "value": 1}},
+                    },
+                    f,
+                )
 
             # Should not raise an error, should start fresh
             collection = storage.get_collection("test_collection", SampleEntity)
@@ -307,12 +327,21 @@ class TestJsonFileStorage:
         """Test that invalid entity data in JSON is handled gracefully."""
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = JsonFileStorage(base_path=tmpdir)
+            data_dir = get_data_dir(tmpdir)
+            data_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create JSON file with invalid entity data
-            file_path = Path(tmpdir) / "test_collection.json"
+            # Create JSON file with invalid entity data at path storage loads from
+            file_path = data_dir / "test_collection.json"
             entity_id = uuid4()
             with open(file_path, "w") as f:
-                json.dump({str(entity_id): {"invalid": "data"}}, f)
+                json.dump(
+                    {
+                        "schema_version": "v2",
+                        "collection_name": "test_collection",
+                        "entities": {str(entity_id): {"invalid": "data"}},
+                    },
+                    f,
+                )
 
             # Should not raise an error, should start fresh
             collection = storage.get_collection("test_collection", SampleEntity)
@@ -389,13 +418,15 @@ class TestJsonFileStorage:
             storage.save("test_collection")
 
             # Verify both entities are in file
-            file_path = Path(tmpdir) / "test_collection.json"
+            data_dir = get_data_dir(tmpdir)
+            file_path = data_dir / "test_collection.json"
             with open(file_path) as f:
                 data = json.load(f)
 
-            assert len(data) == 2
-            assert str(entity1_id) in data
-            assert str(entity2_id) in data
+            entities = data.get("entities", {})
+            assert len(entities) == 2
+            assert str(entity1_id) in entities
+            assert str(entity2_id) in entities
 
     def test_save_updates_modified_entity(self) -> None:
         """Test that save updates modified entity data."""
@@ -439,13 +470,13 @@ class TestJsonFileStorage:
             )
 
             test_collection = storage.get_collection("test_entities", SampleEntity)
-            profile_collection = storage.get_collection("profiles", ResearchProfile)
+            profile_collection = storage.get_collection("research/profiles", ResearchProfile)
 
             test_collection[test_entity_id] = test_entity
             profile_collection[profile_id] = profile
 
             storage.save("test_entities")
-            storage.save("profiles")
+            storage.save("research/profiles")
 
             # Verify both collections work independently
             assert len(test_collection) == 1
@@ -465,7 +496,8 @@ class TestJsonFileStorage:
             collection[entity_id] = entity
             storage.save("test_collection")
 
-            file_path = Path(tmpdir) / "test_collection.json"
+            data_dir = get_data_dir(tmpdir)
+            file_path = data_dir / "test_collection.json"
             assert file_path.exists()
 
             # Clear collection

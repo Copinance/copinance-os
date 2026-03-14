@@ -29,7 +29,7 @@ class ConcreteWorkflowExecutor(BaseWorkflowExecutor):
             raise ValueError("Test error")
         return {
             "result": "success",
-            "data": {"symbol": job.stock_symbol},
+            "data": {"symbol": job.instrument_symbol},
         }
 
 
@@ -47,8 +47,8 @@ class TestBaseWorkflowExecutor:
         executor = ConcreteWorkflowExecutor()
         job = Job(
             id=uuid4(),
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
@@ -65,8 +65,8 @@ class TestBaseWorkflowExecutor:
         executor = ConcreteWorkflowExecutor()
         job = Job(
             id=uuid4(),
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
@@ -74,7 +74,7 @@ class TestBaseWorkflowExecutor:
         results = executor._initialize_results(job, "test_workflow")
 
         assert results["workflow_type"] == "test_workflow"
-        assert results["stock_symbol"] == "AAPL"
+        assert results["instrument_symbol"] == "AAPL"
         assert results["timeframe"] == "mid_term"
         assert results["analysis_type"] == "test_workflow"
         assert "execution_timestamp" in results
@@ -84,8 +84,8 @@ class TestBaseWorkflowExecutor:
         executor = ConcreteWorkflowExecutor(should_fail=False)
         job = Job(
             id=uuid4(),
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
@@ -94,7 +94,7 @@ class TestBaseWorkflowExecutor:
         results = await executor.execute(job, context)
 
         assert results["workflow_type"] == "test_workflow"
-        assert results["stock_symbol"] == "AAPL"
+        assert results["instrument_symbol"] == "AAPL"
         assert results["timeframe"] == "mid_term"
         assert results["status"] == "completed"
         assert results["message"] == "Test_workflow workflow executed successfully"
@@ -106,8 +106,8 @@ class TestBaseWorkflowExecutor:
         executor = ConcreteWorkflowExecutor(should_fail=False)
         job = Job(
             id=uuid4(),
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
@@ -127,8 +127,8 @@ class TestBaseWorkflowExecutor:
         executor = ConcreteWorkflowExecutor(should_fail=True)
         job = Job(
             id=uuid4(),
-            scope=JobScope.STOCK,
-            stock_symbol="AAPL",
+            scope=JobScope.INSTRUMENT,
+            instrument_symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
@@ -137,7 +137,7 @@ class TestBaseWorkflowExecutor:
         results = await executor.execute(job, context)
 
         assert results["workflow_type"] == "test_workflow"
-        assert results["stock_symbol"] == "AAPL"
+        assert results["instrument_symbol"] == "AAPL"
         assert results["status"] == "failed"
         assert "error" in results
         assert results["error"] == "Test error"
@@ -148,15 +148,15 @@ class TestBaseWorkflowExecutor:
         executor = ConcreteWorkflowExecutor(should_fail=False)
         job = Job(
             id=uuid4(),
-            scope=JobScope.STOCK,
-            stock_symbol="aapl",
+            scope=JobScope.INSTRUMENT,
+            instrument_symbol="aapl",
             timeframe=JobTimeframe.MID_TERM,
             workflow_type="test_workflow",
         )
 
         results = await executor.execute(job, {})
 
-        assert results["stock_symbol"] == "AAPL"
+        assert results["instrument_symbol"] == "AAPL"
 
     async def test_execute_different_timeframes(self) -> None:
         """Test execute with different timeframes."""
@@ -165,8 +165,8 @@ class TestBaseWorkflowExecutor:
         for timeframe in JobTimeframe:
             job = Job(
                 id=uuid4(),
-                scope=JobScope.STOCK,
-                stock_symbol="AAPL",
+                scope=JobScope.INSTRUMENT,
+                instrument_symbol="AAPL",
                 timeframe=timeframe,
                 workflow_type="test_workflow",
             )

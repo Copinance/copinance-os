@@ -26,7 +26,7 @@ class ResearchProfileRepositoryImpl(ResearchProfileRepository):
         if storage is None:
             storage = create_storage()
         self._storage = storage
-        self._collection = self._storage.get_collection("profiles", ResearchProfile)
+        self._collection = self._storage.get_collection("research/profiles", ResearchProfile)
 
     async def get_by_id(self, profile_id: UUID) -> ResearchProfile | None:
         """Get research profile by ID."""
@@ -35,14 +35,14 @@ class ResearchProfileRepositoryImpl(ResearchProfileRepository):
     async def save(self, profile: ResearchProfile) -> ResearchProfile:
         """Save or update research profile."""
         self._collection[profile.id] = profile
-        self._storage.save("profiles")
+        self._storage.save("research/profiles")
         return profile
 
     async def delete(self, profile_id: UUID) -> bool:
         """Delete research profile by ID."""
         if profile_id in self._collection:
             del self._collection[profile_id]
-            self._storage.save("profiles")
+            self._storage.save("research/profiles")
             return True
         return False
 

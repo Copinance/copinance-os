@@ -1,13 +1,13 @@
 """Research profile domain model."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import Field
 
 from copinanceos.domain.models.base import Entity
 
 
-class FinancialLiteracy(str, Enum):
+class FinancialLiteracy(StrEnum):
     """Financial literacy levels for research output adaptation."""
 
     BEGINNER = "beginner"

@@ -3,7 +3,7 @@
 import structlog
 
 from copinanceos.application.use_cases.fundamentals import ResearchStockFundamentalsUseCase
-from copinanceos.application.use_cases.stock import GetStockUseCase
+from copinanceos.application.use_cases.market import GetInstrumentUseCase
 from copinanceos.domain.ports.data_providers import (
     FundamentalDataProvider,
     MacroeconomicDataProvider,
@@ -17,7 +17,7 @@ from copinanceos.infrastructure.factories.llm_analyzer import LLMAnalyzerFactory
 from copinanceos.infrastructure.workflows import (
     AgenticWorkflowExecutor,
     MacroRegimeStaticWorkflowExecutor,
-    StaticWorkflowExecutor,
+    MarketInstrumentWorkflowExecutor,
 )
 
 logger = structlog.get_logger(__name__)
@@ -28,7 +28,7 @@ class WorkflowExecutorFactory:
 
     @staticmethod
     def create_all(
-        get_stock_use_case: GetStockUseCase,
+        get_instrument_use_case: GetInstrumentUseCase,
         market_data_provider: MarketDataProvider,
         macro_data_provider: MacroeconomicDataProvider,
         fundamentals_use_case: ResearchStockFundamentalsUseCase,
@@ -40,9 +40,9 @@ class WorkflowExecutorFactory:
         """Create all available workflow executors with their dependencies.
 
         Args:
-            get_stock_use_case: Use case for getting stock information
+            get_instrument_use_case: Use case for getting instrument information
             market_data_provider: Provider for market data
-            fundamentals_use_case: Use case for researching stock fundamentals
+            fundamentals_use_case: Use case for researching equity fundamentals
             fundamental_data_provider: Provider for fundamental data
             sec_filings_provider: Provider for SEC filings
             cache_manager: Cache manager for tool caching
@@ -53,8 +53,8 @@ class WorkflowExecutorFactory:
             List of workflow executors
         """
         executors: list[WorkflowExecutor] = [
-            StaticWorkflowExecutor(
-                get_stock_use_case=get_stock_use_case,
+            MarketInstrumentWorkflowExecutor(
+                get_instrument_use_case=get_instrument_use_case,
                 market_data_provider=market_data_provider,
                 fundamentals_use_case=fundamentals_use_case,
             ),

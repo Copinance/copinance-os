@@ -119,16 +119,16 @@ class Container(containers.DeclarativeContainer):
         profile_management_service=profile_management_service,
         llm_config=llm_config,
     )
-    get_stock_use_case = providers.Callable(
-        lambda config: config["get_stock_use_case"](),
+    get_instrument_use_case = providers.Callable(
+        lambda config: config["get_instrument_use_case"](),
         config=_use_cases_config,
     )
-    search_stocks_use_case = providers.Callable(
-        lambda config: config["search_stocks_use_case"](),
+    search_instruments_use_case = providers.Callable(
+        lambda config: config["search_instruments_use_case"](),
         config=_use_cases_config,
     )
-    get_stock_data_use_case = providers.Callable(
-        lambda config: config["get_stock_data_use_case"](),
+    get_market_data_use_case = providers.Callable(
+        lambda config: config["get_market_data_use_case"](),
         config=_use_cases_config,
     )
     create_profile_use_case = providers.Callable(
@@ -163,8 +163,8 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["workflow_executors"](),
         config=_use_cases_config,
     )
-    run_workflow_use_case = providers.Callable(
-        lambda config: config["run_workflow_use_case"](),
+    job_runner = providers.Callable(
+        lambda config: config["job_runner"](),
         config=_use_cases_config,
     )
 

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from copinanceos.domain.models.stock import StockData
+from copinanceos.domain.models.market import MarketDataPoint
 from copinanceos.domain.ports.data_providers import MarketDataProvider
 from copinanceos.infrastructure.tools.analysis.market_regime.rule_based import (
     MarketRegimeDetectCyclesTool,
@@ -29,7 +29,7 @@ def mock_market_data_provider() -> MarketDataProvider:
 
 
 @pytest.fixture
-def sample_stock_data() -> list[StockData]:
+def sample_stock_data() -> list[MarketDataPoint]:
     """Create sample stock data for testing."""
     base_date = datetime(2024, 1, 1)
     prices = [100.0, 102.0, 101.0, 105.0, 108.0, 107.0, 110.0, 112.0, 115.0, 118.0]
@@ -37,7 +37,7 @@ def sample_stock_data() -> list[StockData]:
     data = []
     for i, price in enumerate(prices):
         data.append(
-            StockData(
+            MarketDataPoint(
                 symbol="TEST",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(price - 0.5)),
@@ -51,7 +51,7 @@ def sample_stock_data() -> list[StockData]:
 
 
 @pytest.fixture
-def extended_stock_data() -> list[StockData]:
+def extended_stock_data() -> list[MarketDataPoint]:
     """Create extended stock data (200+ days) for testing."""
     base_date = datetime(2023, 1, 1)
     # Create a trending upward pattern
@@ -60,7 +60,7 @@ def extended_stock_data() -> list[StockData]:
         # Upward trend with some noise
         price = 100.0 + (i * 0.5) + (i % 10) * 0.1
         data.append(
-            StockData(
+            MarketDataPoint(
                 symbol="TEST",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(price - 0.5)),
@@ -210,7 +210,9 @@ class TestMarketRegimeDetectTrendTool:
 
     @pytest.mark.asyncio
     async def test_execute_success_bull_market(
-        self, mock_market_data_provider: MarketDataProvider, extended_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        extended_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test successful trend detection for bull market."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=extended_stock_data)
@@ -229,7 +231,9 @@ class TestMarketRegimeDetectTrendTool:
 
     @pytest.mark.asyncio
     async def test_execute_insufficient_data(
-        self, mock_market_data_provider: MarketDataProvider, sample_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        sample_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test trend detection with insufficient data."""
         # Provide only 10 data points when 200 are needed for long MA
@@ -260,7 +264,7 @@ class TestMarketRegimeDetectTrendTool:
     ) -> None:
         """Test trend detection with very limited data (< 10 points)."""
         limited_data = [
-            StockData(
+            MarketDataPoint(
                 symbol="TEST",
                 timestamp=datetime.now() - timedelta(days=i),
                 open_price=Decimal("100.0"),
@@ -294,7 +298,9 @@ class TestMarketRegimeDetectTrendTool:
 
     @pytest.mark.asyncio
     async def test_execute_with_custom_parameters(
-        self, mock_market_data_provider: MarketDataProvider, extended_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        extended_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test trend detection with custom parameters."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=extended_stock_data)
@@ -319,7 +325,7 @@ class TestMarketRegimeDetectTrendTool:
         base_date = datetime(2024, 1, 1)
         # Create declining price pattern (ensure prices stay positive)
         declining_data = [
-            StockData(
+            MarketDataPoint(
                 symbol="TEST",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(max(10.0, 120.0 - i * 0.3))),
@@ -382,7 +388,9 @@ class TestMarketRegimeDetectVolatilityTool:
 
     @pytest.mark.asyncio
     async def test_execute_success(
-        self, mock_market_data_provider: MarketDataProvider, extended_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        extended_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test successful volatility regime detection."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=extended_stock_data)
@@ -399,7 +407,9 @@ class TestMarketRegimeDetectVolatilityTool:
 
     @pytest.mark.asyncio
     async def test_execute_insufficient_data(
-        self, mock_market_data_provider: MarketDataProvider, sample_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        sample_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test volatility detection with insufficient data."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=sample_stock_data)
@@ -430,7 +440,7 @@ class TestMarketRegimeDetectVolatilityTool:
         base_date = datetime(2024, 1, 1)
         # Create high volatility pattern (large price swings)
         volatile_data = [
-            StockData(
+            MarketDataPoint(
                 symbol="TEST",
                 timestamp=base_date + timedelta(days=i),
                 open_price=Decimal(str(100.0 + (i % 10) * 5.0)),
@@ -492,7 +502,9 @@ class TestMarketRegimeDetectCyclesTool:
 
     @pytest.mark.asyncio
     async def test_execute_success(
-        self, mock_market_data_provider: MarketDataProvider, extended_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        extended_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test successful cycle detection."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=extended_stock_data)
@@ -516,7 +528,9 @@ class TestMarketRegimeDetectCyclesTool:
 
     @pytest.mark.asyncio
     async def test_execute_insufficient_data(
-        self, mock_market_data_provider: MarketDataProvider, sample_stock_data: list[StockData]
+        self,
+        mock_market_data_provider: MarketDataProvider,
+        sample_stock_data: list[MarketDataPoint],
     ) -> None:
         """Test cycle detection with insufficient data."""
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=sample_stock_data)

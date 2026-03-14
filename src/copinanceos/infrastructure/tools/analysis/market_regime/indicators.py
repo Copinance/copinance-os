@@ -377,7 +377,7 @@ class MarketRegimeIndicatorsTool(Tool):
             total_sectors = 0
 
             # Get current date for YTD calculation
-            # Use UTC to ensure timezone consistency with StockData timestamps
+            # Use UTC to ensure timezone consistency with market data timestamps
             current_date = datetime.now(UTC)
             year_start_date = datetime(current_date.year, 1, 1, tzinfo=UTC)
 

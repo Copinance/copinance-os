@@ -1,20 +1,30 @@
 """Job domain models.
 
 Job is the execution context for workflows (not persisted). It describes scope
-(stock or market), symbol/index, timeframe, and workflow type. Used by
-RunWorkflowUseCase and workflow executors only.
+(instrument or market), instrument/index, timeframe, and workflow type.
+Consumers build Job instances and pass them to a JobRunner (or their own
+orchestrator); workflow executors receive Job + context from the runner.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from copinanceos.domain.models.base import Entity
+from copinanceos.domain.models.market import MarketType
 
 
-class JobTimeframe(str, Enum):
+class RunJobResult(BaseModel):
+    """Result of running a single job via a JobRunner."""
+
+    success: bool
+    results: dict[str, Any] | None = None
+    error_message: str | None = None
+
+
+class JobTimeframe(StrEnum):
     """Timeframe categories."""
 
     SHORT_TERM = "short_term"  # Days to weeks
@@ -22,7 +32,7 @@ class JobTimeframe(str, Enum):
     LONG_TERM = "long_term"  # Months to years
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     """Status of job execution."""
 
     PENDING = "pending"
@@ -32,10 +42,10 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class JobScope(str, Enum):
+class JobScope(StrEnum):
     """Scope/target of a job."""
 
-    STOCK = "stock"
+    INSTRUMENT = "instrument"
     MARKET = "market"
 
 
@@ -43,11 +53,16 @@ class Job(Entity):
     """Workflow execution context (scope, symbol/index, timeframe, type). Not persisted."""
 
     scope: JobScope = Field(
-        default=JobScope.STOCK,
-        description="Target scope for the job (stock or market)",
+        default=JobScope.INSTRUMENT,
+        description="Target scope for the job (instrument or market)",
     )
-    stock_symbol: str | None = Field(
-        default=None, description="Stock symbol (required when scope=stock)"
+    market_type: MarketType | None = Field(
+        default=MarketType.EQUITY,
+        description="Instrument market segment when scope=instrument",
+    )
+    instrument_symbol: str | None = Field(
+        default=None,
+        description="Instrument symbol (required when scope=instrument)",
     )
     market_index: str | None = Field(
         default=None,
@@ -63,12 +78,14 @@ class Job(Entity):
 
     @model_validator(mode="after")
     def _validate_scope(self) -> "Job":
-        if self.scope == JobScope.STOCK:
-            if not self.stock_symbol or not self.stock_symbol.strip():
-                raise ValueError("stock_symbol is required when scope=stock")
-            self.stock_symbol = self.stock_symbol.upper().strip()
+        if self.scope == JobScope.INSTRUMENT:
+            if not self.instrument_symbol or not self.instrument_symbol.strip():
+                raise ValueError("instrument_symbol is required when scope=instrument")
+            self.instrument_symbol = self.instrument_symbol.upper().strip()
+            self.market_type = self.market_type or MarketType.EQUITY
             self.market_index = None
         else:
-            self.stock_symbol = None
+            self.instrument_symbol = None
+            self.market_type = None
             self.market_index = (self.market_index or "SPY").upper().strip()
         return self
