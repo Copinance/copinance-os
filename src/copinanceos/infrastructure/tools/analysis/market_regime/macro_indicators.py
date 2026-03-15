@@ -6,6 +6,7 @@ falls back to yfinance proxies via MarketDataProvider when needed.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
@@ -137,7 +138,7 @@ class MacroRegimeIndicatorsTool(Tool):
             return
         start_str = start_date.strftime("%Y-%m-%d")
         end_str = end_date.strftime("%Y-%m-%d")
-        try:
+        with contextlib.suppress(Exception):
             await self._cache_manager.set(
                 MACRO_BLOCK_CACHE_TOOL_NAME,
                 data=data,
@@ -146,8 +147,6 @@ class MacroRegimeIndicatorsTool(Tool):
                 start_date=start_str,
                 end_date=end_str,
             )
-        except Exception:
-            pass
 
     def get_name(self) -> str:
         return "get_macro_regime_indicators"

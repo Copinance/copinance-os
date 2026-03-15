@@ -1,5 +1,8 @@
 """Command-line interface for Copinance OS."""
 
+import importlib
+import sys
+
 from dotenv import load_dotenv
 
 # Load .env into os.environ so LLM/config env vars are visible to config_loader and Settings
@@ -9,16 +12,49 @@ import typer
 from rich.console import Console
 
 from copinanceos import __version__
-from copinanceos.cli.analyze import analyze_app
-from copinanceos.cli.cache import cache_app
-from copinanceos.cli.market import market_app
-from copinanceos.cli.profile import profile_app
 
 app = typer.Typer(
     name="copinance",
     help="Copinance OS - Open-source market analysis platform",
     no_args_is_help=True,
 )
+
+# Context settings so lazy commands can receive all remaining argv and delegate.
+_LAZY_CONTEXT = {"allow_extra_args": True, "ignore_unknown_options": True}
+
+
+def _lazy_command(
+    name: str,
+    help_text: str,
+    module_path: str,
+    attr: str,
+) -> None:
+    """Register a lazy-loaded subcommand: imports and runs the real app on first use."""
+
+    @app.command(
+        name,
+        help=help_text,
+        context_settings=_LAZY_CONTEXT,
+        add_help_option=False,  # So --help is passed through to the real sub-app; callback always runs
+    )
+    def _delegate(ctx: typer.Context) -> None:
+        # Get remainder: after "copinance" and this command (e.g. analyze) -> equity, --help.
+        # Click sets ctx.args when allow_extra_args=True; fallback to sys.argv[2:] if empty.
+        old_argv = list(sys.argv)
+        remainder = list(getattr(ctx, "args", []) or [])
+        if not remainder and len(old_argv) > 2:
+            remainder = old_argv[2:]
+        new_argv = [f"{old_argv[0]} {name}"] + remainder
+        sys.argv = new_argv
+        try:
+            mod = importlib.import_module(module_path)
+            real_app = getattr(mod, attr)
+            real_app()
+        finally:
+            sys.argv = old_argv
+
+    return None
+
 
 version_app = typer.Typer(help="Show version information.", invoke_without_command=True)
 
@@ -29,11 +65,21 @@ def _version_callback() -> None:
     console.print(f"Copinance OS v{__version__}", style="bold green")
 
 
-# Register sub-commands (order = help listing, alphabetical)
-app.add_typer(analyze_app, name="analyze")
-app.add_typer(cache_app, name="cache")
-app.add_typer(market_app, name="market")
-app.add_typer(profile_app, name="profile")
+# Lazy subcommands: analyze, cache, market, profile load only when invoked.
+_lazy_command(
+    "analyze",
+    "Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis.",
+    "copinanceos.cli.analyze",
+    "analyze_app",
+)
+_lazy_command("cache", "Cache management commands", "copinanceos.cli.cache", "cache_app")
+_lazy_command("market", "Market data commands", "copinanceos.cli.market", "market_app")
+_lazy_command(
+    "profile",
+    "Analysis profile management commands",
+    "copinanceos.cli.profile",
+    "profile_app",
+)
 app.add_typer(version_app, name="version")
 
 

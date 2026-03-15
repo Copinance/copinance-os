@@ -149,7 +149,7 @@ class TestStorageFactory:
         storage = create_storage(base_path="")
 
         assert isinstance(storage, JsonFileStorage)
-        assert storage._base_path == Path("")
+        assert storage._base_path == Path()
 
     def test_get_default_storage_creates_new_instance_each_time(self) -> None:
         """Test that get_default_storage creates a new instance each time."""

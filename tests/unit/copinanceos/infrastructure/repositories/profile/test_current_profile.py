@@ -245,7 +245,7 @@ class TestCurrentProfile:
             assert profile.get_current_profile_id() == profile_id
 
             # Verify other keys are preserved
-            with open(config_file_path) as f:
+            with config_file_path.open() as f:
                 updated_config = json.load(f)
                 assert updated_config["schema_version"] == PERSISTENCE_SCHEMA_VERSION
                 assert updated_config["other_key"] == "value"
@@ -278,7 +278,7 @@ class TestCurrentProfile:
             assert profile.get_current_profile_id() is None
 
             # Verify other keys are preserved
-            with open(config_file_path) as f:
+            with config_file_path.open() as f:
                 updated_config = json.load(f)
                 assert updated_config["schema_version"] == PERSISTENCE_SCHEMA_VERSION
                 assert updated_config["other_key"] == "value"

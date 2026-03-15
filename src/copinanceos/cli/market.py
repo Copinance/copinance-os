@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 from typing import Any
 
@@ -100,15 +101,13 @@ async def get_market_quote(
             return
 
         if not no_cache:
-            try:
+            with contextlib.suppress(Exception):
                 await cache_manager.set(
                     "get_market_quote",
                     data=quote,
                     metadata={"symbol": symbol_upper},
                     symbol=symbol_upper,
                 )
-            except Exception:
-                pass
 
     table = Table(title=f"Market Quote for {quote.get('symbol', symbol_upper)}")
     table.add_column("Field", style="cyan")
@@ -236,7 +235,7 @@ async def get_market_history(
             return
 
         rows = _history_rows_from_provider(history)
-        try:
+        with contextlib.suppress(Exception):
             await cache_manager.set(
                 "get_historical_market_data",
                 data=rows,
@@ -246,8 +245,6 @@ async def get_market_history(
                 end_date=end_str,
                 interval=interval,
             )
-        except Exception:
-            pass
 
     cache_dir = get_cache_dir(get_storage_path_safe())
     cache_location = cache_file_path if cache_file_path else str(cache_dir)
@@ -571,7 +568,7 @@ async def get_market_fundamentals(
             return
 
         if not no_cache:
-            try:
+            with contextlib.suppress(Exception):
                 await cache_manager.set(
                     "get_market_fundamentals",
                     data=fundamentals_data,
@@ -584,8 +581,6 @@ async def get_market_fundamentals(
                     periods=periods,
                     period_type=period_type,
                 )
-            except Exception:
-                pass
 
     # Title and data-availability note
     console.print(f"[bold]Fundamentals for {fundamentals_data.get('symbol', symbol_upper)}[/bold]")

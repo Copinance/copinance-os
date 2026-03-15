@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation**: Aligned docs with current behavior and conventions: virtualenv is `.venv` (README, installation, CONTRIBUTING); README extension interfaces match architecture (LLM analyzer, data providers, strategies, repositories); CLI reference notes fast startup for `copinance --help` and `copinance version` (lazy subcommands); installation states that `make setup` creates `.venv`.
 - **Documentation**: Library guide Storage and Persistence section now clarifies that `.copinance` is created by storage (repositories), not by cache; documents `storage_type="memory"` and env alternative; configuration and library API reference updated for storage options.
 - **Market search**: Cache hits that are all "stub" instruments (e.g. bad symbol "APPLE") are treated as empty so the provider is queried and can return real results (e.g. AAPL). When symbol lookup fails, fall back to provider name search (yfinance Search) so queries like "APPLE" resolve to AAPL.
 - **Container/DI**: `cache_enabled` and `cache_manager` overrides are applied when returning an existing container, so library callers (e.g. `get_container(cache_enabled=False)`) are no longer ignored.
@@ -40,12 +41,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Containers, config, and tests updated for executor-based architecture; developer guide, user guide, and tools docs describe analysis modes and CLI usage.
 - Enhanced CONTRIBUTING.md with commit message template, pull request guidance, and "Adding New Tools" section.
 - MANIFESTO.md, README.md, and market regime documentation updated; `pandas-stubs` and yfinance type fixes for mypy/CI.
-
-### Removed
-
-- **Workflow system**: agentic, static, macro_regime, and base workflows; workflow executor factory (replaced by analysis executors and JobRunner).
-- **Ask CLI**: removed; question-driven analysis available via `analyze` with question-driven mode.
-- `research` CLI and research subcommands (replaced by `analyze` and market flows).
-- Research use case, domain models, and research repository (superseded by job runner, Job model, and analysis executors).
-- Stock use case and `stock` CLI (replaced by market use cases and `market` CLI).
-- Workflow use case and dedicated workflow/stock tests (superseded by executor and analyze use case tests).

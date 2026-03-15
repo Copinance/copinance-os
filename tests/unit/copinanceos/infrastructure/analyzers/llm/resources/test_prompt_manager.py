@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, mock_open, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -181,9 +181,15 @@ class TestPromptManager:
         with pytest.raises(FileNotFoundError, match="not found"):
             manager._load_prompt_file("nonexistent_prompt")
 
-    def test_load_from_package_success(self) -> None:
+    def test_load_from_package_success(self, tmp_path: Path) -> None:
         """Test loading prompt from package data."""
         manager = PromptManager()
+        prompt_file = tmp_path / "test_prompt.json"
+        prompt_data = {
+            "system_prompt": "System",
+            "user_prompt": "User",
+        }
+        prompt_file.write_text(json.dumps(prompt_data), encoding="utf-8")
 
         with (
             patch("importlib.resources.files") as mock_files,
@@ -193,18 +199,12 @@ class TestPromptManager:
             mock_files.return_value = mock_resource_path
             mock_resource_path.__truediv__.return_value = mock_resource_path
 
-            mock_file_path = MagicMock()
-            mock_file_path.__enter__ = Mock(return_value=Path("/tmp/test.json"))
-            mock_file_path.__exit__ = Mock(return_value=None)
-            mock_as_file.return_value = mock_file_path
+            mock_cm = MagicMock()
+            mock_cm.__enter__ = Mock(return_value=prompt_file)
+            mock_cm.__exit__ = Mock(return_value=None)
+            mock_as_file.return_value = mock_cm
 
-            prompt_data = {
-                "system_prompt": "System",
-                "user_prompt": "User",
-            }
-
-            with patch("builtins.open", mock_open(read_data=json.dumps(prompt_data))):
-                result = manager._load_from_package("test_prompt")
+            result = manager._load_from_package("test_prompt")
 
             assert result == prompt_data
 
@@ -218,9 +218,11 @@ class TestPromptManager:
             with pytest.raises(FileNotFoundError, match="not found in package"):
                 manager._load_from_package("nonexistent_prompt")
 
-    def test_load_from_package_invalid_json(self) -> None:
+    def test_load_from_package_invalid_json(self, tmp_path: Path) -> None:
         """Test loading prompt from package with invalid JSON."""
         manager = PromptManager()
+        prompt_file = tmp_path / "test_prompt.json"
+        prompt_file.write_text("invalid json", encoding="utf-8")
 
         with (
             patch("importlib.resources.files") as mock_files,
@@ -230,14 +232,13 @@ class TestPromptManager:
             mock_files.return_value = mock_resource_path
             mock_resource_path.__truediv__.return_value = mock_resource_path
 
-            mock_file_path = MagicMock()
-            mock_file_path.__enter__ = Mock(return_value=Path("/tmp/test.json"))
-            mock_file_path.__exit__ = Mock(return_value=None)
-            mock_as_file.return_value = mock_file_path
+            mock_cm = MagicMock()
+            mock_cm.__enter__ = Mock(return_value=prompt_file)
+            mock_cm.__exit__ = Mock(return_value=None)
+            mock_as_file.return_value = mock_cm
 
-            with patch("builtins.open", mock_open(read_data="invalid json")):
-                with pytest.raises(ValueError, match="Invalid JSON"):
-                    manager._load_from_package("test_prompt")
+            with pytest.raises(ValueError, match="Invalid JSON"):
+                manager._load_from_package("test_prompt")
 
     def test_get_prompt_with_variables(self, tmp_path: Path) -> None:
         """Test get_prompt with variable substitution."""

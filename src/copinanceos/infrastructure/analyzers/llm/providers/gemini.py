@@ -635,9 +635,11 @@ class GeminiProvider(LLMProvider):
                             )
 
                         # Check if result is empty
-                        if tool_result.data is None:
-                            is_empty_result = True
-                        elif tool_result.data == [] or tool_result.data == {}:
+                        if (
+                            tool_result.data is None
+                            or tool_result.data == []
+                            or tool_result.data == {}
+                        ):
                             is_empty_result = True
                         elif isinstance(tool_result.data, dict):
                             # Check if dict has no meaningful data

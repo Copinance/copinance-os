@@ -26,6 +26,8 @@ copinance <command>
 python -m copinanceos.cli <command>
 ```
 
+**Performance:** `copinance --help` and `copinance version` load quickly because heavy subcommands (analyze, cache, market, profile) are loaded only when you run them. See [Architecture — Container and performance](/developer-guide/architecture#container-and-performance) for the design.
+
 ## Version
 
 ```bash

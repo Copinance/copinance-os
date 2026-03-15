@@ -422,11 +422,9 @@ class OllamaProvider(LLMProvider):
                     tool_name = obj.get("tool") or obj.get("action")
                     tool_params = obj.get("args") or obj.get("parameters")
 
-                    if tool_name and (tool_params is not None):
-                        # Validate that it's a valid tool name
-                        if tool_name in executor.list_tools():
-                            function_calls.append({"name": tool_name, "args": tool_params})
-                            logger.debug("Found tool call in response", tool=tool_name)
+                    if tool_name and tool_params is not None and tool_name in executor.list_tools():
+                        function_calls.append({"name": tool_name, "args": tool_params})
+                        logger.debug("Found tool call in response", tool=tool_name)
 
                 # If no function calls found, we're done
                 if not function_calls:
@@ -541,9 +539,11 @@ class OllamaProvider(LLMProvider):
                             )
 
                         # Check if result is empty
-                        if tool_result.data is None:
-                            is_empty_result = True
-                        elif tool_result.data == [] or tool_result.data == {}:
+                        if (
+                            tool_result.data is None
+                            or tool_result.data == []
+                            or tool_result.data == {}
+                        ):
                             is_empty_result = True
                         elif isinstance(tool_result.data, dict):
                             # Check if dict has no meaningful data

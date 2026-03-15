@@ -45,11 +45,11 @@ copinanceos/
 └── cli/                 # CLI implementation (modular)
 ```
 
-**Extension Interfaces Ready:**
-- Data Provider interfaces (market, alternative, fundamental, macro)
-- Analyzer interfaces (NLP, LLM, vision, quant, graph, portfolio)
+**Extension interfaces:** See [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture) for the full list. Key extension points:
+- Data provider interfaces (market, fundamental, macro, alternative)
+- LLM analyzer interface (Gemini, Ollama; plug in other providers)
 - Strategy interfaces (screening, due diligence, valuation, risk, thematic, monitoring)
-- Core interfaces (repositories, JobRunner, AnalysisExecutor)
+- Repositories, JobRunner, AnalysisExecutor, storage
 
 See [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture) for details.
 
@@ -78,8 +78,8 @@ This will:
 ```bash
 git clone https://github.com/copinance/copinance-os.git
 cd copinance-os
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 

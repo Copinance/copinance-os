@@ -33,7 +33,7 @@ class CurrentProfile:
             return None
 
         try:
-            with open(config_file) as f:
+            with config_file.open() as f:
                 config = json.load(f)
                 if config.get("schema_version") != PERSISTENCE_SCHEMA_VERSION:
                     return None
@@ -55,7 +55,7 @@ class CurrentProfile:
         config = {}
         if config_file.exists():
             try:
-                with open(config_file) as f:
+                with config_file.open() as f:
                     config = json.load(f)
             except (json.JSONDecodeError, ValueError):
                 config = {}
@@ -66,5 +66,5 @@ class CurrentProfile:
             config["current_profile_id"] = str(profile_id)
         config["schema_version"] = PERSISTENCE_SCHEMA_VERSION
 
-        with open(config_file, "w") as f:
+        with config_file.open("w") as f:
             json.dump(config, f, indent=2)

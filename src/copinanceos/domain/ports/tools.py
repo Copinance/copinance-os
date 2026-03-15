@@ -135,12 +135,11 @@ class Tool(ABC):
                 raise ValueError(f"Parameter {param_name} must be an array")
 
             # Enum validation
-            if "enum" in param_schema:
-                if param_value not in param_schema["enum"]:
-                    raise ValueError(
-                        f"Parameter {param_name} must be one of {param_schema['enum']}. "
-                        f"You provided: {param_value}"
-                    )
+            if "enum" in param_schema and param_value not in param_schema["enum"]:
+                raise ValueError(
+                    f"Parameter {param_name} must be one of {param_schema['enum']}. "
+                    f"You provided: {param_value}"
+                )
 
             validated[param_name] = param_value
 

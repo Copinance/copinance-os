@@ -107,6 +107,15 @@ runner = container.job_runner()
 result = await runner.run(job, context)
 ```
 
+### Container and performance
+
+The global `container` used in library and CLI code is a **lazy proxy** (`_ContainerProxy`): no real container is created at import time. The actual container is instantiated only on first use—either when you call `get_container(...)` or when you first access an attribute (e.g. `container.job_runner()`).
+
+- **Use cases and providers** are created by the DI container when first requested (e.g. `container.job_runner()`, `container.create_profile_use_case()`). The container uses **singletons** where appropriate, so each service is built once and reused.
+- For **normal library usage** there is no need for extra lazy loading; the proxy plus singleton pattern keeps startup and first-call cost predictable without additional wiring.
+
+See [Using as a Library](/getting-started/library#configuration) for container configuration options.
+
 ## Extension Points
 
 The architecture provides 22 port interfaces for extension:

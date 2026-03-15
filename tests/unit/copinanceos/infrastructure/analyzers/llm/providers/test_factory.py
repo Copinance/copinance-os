@@ -90,18 +90,18 @@ class TestLLMProviderFactory:
 
     def test_create_provider_ollama_case_insensitive(self) -> None:
         """Test that provider name is case insensitive."""
-        with patch(
-            "copinanceos.infrastructure.analyzers.llm.providers.ollama.HTTPX_AVAILABLE", True
+        with (
+            patch(
+                "copinanceos.infrastructure.analyzers.llm.providers.ollama.HTTPX_AVAILABLE", True
+            ),
+            patch("copinanceos.infrastructure.analyzers.llm.providers.ollama.httpx") as mock_httpx,
         ):
-            with patch(
-                "copinanceos.infrastructure.analyzers.llm.providers.ollama.httpx"
-            ) as mock_httpx:
-                mock_client = MagicMock()
-                mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
-                llm_config = LLMConfig(provider="ollama", base_url="http://localhost:11434")
-                provider = LLMProviderFactory.create_provider("OLLAMA", llm_config=llm_config)
+            mock_client = MagicMock()
+            mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
+            llm_config = LLMConfig(provider="ollama", base_url="http://localhost:11434")
+            provider = LLMProviderFactory.create_provider("OLLAMA", llm_config=llm_config)
 
-                assert isinstance(provider, OllamaProvider)
+            assert isinstance(provider, OllamaProvider)
 
     def test_create_provider_openai_raises_error(self) -> None:
         """Test that creating OpenAI provider raises ValueError."""

@@ -303,9 +303,11 @@ class TestGeminiProvider:
                 loop = asyncio.new_event_loop()
                 mock_loop.return_value = loop
 
-                with patch.object(loop, "run_in_executor", side_effect=run_in_executor_mock):
-                    with pytest.raises(Exception, match="API error"):
-                        await provider.generate_text("test")
+                with (
+                    patch.object(loop, "run_in_executor", side_effect=run_in_executor_mock),
+                    pytest.raises(Exception, match="API error"),
+                ):
+                    await provider.generate_text("test")
 
     @pytest.mark.asyncio
     async def test_is_available_returns_false_when_gemini_not_available(self) -> None:

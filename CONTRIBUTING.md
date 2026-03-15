@@ -10,7 +10,7 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 
 1. Fork the repository
 2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/copinance-os.git`
-3. Install development dependencies: `pip install -e ".[dev]"`
+3. Install development dependencies: run `make setup` (creates `.venv`, installs deps, and pre-commit), or manually: `python3 -m venv .venv`, activate it, then `pip install -e ".[dev]"`
 4. Create a branch: `git checkout -b feature/your-feature-name`
 
 ## Development Workflow

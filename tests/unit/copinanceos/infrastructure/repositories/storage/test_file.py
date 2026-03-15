@@ -46,7 +46,7 @@ class TestJsonFileStorage:
         """Test initialization with default path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Change to temp directory to test default path
-            old_cwd = os.getcwd()
+            old_cwd = Path.cwd()
             try:
                 os.chdir(tmpdir)
                 JsonFileStorage()
@@ -118,7 +118,7 @@ class TestJsonFileStorage:
             file_path = data_dir / "test_collection.json"
             assert file_path.exists()
 
-            with open(file_path) as f:
+            with file_path.open() as f:
                 data = json.load(f)
 
             assert "entities" in data
@@ -175,7 +175,7 @@ class TestJsonFileStorage:
             assert file_path.exists()
 
             # Load and verify
-            with open(file_path) as f:
+            with file_path.open() as f:
                 data = json.load(f)
 
             assert data["schema_version"] == "v2"
@@ -285,7 +285,7 @@ class TestJsonFileStorage:
 
             # Create a corrupted JSON file at the path storage will load from
             file_path = data_dir / "test_collection.json"
-            with open(file_path, "w") as f:
+            with file_path.open("w") as f:
                 f.write("invalid json content {")
 
             # Should not raise an error, should start fresh
@@ -308,7 +308,7 @@ class TestJsonFileStorage:
 
             # Create JSON file with invalid UUID at path storage loads from
             file_path = data_dir / "test_collection.json"
-            with open(file_path, "w") as f:
+            with file_path.open("w") as f:
                 json.dump(
                     {
                         "schema_version": "v2",
@@ -334,7 +334,7 @@ class TestJsonFileStorage:
             # Create JSON file with invalid entity data at path storage loads from
             file_path = data_dir / "test_collection.json"
             entity_id = uuid4()
-            with open(file_path, "w") as f:
+            with file_path.open("w") as f:
                 json.dump(
                     {
                         "schema_version": "v2",
@@ -421,7 +421,7 @@ class TestJsonFileStorage:
             # Verify both entities are in file
             data_dir = get_data_dir(tmpdir)
             file_path = data_dir / "test_collection.json"
-            with open(file_path) as f:
+            with file_path.open() as f:
                 data = json.load(f)
 
             entities = data.get("entities", {})

@@ -1,5 +1,6 @@
 """Deterministic instrument analysis executor."""
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -137,7 +138,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             )
             options_chain = options_response.chain
             if self._cache_manager:
-                try:
+                with contextlib.suppress(Exception):
                     await self._cache_manager.set(
                         "get_options_chain",
                         data=options_chain.model_dump(mode="json"),
@@ -148,8 +149,6 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                         underlying_symbol=symbol,
                         expiration_date=expiration_date,
                     )
-                except Exception:
-                    pass
 
         if side == OptionSide.CALL:
             selected_contracts = options_chain.calls
@@ -330,15 +329,13 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             response = await self._get_quote_use_case.execute(GetQuoteRequest(symbol=symbol_upper))
             quote = response.quote
             if self._cache_manager and quote:
-                try:
+                with contextlib.suppress(Exception):
                     await self._cache_manager.set(
                         "get_market_quote",
                         data=quote,
                         metadata={"symbol": symbol_upper},
                         symbol=symbol_upper,
                     )
-                except Exception:
-                    pass
             return self._normalize_quote(quote or {}, symbol_upper)
         except Exception as e:
             logger.warning("Failed to get market quote", symbol=symbol_upper, error=str(e))
@@ -359,17 +356,13 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             if hasattr(point, "close_price") and point.close_price is not None:
                 prices.append(float(point.close_price))
             elif isinstance(point, dict) and point.get("close_price") is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     prices.append(float(point["close_price"]))
-                except (TypeError, ValueError):
-                    pass
             if hasattr(point, "volume"):
                 volumes.append(point.volume)
             elif isinstance(point, dict) and point.get("volume") is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     volumes.append(int(point["volume"]))
-                except (TypeError, ValueError):
-                    pass
 
         price_stats: dict[str, str] = {}
         if prices:
@@ -581,7 +574,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             )
 
             if self._cache_manager:
-                try:
+                with contextlib.suppress(Exception):
                     await self._cache_manager.set(
                         "get_equity_fundamentals",
                         data=fundamentals.model_dump(mode="json"),
@@ -594,8 +587,6 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                         periods=periods,
                         period_type=period_type,
                     )
-                except Exception:
-                    pass
             return fundamentals_dict
         except Exception as e:
             logger.warning("Failed to get fundamentals", symbol=symbol_upper, error=str(e))
