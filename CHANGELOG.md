@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Container/DI**: Optional `storage_type` and `storage_path` on `get_container()` for library integrators; pass `storage_type="memory"` to avoid creating a `.copinance` directory on disk without using `COPINANCEOS_STORAGE_TYPE`. Unit tests for container storage overrides.
 - **Market search**: `EXCHANGE_DISPLAY_NAMES` and `format_exchange()` for human-readable market names (e.g. NMS → NASDAQ, NYQ → NYSE); "Market" column in search results; `longName`, `shortName`, and `exch_disp` from yfinance in results.
 - **Container/DI**: Lazy container proxy so no container is created at import time; first `get_container()` or attribute access wins. Unit tests for container cache configuration.
 - Integration executor test: question context passed so run reaches LLM check.
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation**: Library guide Storage and Persistence section now clarifies that `.copinance` is created by storage (repositories), not by cache; documents `storage_type="memory"` and env alternative; configuration and library API reference updated for storage options.
 - **Market search**: Cache hits that are all "stub" instruments (e.g. bad symbol "APPLE") are treated as empty so the provider is queried and can return real results (e.g. AAPL). When symbol lookup fails, fall back to provider name search (yfinance Search) so queries like "APPLE" resolve to AAPL.
 - **Container/DI**: `cache_enabled` and `cache_manager` overrides are applied when returning an existing container, so library callers (e.g. `get_container(cache_enabled=False)`) are no longer ignored.
 - Replaced workflow system with executor-based analysis: instrument, market, and question-driven executors; job execution centralized in `DefaultJobRunner`.

@@ -19,12 +19,13 @@ from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.analyzers.llm.config_loader import load_llm_config_from_env
 from copinanceos.infrastructure.analyzers.llm.resources import PromptManager
 from copinanceos.infrastructure.cache import CacheManager
-from copinanceos.infrastructure.config import get_settings
+from copinanceos.infrastructure.config import get_settings, get_storage_path_safe
 from copinanceos.infrastructure.containers.data_providers import configure_data_providers
 from copinanceos.infrastructure.containers.repositories import configure_repositories
 from copinanceos.infrastructure.containers.services import configure_services
 from copinanceos.infrastructure.containers.storage import configure_storage
 from copinanceos.infrastructure.containers.use_cases import configure_use_cases
+from copinanceos.infrastructure.repositories.storage import create_storage
 
 
 class Container(containers.DeclarativeContainer):
@@ -213,6 +214,24 @@ class Container(containers.DeclarativeContainer):
 _container: Container | None = None
 
 
+def _storage_override_provider(
+    storage_type_override: str | None,
+    storage_path_override: str | None,
+) -> providers.Singleton:
+    """Build a Singleton provider for storage when overrides are passed to get_container()."""
+
+    def _create() -> object:
+        st = (
+            storage_type_override
+            if storage_type_override is not None
+            else get_settings().storage_type
+        )
+        sp = storage_path_override if storage_path_override is not None else get_storage_path_safe()
+        return create_storage(storage_type=st, base_path=sp)
+
+    return providers.Singleton(_create)
+
+
 def get_container(
     llm_config: LLMConfig | None = None,
     fred_api_key: str | None = None,
@@ -221,6 +240,8 @@ def get_container(
     prompt_manager: PromptManager | None = None,
     cache_enabled: bool | None = None,
     cache_manager: CacheManager | None = None,
+    storage_type: str | None = None,
+    storage_path: str | None = None,
 ) -> Container:
     """Get the global dependency injection container.
 
@@ -247,6 +268,13 @@ def get_container(
             prompt caching; ``cache_enabled`` is ignored. Pass your own implementation
             when using the library with your own caching layer. If you want no cache,
             pass ``cache_enabled=False`` instead.
+        storage_type: Optional storage backend type (e.g. ``"file"`` or ``"memory"``).
+            If provided, overrides settings/env. Use ``"memory"`` to avoid creating
+            a ``.copinance`` directory on disk (repositories and data stay in memory).
+        storage_path: Optional root path for file storage. Only used when
+            ``storage_type`` is ``"file"`` (or when falling back to file from settings).
+            If ``storage_type`` is ``None``, this is ignored unless you also set
+            storage_type explicitly; when both are None, settings are used.
 
     Returns:
         Container instance
@@ -282,6 +310,12 @@ def get_container(
         elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
             container_instance.cache_manager.override(providers.Object(None))
 
+        # Storage: override when storage_type or storage_path provided (library integrators)
+        if storage_type is not None or storage_path is not None:
+            container_instance.storage_backend.override(
+                _storage_override_provider(storage_type, storage_path)
+            )
+
         if _container is None:
             _container = container_instance
         else:
@@ -292,6 +326,11 @@ def get_container(
         _container.cache_manager.override(providers.Object(cache_manager))
     elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
         _container.cache_manager.override(providers.Object(None))
+
+    # Apply storage overrides when storage_type or storage_path provided
+    if storage_type is not None or storage_path is not None:
+        _container.storage_backend.override(_storage_override_provider(storage_type, storage_path))
+
     return _container
 
 

@@ -103,5 +103,6 @@ When using Copinance OS as a **library**, pass config into `get_container()`; en
 
 - **LLMConfig**: Required for question-driven analysis. Example: `get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))`.
 - **FRED**: Optional. `get_container(..., fred_api_key="your-key")`.
+- **Storage**: To avoid creating a `.copinance` directory on disk, use `get_container(..., storage_type="memory")` or set `COPINANCEOS_STORAGE_TYPE=memory` in env. See [Storage and Persistence](library#storage-and-persistence).
 
 Full container options and examples: [Using as a Library](library).

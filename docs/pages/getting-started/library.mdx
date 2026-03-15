@@ -134,6 +134,8 @@ container = get_container(
     prompt_manager=None,               # optional; custom PromptManager instance
     cache_enabled=None,                # optional; True/False or None (use settings)
     cache_manager=None,                # optional; use your own CacheManager
+    storage_type=None,                 # optional; "file" | "memory" to override settings
+    storage_path=None,                 # optional; root path for file storage
 )
 ```
 
@@ -142,6 +144,7 @@ container = get_container(
 - **`load_from_env`:** If `True` and `llm_config` is `None`, the container will try to load LLM settings from env (e.g. `COPINANCEOS_GEMINI_API_KEY`). Prefer passing `llm_config` in library code.
 - **`prompt_templates`** / **`prompt_manager`:** Optional. See [Prompt templates](#prompt-templates) below.
 - **`cache_enabled`** / **`cache_manager`:** Optional. See [Cache](#cache) below.
+- **`storage_type`** / **`storage_path`:** Optional. See [Storage and Persistence](#storage-and-persistence) below. Use `storage_type="memory"` to avoid creating a `.copinance` directory on disk.
 
 ### LLMConfig (required for question-driven analysis)
 
@@ -481,7 +484,7 @@ Use this section as a single reference for every option available when using Cop
 
 ### Container entry points
 
-Get the container with `get_container(...)` from `copinanceos.infrastructure.containers`. You can pass `prompt_templates` or `prompt_manager` for custom prompts (see [Prompt templates](#prompt-templates)), and `cache_enabled` or `cache_manager` for cache control (see [Cache](#cache)). Then call these methods to obtain use cases, runners, or the job runner:
+Get the container with `get_container(...)` from `copinanceos.infrastructure.containers`. You can pass `prompt_templates` or `prompt_manager` for custom prompts (see [Prompt templates](#prompt-templates)), `cache_enabled` or `cache_manager` for cache control (see [Cache](#cache)), and `storage_type` or `storage_path` to avoid or customize disk usage (see [Storage and Persistence](#storage-and-persistence)). Then call these methods to obtain use cases, runners, or the job runner:
 
 | Entry point | Method | Returns | Purpose |
 |-------------|--------|---------|--------|
@@ -617,10 +620,27 @@ Profiles store **financial literacy level** and preferences; they are not user a
 
 ## Storage and Persistence
 
-By default, the container uses **in-memory** storage (or file storage under `.copinance` when run via CLI). For a long-running app you may want:
+The **`.copinance`** directory (e.g. `data/`, `equities.json`) is created by the **storage** layer used by repositories (instrument lists, profiles, etc.), not by the cache. Cache (when enabled) also uses the same storage path for tool and prompt cache files.
 
-- **In-memory:** default; no setup; data is lost when the process exits.
-- **File:** set `COPINANCEOS_STORAGE_TYPE=file` and `COPINANCEOS_STORAGE_PATH` (or equivalent in your config) so the container’s storage backend uses disk.
+**Default behavior:** Storage is file-based (settings `COPINANCEOS_STORAGE_TYPE=file`, `COPINANCEOS_STORAGE_PATH=.copinance`), so the CLI and any code using the default container will create `.copinance` on disk unless overridden.
+
+**To avoid creating `.copinance` when integrating the library** (e.g. in a FastAPI backend where you want no on-disk usage):
+
+- **In code:** Pass `storage_type="memory"` to `get_container()`. Repositories then use in-memory storage and no directory is created. You can also pass `cache_enabled=False` if you want every request to use fresh data.
+
+  ```python
+  container = get_container(
+      llm_config=llm_config,
+      load_from_env=False,
+      cache_enabled=False,
+      storage_type="memory",
+  )
+  ```
+
+- **Via environment:** Set `COPINANCEOS_STORAGE_TYPE=memory` so the container uses in-memory storage without changing code.
+
+For a long-running app you may want file persistence: keep the default (or set `storage_type="file"` and optionally `storage_path`). In-memory storage loses data when the process exits.
+
 
 The library does not impose a database. You can implement the repository and storage ports (see [Developer Guide](/developer-guide/extending)) and wire them into the container if you need PostgreSQL, MongoDB, etc.
 
