@@ -145,7 +145,7 @@ type-check: ## Run type checking with mypy
 	fi
 	$(MYPY) src/
 
-quality: lint type-check format-check ## Run all quality checks
+quality: format lint type-check format-check ## Run all quality checks
 
 clean: clean-cache ## Clean up generated files (keeps venv)
 	rm -rf build/

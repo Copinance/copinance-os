@@ -50,10 +50,7 @@ class LLMAnalyzerFactory:
             ```
         """
         if provider_name is None:
-            if llm_config:
-                provider_name = llm_config.provider
-            else:
-                provider_name = "gemini"  # Default fallback
+            provider_name = llm_config.provider if llm_config else "gemini"
 
         provider = LLMProviderFactory.create_provider(provider_name, llm_config)
         return LLMAnalyzerImpl(provider)

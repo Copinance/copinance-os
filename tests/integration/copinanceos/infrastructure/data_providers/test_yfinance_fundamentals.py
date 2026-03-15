@@ -209,10 +209,9 @@ class TestYFinanceFundamentalProvider:
                 fundamentals.income_statements
                 and fundamentals.income_statements[0].total_revenue
                 and fundamentals.income_statements[0].gross_profit
-            ):
-                if ratios.gross_margin is not None:
-                    assert isinstance(ratios.gross_margin, Decimal)
-                    assert 0 <= ratios.gross_margin <= 100  # Percentage
+            ) and ratios.gross_margin is not None:
+                assert isinstance(ratios.gross_margin, Decimal)
+                assert 0 <= ratios.gross_margin <= 100  # Percentage
 
     @pytest.mark.asyncio
     async def test_market_data_included(

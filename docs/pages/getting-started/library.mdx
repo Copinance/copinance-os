@@ -146,6 +146,8 @@ container = get_container(
 - **`cache_enabled`** / **`cache_manager`:** Optional. See [Cache](#cache) below.
 - **`storage_type`** / **`storage_path`:** Optional. See [Storage and Persistence](#storage-and-persistence) below. Use `storage_type="memory"` to avoid creating a `.copinance` directory on disk.
 
+**Performance:** The container is created only on first use (lazy proxy), and use cases and providers are singletons created when first requested. See [Architecture — Container and performance](/developer-guide/architecture#container-and-performance) for details.
+
 ### LLMConfig (required for question-driven analysis)
 
 For **question-driven** analysis you must supply `LLMConfig` when creating the container:

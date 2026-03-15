@@ -29,9 +29,7 @@ class LocalFileCacheBackend(CacheBackend):
         """
         if cache_dir is None:
             storage = create_storage()
-            if isinstance(storage, JsonFileStorage):
-                cache_dir = get_cache_dir(storage._root_path)
-            elif hasattr(storage, "_root_path"):
+            if isinstance(storage, JsonFileStorage) or hasattr(storage, "_root_path"):
                 cache_dir = get_cache_dir(storage._root_path)
             elif hasattr(storage, "_base_path"):
                 cache_dir = get_cache_dir(storage._base_path)

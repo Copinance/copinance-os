@@ -72,6 +72,7 @@ include = ["copinanceos*"]
 
 [tool.setuptools.package-data]
 copinanceos = [
+    "py.typed",
     "infrastructure/analyzers/llm/resources/*.json",
 ]
 
@@ -143,12 +144,20 @@ select = [
     "UP",       # pyupgrade
     "N",        # pep8-naming: enforces Python naming conventions
     "PLC0415",  # import-outside-top-level: checks imports are not inside functions/blocks
+    "D1",       # pydocstyle: docstring conventions (D100 module, D107 __init__, etc.)
+    "SIM",      # flake8-simplify: simplify code (e.g. if/else, ternary)
+    "PTH",      # flake8-use-pathlib: use pathlib instead of os.path
 ]
 ignore = [
     "E501",  # line too long, handled by black
     "B008",  # do not perform function calls in argument defaults
     "E402",  # module level import not at top of file (allow for optional imports in try/except blocks)
 ]
+# D1 (docstrings): require module docstrings (D100); method/class docstrings (D101, D102, D103, D107) encouraged but not enforced to avoid bulk churn
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D100", "D101", "D102", "D103", "D107"]
+".pre-commit-hooks/*" = ["D100", "D101", "D102", "D103", "D107"]
+"src/**" = ["D101", "D102", "D103", "D107"]
 # Note: PLC0415 (import-outside-top-level) will flag imports inside functions/methods.
 # This helps enforce PEP 8 style: imports should be at module level, not inside functions.
 # Imports in try/except blocks at module level are acceptable for optional dependencies.

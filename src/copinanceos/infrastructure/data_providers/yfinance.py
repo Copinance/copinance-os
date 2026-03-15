@@ -846,9 +846,12 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 # Calculate NOPAT (Net Operating Profit After Tax)
                 # Approximate tax rate from income statement
                 tax_rate = Decimal("0")
-                if income.income_before_tax and income.income_before_tax > 0:
-                    if income.income_tax_expense:
-                        tax_rate = income.income_tax_expense / income.income_before_tax
+                if (
+                    income.income_before_tax
+                    and income.income_before_tax > 0
+                    and income.income_tax_expense
+                ):
+                    tax_rate = income.income_tax_expense / income.income_before_tax
                 nopat = income.operating_income * (Decimal("1") - tax_rate)
 
                 # Calculate Invested Capital
@@ -1135,10 +1138,10 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                     for idx in row_series.index:
                         value = row_series.loc[idx]
                         # Check if NaN (using pandas isnan if available, otherwise v != v)
-                        if value is None:
-                            income_row_dict[idx] = None
-                        elif isinstance(value, float) and (
-                            value != value or (pd and pd.isna(value))
+                        if (
+                            value is None
+                            or isinstance(value, float)
+                            and (value != value or (pd and pd.isna(value)))
                         ):
                             income_row_dict[idx] = None
                         else:
@@ -1212,10 +1215,10 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                     for idx in row_series.index:
                         value = row_series.loc[idx]
                         # Check if NaN (using pandas isnan if available, otherwise v != v)
-                        if value is None:
-                            balance_row_dict[idx] = None
-                        elif isinstance(value, float) and (
-                            value != value or (pd and pd.isna(value))
+                        if (
+                            value is None
+                            or isinstance(value, float)
+                            and (value != value or (pd and pd.isna(value)))
                         ):
                             balance_row_dict[idx] = None
                         else:
@@ -1325,10 +1328,10 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                     for idx in row_series.index:
                         value = row_series.loc[idx]
                         # Check if NaN (using pandas isnan if available, otherwise v != v)
-                        if value is None:
-                            cashflow_row_dict[idx] = None
-                        elif isinstance(value, float) and (
-                            value != value or (pd and pd.isna(value))
+                        if (
+                            value is None
+                            or isinstance(value, float)
+                            and (value != value or (pd and pd.isna(value)))
                         ):
                             cashflow_row_dict[idx] = None
                         else:
@@ -1354,10 +1357,9 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                             cashflow_row_dict.get("Capital Expenditures")
                             or cashflow_row_dict.get("Capital Expenditure")
                         )
-                        if capex:
-                            fcf = operating_cf - abs(capex)  # CapEx is typically negative
-                        else:
-                            fcf = operating_cf
+                        fcf = (
+                            operating_cf - abs(capex) if capex else operating_cf
+                        )  # CapEx is typically negative
 
                     cashflow = CashFlowStatement(
                         period=period,

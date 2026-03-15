@@ -34,10 +34,7 @@ def _stock_from_quote(symbol: str, quote: dict[str, Any]) -> Stock:
         or quote.get("name")
         or quote.get("symbol", symbol)
     )
-    if isinstance(name, str):
-        name = name.strip() or symbol.upper()
-    else:
-        name = symbol.upper()
+    name = name.strip() or symbol.upper() if isinstance(name, str) else symbol.upper()
 
     def _dec(v: Any) -> Decimal | None:
         if v is None:

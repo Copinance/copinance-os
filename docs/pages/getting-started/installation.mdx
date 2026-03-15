@@ -17,7 +17,7 @@ make setup
 ```
 
 This will:
-- Create a virtual environment
+- Create a virtual environment at `.venv`
 - Install all dependencies
 - Set up pre-commit hooks
 
@@ -25,8 +25,8 @@ This will:
 ```bash
 git clone https://github.com/copinance/copinance-os.git
 cd copinance-os
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 

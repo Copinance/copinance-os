@@ -50,10 +50,7 @@ def save_analysis_results(results: dict[str, Any], storage_path: str = ".copinan
         ts_str = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
 
     symbol = instrument_symbol or market_index
-    if symbol:
-        slug = f"{execution_type}_{symbol}_{ts_str}"
-    else:
-        slug = f"{execution_type}_{ts_str}"
+    slug = f"{execution_type}_{symbol}_{ts_str}" if symbol else f"{execution_type}_{ts_str}"
     slug = re.sub(r"[^\w\-.]", "_", slug)
     target_dir = results_dir / execution_type / str(market_type)
     target_dir.mkdir(parents=True, exist_ok=True)

@@ -9,6 +9,7 @@ All data sources are free and use existing yfinance provider.
 """
 
 import asyncio
+import contextlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -199,15 +200,13 @@ class MarketRegimeIndicatorsTool(Tool):
                 )
         quote = await self._provider.get_quote(symbol_upper)
         if self._cache_manager and quote:
-            try:
+            with contextlib.suppress(Exception):
                 await self._cache_manager.set(
                     "get_market_quote",
                     data=quote,
                     metadata={"symbol": symbol_upper},
                     symbol=symbol_upper,
                 )
-            except Exception:
-                pass
         return quote or {}
 
     async def execute(self, **kwargs: Any) -> ToolResult:
@@ -254,7 +253,7 @@ class MarketRegimeIndicatorsTool(Tool):
                     market_data = None
 
                 # Fetch all sector ETF data once (used by both breadth and rotation)
-                for sector_symbol in SECTOR_ETFS.keys():
+                for sector_symbol in SECTOR_ETFS:
                     try:
                         sector_data = await self._get_historical_data_cached(
                             sector_symbol, start_date, end_date, "1d"

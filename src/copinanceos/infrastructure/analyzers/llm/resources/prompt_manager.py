@@ -98,7 +98,7 @@ class PromptManager:
             custom_file = self._resources_dir / f"{prompt_name}.json"
             if custom_file.exists():
                 try:
-                    with open(custom_file, encoding="utf-8") as f:
+                    with custom_file.open(encoding="utf-8") as f:
                         prompt_data = cast(dict[str, str], json.load(f))
                     self._validate_prompt_data(prompt_data, prompt_name)
                     self._prompts_cache[prompt_name] = prompt_data
@@ -134,9 +134,11 @@ class PromptManager:
         """Load prompt from package data using importlib.resources."""
         try:
             resource_path = resources.files(_PACKAGE) / f"{prompt_name}.json"
-            with resources.as_file(resource_path) as prompt_file:
-                with open(prompt_file, encoding="utf-8") as f:
-                    prompt_data = cast(dict[str, str], json.load(f))
+            with (
+                resources.as_file(resource_path) as prompt_file,
+                Path(prompt_file).open(encoding="utf-8") as f,
+            ):
+                prompt_data = cast(dict[str, str], json.load(f))
             self._validate_prompt_data(prompt_data, prompt_name)
             return prompt_data
         except (FileNotFoundError, ModuleNotFoundError, AttributeError) as e:

@@ -75,7 +75,7 @@ class JsonFileStorage(Storage):
         file_path = self._get_file_path(collection_name)
         if file_path.exists():
             try:
-                with open(file_path) as f:
+                with file_path.open() as f:
                     data = json.load(f)
                     entities = data.get("entities", {})
                     for entity_id_str, entity_data in entities.items():
@@ -109,7 +109,7 @@ class JsonFileStorage(Storage):
             "collection_name": collection_name,
             "entities": entities,
         }
-        with open(file_path, "w") as f:
+        with file_path.open("w") as f:
             json.dump(data, f, indent=2)
 
     def save(self, collection_name: str) -> None:

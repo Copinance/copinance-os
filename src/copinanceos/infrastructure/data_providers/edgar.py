@@ -8,6 +8,7 @@ import json
 import re
 from html.parser import HTMLParser
 from importlib import resources
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -110,9 +111,11 @@ class EdgarFundamentalProvider(FundamentalDataProvider):
                 # Load from package resource using importlib.resources
                 resource_path = resources.files(_RESOURCES_PACKAGE) / "sec_company_tickers.json"
 
-                with resources.as_file(resource_path) as tickers_file:
-                    with open(tickers_file, encoding="utf-8") as f:
-                        self._tickers_data = json.load(f)
+                with (
+                    resources.as_file(resource_path) as tickers_file,
+                    Path(tickers_file).open(encoding="utf-8") as f,
+                ):
+                    self._tickers_data = json.load(f)
 
                 logger.debug(
                     "Loaded company tickers from resource file", count=len(self._tickers_data)
