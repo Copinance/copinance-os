@@ -1,0 +1,16 @@
+# API Reference
+
+Reference for interfaces and extension points when integrating or extending Copinance OS.
+
+## Data Providers
+
+Implement these interfaces to plug in custom market, fundamental, alternative, or macro data sources:
+
+- [Data Provider Interfaces](data-providers) — `MarketDataProvider`, `FundamentalDataProvider`, `AlternativeDataProvider`, `MacroeconomicDataProvider`
+
+Implementation guide: [Extending](/developer-guide/extending).
+
+## Other Extension Points
+
+- **Architecture and ports**: [Architecture](/developer-guide/architecture) — layers, ports (repositories, job runner, analysis executors, storage).
+- **Container and use cases**: [Using as a Library](/getting-started/library#library-api-reference) — container entry points, request/response types, domain types.

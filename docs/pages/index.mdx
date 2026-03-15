@@ -1,44 +1,33 @@
-# Copinance OS Documentation
+# Copinance OS
 
-Welcome to Copinance OS - an open-source market analysis platform and framework.
+Open-source market analysis platform and framework: deterministic instrument/market analysis and question-driven AI analysis.
 
-## What is Copinance OS?
+## What You Get
 
-Copinance OS is a Python library that helps you perform comprehensive market analysis with:
-- **Dual analysis modes** (deterministic instrument/market analysis and question-driven AI analysis)
-- **Adaptive presentation** based on financial literacy level
-- **Extensible architecture** for custom data providers and analyzers
+- **Dual analysis modes**: Deterministic pipelines (equity, options, macro) and question-driven analysis (AI uses tools to answer your questions).
+- **Adaptive presentation**: Results adapt to financial literacy level (beginner, intermediate, advanced).
+- **Extensible architecture**: Clean hexagonal design; plug in custom data providers and analyzers.
+- **CLI and library**: Use from the command line or integrate into any Python application.
 
-## Quick Navigation
+## Quick Links
 
-### 🚀 Getting Started
-- [Installation](getting-started/installation) - Get up and running
-- [Quick Start](getting-started/quickstart) - Your first analysis run in 5 minutes
+| I want to… | Go to |
+|------------|--------|
+| Install and run my first analysis | [Installation](getting-started/installation) → [Quick Start](getting-started/quickstart) |
+| Use the CLI (all commands) | [CLI Reference](user-guide/cli) |
+| Integrate in my app | [Using as a Library](getting-started/library) |
+| Configure API keys and options | [Configuration](getting-started/configuration) |
+| Understand analysis types | [Analysis Modes](user-guide/analysis-modes) |
+| Extend or contribute | [Architecture](developer-guide/architecture), [Extending](developer-guide/extending), [Testing](developer-guide/testing) |
+| Implement a data provider | [API Reference](api-reference/data-providers) |
 
-### 👤 User Guide
-- [CLI Reference](user-guide/cli) - Complete command reference
-- [Analysis Modes](user-guide/analysis-modes) - Instrument, market, and question-driven analysis
-- [Configuration](user-guide/configuration) - Setting up API keys and options
+## Core Concepts
 
-### 🔧 Developer Guide
-- [Architecture](developer-guide/architecture) - System design and patterns
-- [Extending](developer-guide/extending) - Adding custom data providers
-- [Testing](developer-guide/testing) - Test structure and guidelines
-
-### 📚 API Reference
-- [Data Providers](api-reference/data-providers) - Data provider interfaces
-
-## Key Concepts
-
-### Analysis Profiles
-Analysis profiles provide context for analysis execution (financial literacy level, preferences). This is **NOT** user management - your app handles users, we handle analysis context.
-
-### Analysis Modes
-- **Deterministic**: Predefined analysis pipeline (instrument or market) with consistent steps
-- **Question-driven**: AI-powered analysis that adapts to natural-language questions
+- **Analysis profiles**: Context for runs (literacy level, preferences). Not user accounts—your app owns users; we own analysis context.
+- **Deterministic analysis**: Fixed pipeline (quote, history, fundamentals, regime, etc.).
+- **Question-driven analysis**: You ask in natural language; the AI uses tools (quote, history, options, macro, etc.) to answer.
 
 ## Need Help?
 
-- 📖 Check the [User Guide](user-guide/cli) for common tasks
-- 🐛 Report issues on [GitHub](https://github.com/copinance/copinance-os/issues)
-- 💬 Join [Discussions](https://github.com/copinance/copinance-os/discussions) in the repository
+- [GitHub Issues](https://github.com/copinance/copinance-os/issues) — bugs and feature requests
+- [Discussions](https://github.com/copinance/copinance-os/discussions) — questions and ideas

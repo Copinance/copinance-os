@@ -1,5 +1,4 @@
 export default {
   "cli": "CLI Reference",
-  "analysis-modes": "Analysis Modes",
-  "configuration": "Configuration"
+  "analysis-modes": "Analysis Modes"
 }

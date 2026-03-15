@@ -1,8 +1,8 @@
 export default {
-  index: "Home",
+  index: "Introduction",
   "getting-started": "Getting Started",
   "user-guide": "User Guide",
-  "tools": "Tools",
+  "tools": "Tools & Analysis",
   "developer-guide": "Developer Guide",
   "api-reference": "API Reference",
   "discussions": {

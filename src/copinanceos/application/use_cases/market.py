@@ -18,6 +18,14 @@ from copinanceos.domain.validation import StockSymbolValidator
 logger = structlog.get_logger(__name__)
 
 
+def _is_stub_instrument(stock: Stock) -> bool:
+    """True if this looks like a stub (e.g. from failed or partial symbol resolution)."""
+    return (
+        not (stock.exchange or "").strip()
+        and (stock.name or "").strip().upper() == (stock.symbol or "").strip().upper()
+    )
+
+
 def _stock_from_quote(symbol: str, quote: dict[str, Any]) -> Stock:
     """Build a Stock from a provider quote dict (provider-agnostic)."""
     name = (
@@ -131,6 +139,10 @@ class SearchInstrumentsUseCase(UseCase[SearchInstrumentsRequest, SearchInstrumen
 
     async def execute(self, request: SearchInstrumentsRequest) -> SearchInstrumentsResponse:
         instruments = await self._instrument_repository.search(request.query, request.limit)
+        # If the only cache hits are stubs (e.g. bad symbol "APPLE" saved earlier), treat as empty
+        # so the provider can return real results (e.g. AAPL for "APPLE").
+        if instruments and all(_is_stub_instrument(s) for s in instruments):
+            instruments = []
 
         if not instruments and self._market_data_provider:
             use_symbol = False
@@ -145,6 +157,21 @@ class SearchInstrumentsUseCase(UseCase[SearchInstrumentsRequest, SearchInstrumen
                 one = await self._resolve_instrument_from_provider(request.query.upper())
                 if one:
                     instruments = [one]
+                # Symbol lookup failed (e.g. "APPLE" is not a ticker); fall back to name search
+                # so "APPLE" returns AAPL via yfinance Search.
+                if not instruments:
+                    raw = await self._market_data_provider.search_instruments(
+                        request.query, limit=request.limit
+                    )
+                    for item in raw:
+                        sym = (item.get("symbol") or "").strip()
+                        if not sym:
+                            continue
+                        one = await self._resolve_instrument_from_provider(sym)
+                        if one:
+                            instruments.append(one)
+                            if len(instruments) >= request.limit:
+                                break
             else:
                 raw = await self._market_data_provider.search_instruments(
                     request.query, limit=request.limit

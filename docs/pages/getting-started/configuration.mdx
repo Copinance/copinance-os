@@ -1,0 +1,107 @@
+# Configuration
+
+Configure Copinance OS for CLI or library use.
+
+## Configuration Methods
+
+1. **CLI**: Environment variables or a `.env` file.
+2. **Library**: Pass `LLMConfig` and optional `fred_api_key` into `get_container()`. See [Library Integration](#library-integration) below.
+
+## Environment Variables (CLI)
+
+Create a `.env` file in your project root (same directory as `pyproject.toml`):
+
+```bash
+# .env
+COPINANCEOS_GEMINI_API_KEY=your-api-key-here
+```
+
+## LLM Provider Setup
+
+### Gemini (Cloud)
+
+1. Get an API key from [Google AI Studio](https://aistudio.google.com).
+2. Set in `.env`: `COPINANCEOS_GEMINI_API_KEY=your-key`
+3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
+
+**Model selection (optional):**
+```bash
+COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro   # default
+COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash # faster
+```
+
+### Ollama (Local)
+
+1. Install from [ollama.ai](https://ollama.ai) and run `ollama pull llama2`.
+2. Set in `.env`:
+```bash
+COPINANCEOS_LLM_PROVIDER=ollama
+COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
+COPINANCEOS_OLLAMA_MODEL=llama2
+```
+3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
+
+## FRED API (Macro Data)
+
+Optional. Improves macro analysis; yfinance fallback is used without it.
+
+1. Get a free key at [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html).
+2. Set: `COPINANCEOS_FRED_API_KEY=your-fred-api-key`
+3. Verify: `copinance analyze macro` (results should show `"source": "fred"` where applicable).
+
+## Storage and Cache
+
+```bash
+# Storage (optional)
+COPINANCEOS_STORAGE_TYPE=file
+COPINANCEOS_STORAGE_PATH=~/.copinanceos
+
+# Cache (optional, default: true)
+COPINANCEOS_CACHE_ENABLED=true
+```
+
+- **Library:** Use `get_container(..., cache_enabled=False)` or `cache_manager=...`. See [Using as a Library](library#cache).
+
+## Complete .env Examples
+
+**Gemini:**
+```bash
+COPINANCEOS_LLM_PROVIDER=gemini
+COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-key
+COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro
+COPINANCEOS_FRED_API_KEY=your-fred-key
+COPINANCEOS_STORAGE_TYPE=file
+COPINANCEOS_STORAGE_PATH=~/.copinanceos
+```
+
+**Ollama:**
+```bash
+COPINANCEOS_LLM_PROVIDER=ollama
+COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
+COPINANCEOS_OLLAMA_MODEL=llama2
+COPINANCEOS_STORAGE_TYPE=file
+COPINANCEOS_STORAGE_PATH=~/.copinanceos
+```
+
+## Security
+
+Never commit `.env`. Add to `.gitignore`:
+```gitignore
+.env
+.env.local
+```
+
+## Troubleshooting
+
+- **"LLM analyzer not configured"**: Check `.env` location and variable names; restart terminal.
+- **"Gemini not available"**: `pip install google-genai`
+- **"Gemini API key is not configured"**: No quotes around the key; exact name `COPINANCEOS_GEMINI_API_KEY`.
+
+## Library Integration
+
+When using Copinance OS as a **library**, pass config into `get_container()`; env vars are for CLI only.
+
+- **LLMConfig**: Required for question-driven analysis. Example: `get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))`.
+- **FRED**: Optional. `get_container(..., fred_api_key="your-key")`.
+
+Full container options and examples: [Using as a Library](library).

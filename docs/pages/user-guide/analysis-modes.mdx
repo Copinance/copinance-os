@@ -84,24 +84,7 @@ Both deterministic and question-driven analysis adapt to the timeframe:
 
 All analysis runs are one-off: `copinance analyze` runs analysis without persisting jobs. Each run saves results to `.copinance/results/v2/` as versioned JSON envelopes. Profiles and cached tool data also live under versioned subdirectories in `.copinance`.
 
-### Example Analyses
-
-```bash
-# Deterministic equity analysis
-copinance analyze equity AAPL --timeframe mid_term
-
-# Deterministic options analysis
-copinance analyze options AAPL --expiration 2026-06-19
-
-# Deterministic macro regime (custom index)
-copinance analyze macro --market-index SPY
-
-# Question-driven equity: AI answers using tools
-copinance analyze equity AAPL --question "What are the key risks?"
-
-# Question-driven options: AI summarizes options for date
-copinance analyze options AAPL --question "Summarize AAPL options for June 2026" --expiration 2026-06-19
-```
+For all commands and options, see [CLI Reference — Analyze](cli#analyze-commands).
 
 ## Macro Regime Analysis
 
@@ -134,4 +117,4 @@ Example: `copinance analyze macro --market-index QQQ` fetches QQQ (reference), a
 ## Next Steps
 
 - [CLI Reference](cli) - Command details
-- [Configuration](configuration) - Setting up API keys
+- [Configuration](/getting-started/configuration) — Setting up API keys

@@ -4,6 +4,34 @@ from __future__ import annotations
 
 from typing import Any
 
+# Common Yahoo Finance exchange codes → display name (market where equity is traded)
+EXCHANGE_DISPLAY_NAMES: dict[str, str] = {
+    "NMS": "NASDAQ",
+    "NGM": "NASDAQ",
+    "NCM": "NASDAQ",
+    "NYQ": "NYSE",
+    "NYC": "NYSE",
+    "ASE": "NYSE American",
+    "BTS": "BATS",
+    "PCX": "NYSE Arca",
+    "BSE": "BSE",
+    "NSE": "NSE",
+    "LON": "LSE",
+    "HKG": "HKEX",
+    "TO": "TSX",
+    "EPA": "Euronext Paris",
+    "FRA": "XETRA",
+    "ETR": "XETRA",
+}
+
+
+def format_exchange(exchange: str | None) -> str:
+    """Return human-readable market name for an exchange code (e.g. NMS → NASDAQ)."""
+    if not exchange or not str(exchange).strip():
+        return ""
+    code = str(exchange).strip().upper()
+    return EXCHANGE_DISPLAY_NAMES.get(code, code)
+
 
 def _to_float(value: Any) -> float | None:
     """Convert value to float if possible."""

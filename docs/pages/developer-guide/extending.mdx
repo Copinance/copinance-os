@@ -103,6 +103,7 @@ class AlphaVantageProvider(MarketDataProvider):
 from copinanceos.infrastructure.containers import get_container
 from dependency_injector import providers
 
+# Use get_container(llm_config=...) if you need question-driven analysis
 container = get_container()
 container.market_data_provider.override(
     providers.Singleton(AlphaVantageProvider, api_key="your-key")
@@ -136,15 +137,16 @@ Similar to data providers, override the analyzer in your container:
 
 ```python
 from copinanceos.infrastructure.containers import get_container
+from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from dependency_injector import providers
 
-container = get_container()
+container = get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))
 container.llm_analyzer.override(
     providers.Singleton(MyCustomAnalyzer)
 )
 ```
 
-**Note:** If you're using LLM features, make sure to provide `LLMConfig` when creating the container. See [Configuration Guide](../user-guide/configuration#library-integration) for details.
+**Note:** If you're using LLM features, make sure to provide `LLMConfig` when creating the container. See [Configuration](/getting-started/configuration#library-integration) for details.
 
 ## Adding a Custom Executor
 
@@ -192,7 +194,7 @@ The default container uses a file-based cache for tool results and agent prompts
 - **Disable:** `get_container(..., cache_enabled=False)`.
 - **Custom cache:** `get_container(..., cache_manager=my_cache_manager)`. Your instance must match the `CacheManager` interface (see `copinanceos.infrastructure.cache`). The cache is used for tool outputs and for rendered agent prompts.
 
-You can also set `COPINANCEOS_CACHE_ENABLED=false` (see [Configuration](/user-guide/configuration#cache)).
+You can also set `COPINANCEOS_CACHE_ENABLED=false` (see [Configuration](/getting-started/configuration#cache)).
 
 ## Best Practices
 

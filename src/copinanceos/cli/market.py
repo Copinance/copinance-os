@@ -18,7 +18,12 @@ from copinanceos.application.use_cases.market import (
     SearchInstrumentsRequest,
 )
 from copinanceos.cli.error_handler import handle_cli_error
-from copinanceos.cli.formatting import format_compact_number, format_price, format_volume
+from copinanceos.cli.formatting import (
+    format_compact_number,
+    format_exchange,
+    format_price,
+    format_volume,
+)
 from copinanceos.cli.utils import async_command
 from copinanceos.domain.models.market import MarketDataPoint, OptionsChain, OptionSide
 from copinanceos.infrastructure.config import get_storage_path_safe
@@ -47,16 +52,17 @@ async def search_instruments(
     response = await use_case.execute(request)
 
     if not response.instruments:
-        console.print("No instruments found", style="yellow")
+        console.print(f"No instruments found for '{query}'.", style="yellow")
         return
 
     table = Table(title=f"Search Results for '{query}'")
     table.add_column("Symbol", style="cyan")
     table.add_column("Name", style="magenta")
-    table.add_column("Exchange", style="green")
+    table.add_column("Market", style="green")
 
     for instrument in response.instruments:
-        table.add_row(instrument.symbol, instrument.name, instrument.exchange)
+        market = format_exchange(instrument.exchange) or instrument.exchange or "—"
+        table.add_row(instrument.symbol, instrument.name, market)
 
     console.print(table)
 

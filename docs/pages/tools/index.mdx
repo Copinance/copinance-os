@@ -1,22 +1,19 @@
 # Tools Overview
 
-Copinance OS provides a comprehensive suite of tools for market analysis. Tools are executable functions that can be used in analysis, especially question-driven analysis where the AI can dynamically select and use tools to answer questions.
+Tools are executable functions used in analysis—especially question-driven analysis, where the AI selects and runs tools to answer questions. They also power deterministic runs (e.g. `copinance analyze macro`).
 
-## Tool Categories
+## Analysis Tools
 
-### Analysis Tools
-Advanced analytical functions for market regime detection, technical analysis, and macroeconomic analysis.
+Market regime detection and macroeconomic indicators (trend, volatility, cycles, VIX, breadth, sector rotation, 47+ macro indicators). Used automatically in question-driven and macro analysis.
 
-- **Market Regime Detection**: Identify bull/bear markets, volatility regimes, and market cycles
-- **Macro Economic Indicators**: Comprehensive economic data across 9 categories (47+ indicators)
-- See [Analysis Tools](/tools/analysis) for details
+- [Market Regime Detection](analysis/market-regime) — Trend, volatility, cycle detection; VIX, breadth, sector rotation
+- [Macro Economic Indicators](analysis/macro-indicators) — Rates, credit, labor, housing, manufacturing, consumer, global, advanced (FRED + yfinance)
 
-### Data Provider Tools
-Tools that wrap data provider methods, making them accessible to AI agents and analysis runs.
+## Data Provider Tools
 
-- **Market Data Tools**: Get quotes, historical prices, search instruments, inspect options chains
-- **Fundamental Data Tools**: Access financial statements, SEC filings, fundamentals
-- See [Overview](/tools/data-providers) for details
+Tools that wrap provider methods (quotes, history, search, options, fundamentals). Available to the AI in question-driven runs.
+
+- [Data Provider Tools](data-providers) — Market and fundamental tool reference
 
 ## Using Tools
 
@@ -34,32 +31,24 @@ The AI will automatically select and use the appropriate tools to answer your qu
 ### Programmatic Usage
 
 ```python
-from copinanceos.infrastructure.tools.analysis import create_rule_based_regime_tools
-from copinanceos.infrastructure.tools.data_provider import create_market_data_tools
+from copinanceos.infrastructure.tools import (
+    create_rule_based_regime_tools,
+    create_market_data_tools,
+    ToolRegistry,
+)
 from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
 
 provider = YFinanceMarketProvider()
-
-# Create tools
 regime_tools = create_rule_based_regime_tools(provider)
 data_tools = create_market_data_tools(provider)
 
-# Use tools
+# Use a tool
 result = await regime_tools[0].execute(symbol="AAPL")
-```
 
-### Tool Registry
-
-Tools can be registered in a central registry:
-
-```python
-from copinanceos.infrastructure.tools import ToolRegistry
-
+# Optional: central registry
 registry = ToolRegistry()
 registry.register_many(regime_tools)
 registry.register_many(data_tools)
-
-# Get tool by name
 tool = registry.get("detect_market_trend")
 ```
 
@@ -74,6 +63,6 @@ All tools implement the `Tool` interface, which provides:
 
 ## See Also
 
-- [API Reference](../api-reference/data-providers) - Data provider interfaces
-- [Analysis Modes](../user-guide/analysis-modes) - Using tools in analysis
-- [Developer Guide](../developer-guide/extending) - Creating custom tools
+- [Analysis Modes](/user-guide/analysis-modes) — Using tools in analysis
+- [API Reference](/api-reference/data-providers) — Data provider interfaces
+- [Extending](/developer-guide/extending) — Custom tools

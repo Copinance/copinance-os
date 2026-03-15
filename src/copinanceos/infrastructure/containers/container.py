@@ -287,6 +287,11 @@ def get_container(
         else:
             # Return new instance for library integrators with custom API key
             return container_instance
+    # Apply cache overrides to existing container (library use: cache disable was ignored)
+    if cache_manager is not None:
+        _container.cache_manager.override(providers.Object(cache_manager))
+    elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
+        _container.cache_manager.override(providers.Object(None))
     return _container
 
 
@@ -306,7 +311,24 @@ def reset_container() -> None:
     _container = None
 
 
-# Expose container instance for convenience
-# Note: For CLI usage, this will be initialized with LLM config from env if available
-# For library integrators, use get_container(llm_config=your_config) instead
-container = get_container()
+class _ContainerProxy:
+    """Lazy proxy for the global container.
+
+    Delegates to get_container() on every attribute access so that:
+    - No container is created at import time (lazy initialization).
+    - Library code that calls get_container(cache_enabled=False) first gets
+      a container created with those options; later access via this proxy
+      returns the same instance.
+    - Explicit cache/LLM/FRED overrides passed to get_container() are applied
+      when returning an existing container, so options are never ignored.
+
+    Does not use __slots__ so that unittest.mock.patch() can set attributes
+    on the proxy (e.g. @patch("...container.cache_manager")).
+    """
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(get_container(), name)
+
+
+# Lazy default container: no creation at import; first use or get_container(...) wins
+container: Container = _ContainerProxy()  # type: ignore[assignment]

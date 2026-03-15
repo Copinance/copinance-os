@@ -163,6 +163,8 @@ class YFinanceMarketProvider(MarketDataProvider):
 
             quote = {
                 "symbol": symbol.upper(),
+                "longName": info.get("longName"),
+                "shortName": info.get("shortName"),
                 "current_price": Decimal(
                     str(info.get("currentPrice", info.get("regularMarketPrice", 0)))
                 ),
@@ -359,13 +361,15 @@ class YFinanceMarketProvider(MarketDataProvider):
                 logger.debug("No search results found", query=query)
                 return []
 
-            # Format results
+            # Format results (yfinance Search returns dicts with lowercase keys:
+            # symbol, longname, shortname, exchange, exchDisp, quoteType, etc.)
             results: list[dict[str, Any]] = []
             for quote in quotes[:limit]:
                 result = {
                     "symbol": quote.get("symbol", "").upper(),
                     "name": quote.get("longname") or quote.get("shortname", ""),
                     "exchange": quote.get("exchange", ""),
+                    "exch_disp": quote.get("exchDisp", ""),
                     "quoteType": quote.get("quoteType", ""),
                 }
                 # Only include stock/equity results, filter out other types

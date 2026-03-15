@@ -162,13 +162,13 @@ llm_config = LLMConfig(
 )
 ```
 
-See [Configuration](/user-guide/configuration) for provider-specific details and environment variables used by the CLI.
+See [Configuration](configuration) for provider-specific details and environment variables used by the CLI.
 
 ### Cache
 
 The built-in **cache** stores tool results (e.g. quotes, fundamentals) and rendered agent prompts under the configured storage path. Library users can disable it or supply their own cache.
 
-- **Default:** Cache is enabled (see also `COPINANCEOS_CACHE_ENABLED` in [Configuration](/user-guide/configuration)).
+- **Default:** Cache is enabled (see also `COPINANCEOS_CACHE_ENABLED` in [Configuration](configuration)).
 - **Disable cache:** Pass `cache_enabled=False` to `get_container()`. No tool or prompt caching is used; every request hits the providers.
 - **Use your own cache:** Pass `cache_manager=my_cache_manager` to `get_container()`. Your instance must implement the same interface as `CacheManager` (from `copinanceos.infrastructure.cache`). When provided, `cache_enabled` is ignored.
 
@@ -696,7 +696,7 @@ asyncio.run(main())
 
 ## Next Steps
 
-- [Configuration](/user-guide/configuration) — LLM and FRED setup, env vars, security.
+- [Configuration](configuration) — LLM and FRED setup, env vars, security.
 - [API Reference](/api-reference/data-providers) — Data provider and other interfaces.
 - [Architecture](/developer-guide/architecture) — Hexagonal layout, ports, and container.
 - [Extending](/developer-guide/extending) — Custom data providers, executors, and tests.

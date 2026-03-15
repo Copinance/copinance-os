@@ -31,32 +31,33 @@ The static site will be generated in the `docs/out/` directory.
 
 ## Project Structure
 
-All documentation files are located in the `docs/` directory:
+Documentation lives under `docs/pages/` in MDX. Sidebar order and titles are set in `_meta.tsx` files in each section.
 
 ```
 docs/
-├── pages/                 # Documentation pages (MDX format)
-│   ├── index.mdx         # Homepage
-│   ├── _meta.tsx         # Navigation configuration (per-section)
-│   ├── getting-started/  # Getting started guides
-│   ├── user-guide/       # User documentation
-│   ├── developer-guide/  # Developer documentation
-│   └── api-reference/    # API documentation
-├── package.json          # Dependencies and scripts
-├── next.config.js        # Next.js and Nextra configuration
-├── theme.config.tsx      # Theme customization
-├── tsconfig.json         # TypeScript configuration
-└── README.md             # This file
+├── pages/
+│   ├── index.mdx              # Introduction
+│   ├── _meta.tsx              # Root nav: Getting Started, User Guide, Tools, Developer, API Reference
+│   ├── getting-started/      # Installation, Quick Start, Configuration, Using as a Library
+│   ├── user-guide/           # CLI Reference, Analysis Modes
+│   ├── tools/                 # Overview (analysis + data-provider tools), analysis/market-regime, analysis/macro-indicators, data-providers
+│   ├── developer-guide/      # Architecture, Extending, Testing
+│   └── api-reference/        # Overview, Data Provider Interfaces
+├── next.config.mjs
+├── theme.config.tsx
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
 
 ## Configuration
 
-- `next.config.js` - Next.js and Nextra configuration
+- `next.config.mjs` - Next.js and Nextra configuration
 - `theme.config.tsx` - Theme customization
 - `package.json` - Dependencies and scripts
 - `tsconfig.json` - TypeScript configuration
 
-The documentation is configured for GitHub Pages deployment with the base path `/copinance-os`. This is set in `next.config.js` and will automatically adjust based on the `NODE_ENV`.
+The documentation is configured for GitHub Pages deployment with the base path `/copinance-os`. This is set in `next.config.mjs` and adjusts automatically based on `NODE_ENV`.
 
 ## Customization
 

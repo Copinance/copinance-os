@@ -200,12 +200,12 @@ pre-commit run --all-files
 
 - **[Manifesto](MANIFESTO.md)** - My vision and philosophy
 - **[Documentation](https://copinance.github.io/copinance-os/)** - Complete documentation (hosted on GitHub Pages)
-  - [Getting Started](https://copinance.github.io/copinance-os/getting-started/installation/) - Installation and quick start
-  - [Using as a Library](https://copinance.github.io/copinance-os/getting-started/library) - Full guide: container entry points, all use cases, request/response types, and examples
-  - [Library API Reference](https://copinance.github.io/copinance-os/getting-started/library#library-api-reference) - Every option: container methods, request fields, module paths
-  - [User Guide](https://copinance.github.io/copinance-os/user-guide/cli/) - CLI reference and analysis modes
-  - [Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/) - Architecture and extending
-  - [API Reference](https://copinance.github.io/copinance-os/api-reference/data-providers/) - Data provider and other interfaces
+  - [Getting Started](https://copinance.github.io/copinance-os/getting-started/installation/) — Installation, Quick Start, Configuration, Using as a Library
+  - [Library API Reference](https://copinance.github.io/copinance-os/getting-started/library#library-api-reference) — Container methods, request/response types, module paths
+  - [User Guide](https://copinance.github.io/copinance-os/user-guide/cli/) — CLI reference and analysis modes
+  - [Tools](https://copinance.github.io/copinance-os/tools/) — Analysis tools (regime, macro) and data-provider tools
+  - [Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/) — Architecture, extending, testing
+  - [API Reference](https://copinance.github.io/copinance-os/api-reference/) — Data provider and extension interfaces
 - **[Documentation Setup](docs/README.md)** - Local development setup for documentation
 - **[Contributing](CONTRIBUTING.md)** - How to contribute
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards
@@ -271,7 +271,7 @@ Request/response types live in `copinanceos.application.use_cases.market`, `copi
 **Quick usage:**
 
 1. **Install** in your project: `pip install copinance-os` (or `pip install -e .` from source).
-2. **Configure the container:** pass `LLMConfig` for question-driven analysis; optionally `fred_api_key` for macro. See [Configuration](https://copinance.github.io/copinance-os/user-guide/configuration).
+2. **Configure the container:** pass `LLMConfig` for question-driven analysis; optionally `fred_api_key` for macro. See [Configuration](https://copinance.github.io/copinance-os/getting-started/configuration).
 3. **Use cases (no jobs):** `uc = container.get_quote_use_case()` then `await uc.execute(GetQuoteRequest(symbol="AAPL"))`. The same pattern applies to search, historical data, options chain, fundamentals, and progressive analyze — see the library doc for all request types.
 4. **Or run analysis via jobs:** `runner = container.job_runner()`, build a `Job`, then `await runner.run(job, {})`. Use `result.success`, `result.results`, `result.error_message`.
 
@@ -301,7 +301,7 @@ async def main():
 asyncio.run(main())
 ```
 
-See also: [Configuration](https://copinance.github.io/copinance-os/user-guide/configuration) (LLM/FRED, security), [API Reference](https://copinance.github.io/copinance-os/api-reference/data-providers) (interfaces), [Quick Start](https://copinance.github.io/copinance-os/getting-started/quickstart) (CLI).
+See also: [Configuration](https://copinance.github.io/copinance-os/getting-started/configuration) (LLM/FRED, security), [API Reference](https://copinance.github.io/copinance-os/api-reference/data-providers) (interfaces), [Quick Start](https://copinance.github.io/copinance-os/getting-started/quickstart) (CLI).
 
 ## Contributing
 

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Market search**: `EXCHANGE_DISPLAY_NAMES` and `format_exchange()` for human-readable market names (e.g. NMS → NASDAQ, NYQ → NYSE); "Market" column in search results; `longName`, `shortName`, and `exch_disp` from yfinance in results.
+- **Container/DI**: Lazy container proxy so no container is created at import time; first `get_container()` or attribute access wins. Unit tests for container cache configuration.
+- Integration executor test: question context passed so run reaches LLM check.
+- `.gitignore`: `.cursor/` and normalize trailing newline.
 - **Executor-based analysis architecture**: `AnalysisExecutor` port with instrument, market, and question-driven executors; `JobRunner` for job execution (replaces workflow-based orchestration).
 - **Analyze use case**: modes (auto, deterministic, question_driven) and scope-based routing; `DefaultJobRunner` in `run_job.py` resolves an executor per job, builds profile context, and runs analysis.
 - **AnalysisProfile**: renamed from ResearchProfile; regime models moved to `domain/models/regime` (macro, market_regime).
@@ -25,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Market search**: Cache hits that are all "stub" instruments (e.g. bad symbol "APPLE") are treated as empty so the provider is queried and can return real results (e.g. AAPL). When symbol lookup fails, fall back to provider name search (yfinance Search) so queries like "APPLE" resolve to AAPL.
+- **Container/DI**: `cache_enabled` and `cache_manager` overrides are applied when returning an existing container, so library callers (e.g. `get_container(cache_enabled=False)`) are no longer ignored.
 - Replaced workflow system with executor-based analysis: instrument, market, and question-driven executors; job execution centralized in `DefaultJobRunner`.
 - Analyze and market CLIs extended with new options; profile and execution wired through job runner and Job model.
 - Stock-centric flows replaced by market/instrument-centric: instrument search and data access via `market` use cases and `market` CLI.

@@ -59,7 +59,7 @@ def test_job_creation():
 
 ### Integration Tests
 
-Test component interactions:
+Test component interactions using fixtures from `tests/conftest.py`:
 
 ```python
 import pytest
@@ -69,11 +69,7 @@ from copinanceos.domain.models.stock import Stock
 @pytest.mark.integration
 async def test_stock_repository_save_and_get(isolated_storage):
     repo = StockRepositoryImpl(storage=isolated_storage)
-    stock = Stock(
-        symbol="AAPL",
-        name="Apple Inc.",
-        exchange="NASDAQ",
-    )
+    stock = Stock(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ")
 
     saved = await repo.save(stock)
     retrieved = await repo.get_by_symbol(saved.symbol)

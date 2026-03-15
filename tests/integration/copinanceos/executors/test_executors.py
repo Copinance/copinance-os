@@ -50,7 +50,9 @@ class TestEndToEndExecutors:
             timeframe=JobTimeframe.SHORT_TERM,
             execution_type=INSTRUMENT_QUESTION_DRIVEN_TYPE,
         )
-        response = await runner.run(job, {})
+        # Pass a question so execution reaches the LLM check; without it we get "Question is required" first
+        context = {"question": "What is the short-term outlook for MSFT?"}
+        response = await runner.run(job, context)
 
         assert response.success is True
         if response.results:
