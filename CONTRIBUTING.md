@@ -19,7 +19,7 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 
 ```bash
 # Install in development mode with all dependencies
-pip install -e ".[dev,docs]"
+pip install -e ".[dev]"
 
 # Install pre-commit hooks
 pre-commit install

@@ -33,7 +33,7 @@ Copinance OS is a **pure Python library** following clean hexagonal architecture
 copinanceos/
 ├── domain/              # Core business logic (no dependencies)
 │   ├── models/          # Entities: AnalysisProfile, Stock; Job (analysis execution context)
-│   └── ports/           # 22 interfaces for extensibility
+│   └── ports/           # 23 interfaces for extensibility
 ├── application/         # Use cases, default job runner (replaceable)
 │   ├── use_cases/       # Business operations
 │   └── run_job.py       # DefaultJobRunner (optional; implement JobRunner for custom orchestration)

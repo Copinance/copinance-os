@@ -120,9 +120,10 @@ See [Using as a Library](/getting-started/library#configuration) for container c
 
 ## Extension Points
 
-The architecture provides 22 port interfaces for extension:
+The architecture provides 23 port interfaces for extension:
 
 - **5 Data Provider interfaces**: Market, Alternative, Fundamental, Macro, Base DataProvider
+- **1 Analytics port**: `OptionsChainGreeksEstimator` (options-chain BSM Greeks; default QuantLib implementation)
 - **1 Analyzer interface**: LLM
 - **6 Strategy interfaces**: Screening, Due Diligence, Valuation, Risk, Thematic, Monitoring
 - **4 Tool interfaces**: Tool, ToolParameter, ToolSchema, ToolResult

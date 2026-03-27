@@ -75,7 +75,7 @@ _lazy_command(
 _lazy_command("cache", "Cache management commands", "copinanceos.cli.cache", "cache_app")
 _lazy_command(
     "market",
-    "Market data: search, quote, history, options chain (BSM Greeks), fundamentals",
+    "Market data: search, quote, history, options (BSM Greeks via QuantLib), fundamentals",
     "copinanceos.cli.market",
     "market_app",
 )

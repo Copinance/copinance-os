@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation & metadata**: Package description (`pyproject.toml`) and `copinanceos` module docstring aligned with README and docs: “market analysis” and “question-driven AI” (replacing “market research” / “agent AI” in those metadata strings). Extension point count raised to **23** and `OptionsChainGreeksEstimator` documented in architecture and extending guides; README architecture tree and MANIFESTO updated to match.
+- **CLI / user guide**: Root `copinance --help` `market` summary aligned with the `market` Typer app (“options (BSM Greeks via QuantLib)”); `market options --expiration` Typer help aligned with the user guide default wording. CLI reference table (`market`, `cache`) and macro `--timeframe` default (`mid_term`) clarified.
+- **Contributing**: `pip install -e ".[dev]"` only — removed nonexistent `.[dev,docs]` extra from the setup example.
 - **Yahoo options:** Default `--expiration` now picks the earliest listed expiry **on or after today** (not raw `ticker.options[0]`), avoiding expired front months and missing BSM Greeks the day after expiry.
 - **BSM / QuantLib:** Treat expiry **strictly before** evaluation as expired (`maturity < eval`); allow **same calendar day** as 0DTE. With normalized IV (see below), Greeks can compute for live expiries.
 - **Yahoo options / BSM:** Normalize option-chain `impliedVolatility` when value is **> 1** (treat as percent points → divide by 100) so QuantLib BSM Greeks match σ as a fraction; fixes `-` Greeks when Yahoo returns values like `13.67` for ~13.7% vol.

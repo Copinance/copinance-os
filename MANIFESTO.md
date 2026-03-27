@@ -207,7 +207,7 @@ Stock/macro analysis for consistency, agent (question-driven) analysis for adapt
 Start with free data, scale as you grow. Your data, your control.
 
 ### 7. Clean Architecture
-Built to last, evolve, and extend with 22+ extension interfaces.
+Built to last, evolve, and extend with 23+ extension interfaces.
 
 ### 8. Quality Over Quantity
 Excellence in core capabilities, extensibility for everything else.

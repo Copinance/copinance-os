@@ -7,8 +7,8 @@ Complete guide to using the Copinance OS command-line interface.
 | Command | Description |
 |--------|-------------|
 | `analyze` | Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. |
-| `cache` | Cache management commands. |
-| `market` | Market data commands. |
+| `cache` | Cache management commands (clear, refresh, info). |
+| `market` | Market data: search, quote, history, options (BSM Greeks via QuantLib), fundamentals. |
 | `profile` | Analysis profile management commands. |
 | `version` | Show version information. |
 
@@ -286,7 +286,7 @@ copinance analyze macro --no-include-sector-rotation
 
 **Options:**
 - `--market-index` / `-m`: Reference index for trend/volatility and sector comparison (`SPY`, `QQQ`, `DIA`, `IWM`). Breadth and rotation always use the 11 S&P sector ETFs and VIX.
-- `--timeframe`: `short_term`, `mid_term`, or `long_term`
+- `--timeframe`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--question` / `-q`: Optional natural-language question (enables question-driven mode in auto)
 - `--mode`: `auto`, `deterministic`, or `question_driven`
 - `--lookback-days`: Lookback window in days (default: 252)

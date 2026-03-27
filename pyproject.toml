@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "copinance-os"
 version = "0.1.0"
-description = "Open-source market research platform and framework with agent AI and instrument/macro analysis"
+description = "Open-source market analysis platform and framework with question-driven AI and deterministic instrument/macro analysis"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}

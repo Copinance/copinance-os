@@ -406,7 +406,7 @@ async def get_options_chain(
         None,
         "--expiration",
         "-e",
-        help="Expiration in YYYY-MM-DD (default: nearest listed expiry from provider)",
+        help="Expiration in YYYY-MM-DD (default: earliest listed expiry on or after today)",
     ),
     option_side: OptionSide = typer.Option(
         OptionSide.ALL,
