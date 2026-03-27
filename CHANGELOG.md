@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Yahoo options:** Default `--expiration` now picks the earliest listed expiry **on or after today** (not raw `ticker.options[0]`), avoiding expired front months and missing BSM Greeks the day after expiry.
+- **BSM / QuantLib:** Treat expiry **strictly before** evaluation as expired (`maturity < eval`); allow **same calendar day** as 0DTE. With normalized IV (see below), Greeks can compute for live expiries.
+- **Yahoo options / BSM:** Normalize option-chain `impliedVolatility` when value is **> 1** (treat as percent points → divide by 100) so QuantLib BSM Greeks match σ as a fraction; fixes `-` Greeks when Yahoo returns values like `13.67` for ~13.7% vol.
+- **CLI — `market options`:** Always shows Delta/Gamma/Theta/Vega/Rho columns by default (cells `-` when Greeks are not computed); `--no-greeks` hides them. Expanded help text and short flags for expiration/side. Docs (user guide, README, library API, options chain metadata) updated for BSM Greeks and `COPINANCEOS_OPTION_GREEKS_*` settings.
 - **Documentation**: Aligned docs with current behavior and conventions: virtualenv is `.venv` (README, installation, CONTRIBUTING); README extension interfaces match architecture (LLM analyzer, data providers, strategies, repositories); CLI reference notes fast startup for `copinance --help` and `copinance version` (lazy subcommands); installation states that `make setup` creates `.venv`.
 - **Documentation**: Library guide Storage and Persistence section now clarifies that `.copinance` is created by storage (repositories), not by cache; documents `storage_type="memory"` and env alternative; configuration and library API reference updated for storage options.
 - **Market search**: Cache hits that are all "stub" instruments (e.g. bad symbol "APPLE") are treated as empty so the provider is queried and can return real results (e.g. AAPL). When symbol lookup fails, fall back to provider name search (yfinance Search) so queries like "APPLE" resolve to AAPL.

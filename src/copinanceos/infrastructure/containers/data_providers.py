@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from dependency_injector import providers
 
+from copinanceos.infrastructure.analytics.options import QuantLibBsmGreekEstimator
 from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
 from copinanceos.infrastructure.cache import CacheManager, LocalFileCacheBackend
 from copinanceos.infrastructure.config import get_settings
@@ -14,6 +15,7 @@ from copinanceos.infrastructure.data_providers import (
     YFinanceMarketProvider,
 )
 from copinanceos.infrastructure.factories import LLMAnalyzerFactory
+from copinanceos.infrastructure.market import OptionAnalyticsMarketDataProvider
 
 
 def configure_data_providers(
@@ -34,8 +36,15 @@ def configure_data_providers(
     # Use provided API key if given, otherwise fall back to settings (CLI default)
     effective_fred_api_key = fred_api_key if fred_api_key is not None else settings.fred_api_key
 
+    yfinance_market_provider = providers.Singleton(YFinanceMarketProvider)
+    option_greeks_estimator = providers.Singleton(QuantLibBsmGreekEstimator)
+
     return {
-        "market_data_provider": providers.Singleton(YFinanceMarketProvider),
+        "market_data_provider": providers.Singleton(
+            OptionAnalyticsMarketDataProvider,
+            inner=yfinance_market_provider,
+            option_greeks_estimator=option_greeks_estimator,
+        ),
         "fundamental_data_provider": providers.Singleton(YFinanceFundamentalProvider),
         "sec_filings_provider": providers.Singleton(EdgarFundamentalProvider),
         "macro_data_provider": providers.Singleton(

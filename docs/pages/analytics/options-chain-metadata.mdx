@@ -1,0 +1,48 @@
+# Options chain metadata
+
+`OptionsChain.metadata` is a string map shared by **data providers** (inputs) and **option analytics** (outputs). Keys are lowercase `snake_case`. This page is the reference for **reserved keys** and configuration.
+
+For **how to read Greeks** (moneyness, theta caveats), see [BSM & Greeks (QuantLib)](/analytics/bsm-and-greeks).
+
+## Provider inputs (optional)
+
+| Key | Source | Meaning |
+|-----|--------|---------|
+| `provider` | Data provider implementation | Short name (e.g. `yfinance`). |
+| `dividend_yield` | Optional; if set, overrides default | Continuous dividend yield used in BSM Greek estimation (decimal, e.g. `0.02` for 2%). If absent, application settings (`COPINANCEOS_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT`) or `AnalysisProfile.preferences` applies. See [Configuration](/getting-started/configuration). |
+
+**Implied volatility (yfinance):** Raw `impliedVolatility` from the option chain is normalized when building `OptionContract`: values **greater than 1** are treated as **percent points** (e.g. `13.67` → σ `0.1367`) so BSM/Greeks match QuantLib’s σ convention. Values **≤ 1** are kept as fractional σ (e.g. `0.25` = 25% vol). So a stored **0.94** is **~94% annualized vol**, not 0.94%—only the “percent points” branch divides by 100.
+
+## Greek estimation outputs (when estimation runs)
+
+Set by `estimate_bsm_greeks_for_options_chain` / `QuantLibBsmGreekEstimator` when at least one contract receives Greeks:
+
+| Key | Example | Meaning |
+|-----|---------|---------|
+| `option_greeks_model` | `quantlib_analytic_european_bsm` | Model identifier. |
+| `option_greeks_risk_free_rate` | `0.045` | Rate used for that run (string decimal). |
+| `option_greeks_dividend_yield_assumption` | `0` | Continuous yield passed into QuantLib for that run. |
+| `option_greeks_as_of_date` | `2026-03-28` | Evaluation date (ISO date). |
+
+## Configuration and profile
+
+- **Environment / `.env`** (via `pydantic-settings`, prefix `COPINANCEOS_`):
+  - `OPTION_GREEKS_RISK_FREE_RATE` — optional; unset uses built-in default (`0.045`).
+  - `OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT` — optional; unset uses `0` when chain has no `dividend_yield`.
+- **`AnalysisProfile.preferences`** (optional overrides when you construct `QuantLibBsmGreekEstimator(profile=...)`):
+  - `option_greeks_risk_free_rate`
+  - `option_greeks_dividend_yield_default`
+
+The default DI container uses `QuantLibBsmGreekEstimator()` with `profile=None`, so only **settings** apply unless you wire a custom estimator.
+
+## CLI
+
+`copinance market options <SYMBOL>` prints Greek columns by default (showing `-` when not computed). Use `--no-greeks` to hide them. If cached tool data predates Greek support, use `--no-cache` once. See [User Guide — CLI](/user-guide/cli#options-chain-snapshot) and [Reading the Greek columns](/user-guide/cli#reading-the-greek-columns).
+
+## Layout in code
+
+- Vendor integrations: `infrastructure.data_providers` only.
+- Greek estimation: `infrastructure.analytics.options`.
+- Composed `MarketDataProvider` (source + estimator): `infrastructure.market`.
+
+See [Architecture](/developer-guide/architecture) for layer rules.

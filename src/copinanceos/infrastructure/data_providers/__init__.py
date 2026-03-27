@@ -1,8 +1,7 @@
-"""Data provider implementations.
+"""Vendor data provider implementations (source integrations only).
 
-This module contains implementations of data provider interfaces.
-Developers can easily add their own providers by implementing the interfaces
-defined in `copinanceos.domain.ports.data_providers`.
+For composing market access with derived option analytics (Greeks, etc.), see
+``copinanceos.infrastructure.market`` and ``copinanceos.infrastructure.analytics``.
 """
 
 from copinanceos.infrastructure.data_providers.edgar import EdgarFundamentalProvider

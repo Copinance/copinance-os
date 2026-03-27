@@ -89,24 +89,46 @@ copinance market history SPY --start 2026-03-01 --end 2026-03-14 --interval 1h -
 
 ### Options Chain Snapshot
 
-Fetch an options chain for an underlying symbol. Uses the same cache as in question-driven analysis; with `--side all`, calls and puts are interleaved so a small limit shows both.
+Fetch an options chain for an underlying symbol. The table includes **Delta, Gamma, Theta, Vega, and Rho** by default when Greek columns are enabled: values are filled using **analytic European BSM** via **QuantLib** when the snapshot has an underlying price, each row has implied volatility, and the chain expiry is **not before today** (default expiry is the earliest listed date **on or after today** so you do not get a rolled-off front month). Otherwise those cells show `-`. Uses the same cache as in question-driven analysis; with `--side all`, calls and puts are interleaved so a small limit shows both.
 
 ```bash
-# List options for AAPL (default expiration; all sides; uses cache)
+# List options for AAPL (default expiration; all sides; Greek columns on; uses cache)
 copinance market options AAPL
 
 # List only call options expiring on 2026-06-19 for AAPL
-copinance market options AAPL --expiration 2026-06-19 --side call
+copinance market options AAPL -e 2026-06-19 -s call
 
-# List both calls and puts for MSTR, up to 20 contracts, skip cache
-copinance market options MSTR --side all --limit 20 --no-cache
+# Refresh from provider (e.g. after upgrade or if cache has no Greeks)
+copinance market options SPY --no-cache
+
+# Narrow terminal: hide Greek columns
+copinance market options MSTR --side all --limit 20 --no-greeks
 ```
 
 **Options:**
-- `--expiration <date>`: Expiration date in `YYYY-MM-DD`
-- `--side <side>`: `call`, `put`, or `all`
-- `--limit <number>`: Maximum contracts to show (default: `0` = show all)
+- `-e` / `--expiration <date>`: Expiration in `YYYY-MM-DD`
+- `-s` / `--side <side>`: `call`, `put`, or `all`
+- `--limit` / `-n <number>`: Maximum contracts to show (default: `0` = show all)
 - `--no-cache`: Bypass cache and fetch fresh data
+- `--no-greeks`: Hide Delta/Gamma/Theta/Vega/Rho columns
+
+**Tuning BSM inputs:** set `COPINANCEOS_OPTION_GREEKS_RISK_FREE_RATE` and optional `COPINANCEOS_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT` (see [Configuration](/getting-started/configuration)). Metadata keys are documented in [Options chain metadata](/analytics/options-chain-metadata).
+
+#### Reading the Greek columns
+
+Greeks come from **European Black–Scholes–Merton** via **QuantLib** (`AnalyticEuropeanEngine`), using the chain’s underlying price and each row’s implied volatility (after [normalization](/analytics/options-chain-metadata#provider-inputs-optional) for Yahoo-style data).
+
+**Moneyness (typical patterns):**
+
+- **Deep in-the-money calls** (strike well below spot): **delta ≈ 1**, **gamma ≈ 0**, **vega ≈ 0**—delta is near its upper bound, so curvature and volatility sensitivity are small.
+- **Deep out-of-the-money puts** (strike well below spot, tiny premium): **delta ≈ 0**, and **gamma**, **vega**, and **theta** are often **tiny**; the table shows **`0`** or scientific notation when values are negligible, and rounds floating-point dust to zero so harmless noise does not look like a large negative delta.
+- **Near the money** (strikes around spot): **gamma** and **vega** are usually **largest**; **call delta** moves from roughly **0** toward **1** as strike falls; **put delta** moves from roughly **0** toward **−1** as strike rises through the money.
+
+**Rho:** For this setup, **call rho** is typically **positive**; **European put rho** is often **negative**. Signs align with “sensitivity of option value to the risk-free rate” under the same model inputs.
+
+**Theta (important):** QuantLib’s `theta()` is **not** the same as a casual “dollars decay per calendar day” figure you might see on a retail chain. It follows **QuantLib’s definition** for the analytic engine (time decay in the library’s units). Near **expiry** and **at the money**, **magnitude can look very large** next to the option **last** price—that usually reflects **how theta is scaled in the engine**, not that the option literally loses that many dollars per day. For publication-grade “daily theta” you would convert from QuantLib’s convention (see [QuantLib Greeks](https://www.quantlib.org/reference/group__quantlib__greeks.html) and library docs) or bump the price with a small time step.
+
+**Implied volatility in the table:** After normalization, a printed IV of **0.94** means about **94% annualized σ** (fractional form). Values **above 1** from Yahoo were converted from **percent points** (see [Options chain metadata](/analytics/options-chain-metadata)).
 
 ### Fundamentals
 

@@ -24,6 +24,21 @@ class OptionSide(StrEnum):
     ALL = "all"
 
 
+class OptionGreeks(ValueObject):
+    """First-order sensitivities for a European vanilla option under Black–Scholes–Merton.
+
+    Computed with QuantLib's ``AnalyticEuropeanEngine`` (analytic formulas). Convention
+    for ``theta``, ``vega``, and ``rho`` matches QuantLib's implementation (same units
+    as ``EuropeanOption.theta()``, ``vega()``, and ``rho()``).
+    """
+
+    delta: Decimal = Field(..., description="Delta (∂V/∂S)")
+    gamma: Decimal = Field(..., description="Gamma (∂²V/∂S²)")
+    theta: Decimal = Field(..., description="Theta (time decay; QuantLib convention)")
+    vega: Decimal = Field(..., description="Vega (∂V/∂σ; QuantLib convention)")
+    rho: Decimal = Field(..., description="Rho (∂V/∂r; QuantLib convention)")
+
+
 class MarketDataPoint(ValueObject):
     """Normalized market OHLCV data for a tradable instrument."""
 
@@ -53,6 +68,10 @@ class OptionContract(ValueObject):
     implied_volatility: Decimal | None = Field(None, description="Implied volatility")
     in_the_money: bool | None = Field(None, description="Whether the contract is in the money")
     currency: str | None = Field(None, description="Currency")
+    greeks: OptionGreeks | None = Field(
+        None,
+        description="European BSM analytic Greeks when implied vol and spot are available",
+    )
     metadata: dict[str, str] = Field(default_factory=dict, description="Additional metadata")
 
 

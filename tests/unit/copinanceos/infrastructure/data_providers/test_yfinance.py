@@ -1,6 +1,6 @@
 """Unit tests for yfinance data provider implementation."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,10 +15,41 @@ from copinanceos.domain.models.fundamentals import (
     StockFundamentals,
 )
 from copinanceos.domain.models.market import MarketDataPoint
+from copinanceos.infrastructure.data_providers import yfinance as yfinance_module
 from copinanceos.infrastructure.data_providers.yfinance import (
     YFinanceFundamentalProvider,
     YFinanceMarketProvider,
 )
+
+
+@pytest.mark.unit
+def test_select_options_expiration_prefers_first_on_or_after_as_of() -> None:
+    pick = yfinance_module._select_options_expiration_string
+    avail = ["2026-03-27", "2026-04-03", "2026-04-10"]
+    assert pick(avail, None, as_of=date(2026, 3, 28)) == "2026-04-03"
+
+
+@pytest.mark.unit
+def test_select_options_expiration_explicit_wins() -> None:
+    pick = yfinance_module._select_options_expiration_string
+    assert pick(["2026-04-03"], "2026-04-03", as_of=date(2026, 3, 28)) == "2026-04-03"
+
+
+@pytest.mark.unit
+def test_select_options_expiration_all_in_the_past_falls_back_to_last() -> None:
+    pick = yfinance_module._select_options_expiration_string
+    assert pick(["2026-03-20", "2026-03-27"], None, as_of=date(2026, 4, 1)) == "2026-03-27"
+
+
+@pytest.mark.unit
+def test_yahoo_option_implied_volatility_percent_to_sigma() -> None:
+    """yahoo sometimes returns IV as percent points; QuantLib needs σ as a fraction."""
+    norm = yfinance_module._yahoo_option_implied_volatility_to_sigma
+    assert norm(None) is None
+    assert norm(Decimal("0.25")) == Decimal("0.25")
+    assert norm(Decimal("1")) == Decimal("1")
+    assert norm(Decimal("13.671876455078125")) == Decimal("0.13671876455078125")
+    assert norm(Decimal("6.87500140625")) == Decimal("0.0687500140625")
 
 
 @pytest.mark.unit

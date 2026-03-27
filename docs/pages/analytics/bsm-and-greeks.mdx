@@ -1,0 +1,23 @@
+# BSM & Greeks (QuantLib)
+
+Option **Greeks** in Copinance OS are estimated with **European** **Black–Scholes–Merton** using **QuantLib**’s `AnalyticEuropeanEngine` (`infrastructure.analytics.options`). Payoffs are **European**; **American** exercise or dividends beyond a continuous yield are not modeled here unless you extend the stack.
+
+For **metadata keys** and **assumption** wiring (rates, dividend defaults), see [Options chain metadata](/analytics/options-chain-metadata).
+
+## Greek summary
+
+| Greek | Notes |
+|-------|--------|
+| **Delta** | Deep ITM calls → ~1; deep OTM puts → ~0; puts ∈ **[-1, 0]**, calls ∈ **[0, 1]** in normal conditions. |
+| **Gamma** | Peaks **near the money**; **≈ 0** deep ITM/OTM (delta barely changes with spot). |
+| **Vega** | **Largest near the money**, **tiny** in the wings—same intuition as gamma but with respect to σ. |
+| **Rho** | **Call rho** typically **positive**; **European put rho** often **negative**, consistent with ∂V/∂r under BSM for the chosen discounting. |
+| **Theta** | Returned in **QuantLib’s theta convention** for this engine—not automatically “option premium dollars per calendar day.” Near **expiry** and **at the money**, **reported magnitude can be very large** compared to **last** price; do **not** treat the printed number as literal daily dollar decay without converting from QuantLib’s definition. See [QuantLib Greeks](https://www.quantlib.org/reference/group__quantlib__greeks.html) and upstream docs for `theta()`. |
+
+## Display vs domain model
+
+The **`copinance market options`** table may **format** near-zero Greeks as `0` or scientific notation. **`OptionGreeks`** on **`OptionContract`** in code keeps full numeric precision from QuantLib.
+
+## Implied volatility
+
+How Yahoo **implied vol** is mapped to σ before BSM is documented under [Provider inputs — implied volatility](/analytics/options-chain-metadata#provider-inputs-optional) on the metadata page.

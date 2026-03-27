@@ -14,6 +14,8 @@ Provides market data for instruments and options.
 - `search_instruments(query, limit) -> list[dict[str, Any]]`
 - `get_options_chain(underlying_symbol, expiration_date=None) -> OptionsChain`
 
+The default app container exposes a **composed** `MarketDataProvider` (`OptionAnalyticsMarketDataProvider`) that returns chains **after** BSM Greek estimation when QuantLib is available; vendor-only adapters live under `infrastructure.data_providers`. See [Analytics — Options chain metadata](/analytics/options-chain-metadata).
+
 ## FundamentalDataProvider
 
 Provides equity fundamentals.

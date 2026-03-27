@@ -2,6 +2,7 @@
 
 from copinanceos.domain.models.tool_results import ToolResult
 from copinanceos.domain.ports.analysis_execution import AnalysisExecutor, JobRunner
+from copinanceos.domain.ports.analytics import OptionsChainGreeksEstimator
 from copinanceos.domain.ports.analyzers import LLMAnalyzer
 from copinanceos.domain.ports.data_providers import (
     AlternativeDataProvider,
@@ -40,6 +41,7 @@ __all__ = [
     # Data Providers
     "DataProvider",
     "MarketDataProvider",
+    "OptionsChainGreeksEstimator",
     "AlternativeDataProvider",
     "FundamentalDataProvider",
     "MacroeconomicDataProvider",

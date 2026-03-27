@@ -73,7 +73,12 @@ _lazy_command(
     "analyze_app",
 )
 _lazy_command("cache", "Cache management commands", "copinanceos.cli.cache", "cache_app")
-_lazy_command("market", "Market data commands", "copinanceos.cli.market", "market_app")
+_lazy_command(
+    "market",
+    "Market data: search, quote, history, options chain (BSM Greeks), fundamentals",
+    "copinanceos.cli.market",
+    "market_app",
+)
 _lazy_command(
     "profile",
     "Analysis profile management commands",

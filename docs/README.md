@@ -37,10 +37,11 @@ Documentation lives under `docs/pages/` in MDX. Sidebar order and titles are set
 docs/
 ├── pages/
 │   ├── index.mdx              # Introduction
-│   ├── _meta.tsx              # Root nav: Getting Started, User Guide, Tools, Developer, API Reference
+│   ├── _meta.tsx              # Root nav: Getting Started, User Guide, Tools, Analytics, Developer, API Reference
 │   ├── getting-started/      # Installation, Quick Start, Configuration, Using as a Library
 │   ├── user-guide/           # CLI Reference, Analysis Modes
 │   ├── tools/                 # Overview (analysis + data-provider tools), analysis/market-regime, analysis/macro-indicators, data-providers
+│   ├── analytics/             # BSM & Greeks, options chain metadata (assumptions, provider inputs)
 │   ├── developer-guide/      # Architecture, Extending, Testing
 │   └── api-reference/        # Overview, Data Provider Interfaces
 ├── next.config.mjs

@@ -1,0 +1,18 @@
+# Analytics
+
+Documentation for **derived** market analytics in Copinance OS—starting with **listed options**: Black–Scholes–Merton sensitivities (Greeks) and the **`OptionsChain.metadata`** contract shared by data providers and estimators.
+
+Raw vendor data lives under **Data providers** ([Architecture](/developer-guide/architecture)); implementation code under `infrastructure.analytics`, `infrastructure.market`, and `infrastructure.data_providers`.
+
+## In this section
+
+- **[BSM & Greeks (QuantLib)](/analytics/bsm-and-greeks)** — European BSM engine, how to read Δ, Γ, ν, Θ, ρ, and QuantLib’s theta convention.
+- **[Options chain metadata](/analytics/options-chain-metadata)** — Reserved `metadata` keys (provider inputs, Greek run provenance), Yahoo implied-vol normalization, env/profile tuning, code layout.
+
+## CLI
+
+End-user commands and column interpretation: [User Guide — Market `options`](/user-guide/cli#options-chain-snapshot) and [Reading the Greek columns](/user-guide/cli#reading-the-greek-columns).
+
+## Configuration
+
+`COPINANCEOS_OPTION_GREEKS_*` and related settings: [Configuration](/getting-started/configuration).

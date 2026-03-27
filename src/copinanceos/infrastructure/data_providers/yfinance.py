@@ -24,7 +24,7 @@ To use a custom provider, simply implement the MarketDataProvider interface:
 """
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
@@ -80,6 +80,49 @@ def _safe_decimal(value: Any) -> Decimal | None:
     except (ValueError, TypeError, OverflowError):
         return None
     return None
+
+
+def _select_options_expiration_string(
+    available_expirations: list[str],
+    explicit_expiration: str | None,
+    *,
+    as_of: date | None = None,
+) -> str:
+    """Choose option expiry string YYYY-MM-DD.
+
+    When ``explicit_expiration`` is omitted, returns the earliest listed expiry whose
+    calendar date is **on or after** ``as_of`` (default: local **today**), so default
+    chains are not an already-expired front month after the session rolls. If every
+    listing is before ``as_of``, returns the latest listed date (chain may be expired;
+    BSM Greeks may be unavailable).
+    """
+    if explicit_expiration is not None:
+        return explicit_expiration
+    if not available_expirations:
+        raise ValueError("available_expirations must not be empty")
+    parsed = sorted({datetime.strptime(x, "%Y-%m-%d").date() for x in available_expirations})
+    today = as_of if as_of is not None else date.today()
+    for d in parsed:
+        if d >= today:
+            return d.strftime("%Y-%m-%d")
+    return parsed[-1].strftime("%Y-%m-%d")
+
+
+def _yahoo_option_implied_volatility_to_sigma(iv: Decimal | None) -> Decimal | None:
+    """Convert Yahoo option-chain implied vol to annualized σ for BSM / QuantLib.
+
+    yfinance usually returns σ as a fraction (e.g. ``0.25`` ≈ 25% vol). Some rows ship
+    the same figure in percent points (e.g. ``13.67`` ≈ 13.67% vol). Values strictly
+    greater than ``1`` are treated as percent points and divided by 100.
+
+    Genuinely extreme fractional σ above 100% (e.g. ``1.2``) would be mis-scaled; that
+    is uncommon for liquid chains. See developer guide (options chain metadata).
+    """
+    if iv is None or iv <= 0:
+        return iv
+    if iv > Decimal("1"):
+        return iv / Decimal("100")
+    return iv
 
 
 def _safe_int(value: Any) -> int | None:
@@ -407,7 +450,10 @@ class YFinanceMarketProvider(MarketDataProvider):
             if not available_expirations:
                 raise ValueError(f"No listed options available for {underlying_symbol}")
 
-            selected_expiration = expiration_date or available_expirations[0]
+            selected_expiration = _select_options_expiration_string(
+                available_expirations,
+                expiration_date,
+            )
             if selected_expiration not in available_expirations:
                 raise ValueError(
                     f"Expiration {selected_expiration} is not available for {underlying_symbol}"
@@ -434,7 +480,10 @@ class YFinanceMarketProvider(MarketDataProvider):
                         ask=_safe_decimal(row.get("ask")),
                         volume=_safe_int(row.get("volume")),
                         open_interest=_safe_int(row.get("openInterest")),
-                        implied_volatility=_safe_decimal(row.get("impliedVolatility")),
+                        greeks=None,
+                        implied_volatility=_yahoo_option_implied_volatility_to_sigma(
+                            _safe_decimal(row.get("impliedVolatility"))
+                        ),
                         in_the_money=(
                             bool(row.get("inTheMoney"))
                             if row.get("inTheMoney") is not None

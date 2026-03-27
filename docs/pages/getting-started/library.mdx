@@ -521,7 +521,7 @@ Get the container with `get_container(...)` from `copinanceos.infrastructure.con
 | Get instrument | `GetInstrumentRequest` | `GetInstrumentResponse` | `symbol` (required). Response: `instrument: Stock \| None` |
 | Get quote | `GetQuoteRequest` | `GetQuoteResponse` | `symbol` (required). Response: `quote: dict`, `symbol: str` |
 | Get historical data | `GetHistoricalDataRequest` | `GetHistoricalDataResponse` | `symbol`, `start_date`, `end_date` (required; `datetime`), `interval` (default `"1d"`). Response: `data: list[MarketDataPoint]`, `symbol` |
-| Get options chain | `GetOptionsChainRequest` | `GetOptionsChainResponse` | `underlying_symbol` (required), `expiration_date: str \| None` (YYYY-MM-DD). Response: `chain: OptionsChain`, `underlying_symbol` |
+| Get options chain | `GetOptionsChainRequest` | `GetOptionsChainResponse` | `underlying_symbol` (required), `expiration_date: str \| None` (YYYY-MM-DD). Response: `chain: OptionsChain`, `underlying_symbol`. With the default container, each `OptionContract` may include `greeks` (BSM estimates via QuantLib) when spot and implied vol are available; see [Analytics — Options chain metadata](/analytics/options-chain-metadata). |
 
 **Enum:** `InstrumentSearchMode` in the same module (`auto`, `symbol`, `general`).
 

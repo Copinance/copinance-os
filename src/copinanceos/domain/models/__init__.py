@@ -14,6 +14,7 @@ from copinanceos.domain.models.market import (
     MarketDataPoint,
     MarketType,
     OptionContract,
+    OptionGreeks,
     OptionsChain,
     OptionSide,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "OptionSide",
     "MarketDataPoint",
     "OptionContract",
+    "OptionGreeks",
     "OptionsChain",
     "MacroDataPoint",
     "StockFundamentals",

@@ -49,6 +49,20 @@ Optional. Improves macro analysis; yfinance fallback is used without it.
 2. Set: `COPINANCEOS_FRED_API_KEY=your-fred-api-key`
 3. Verify: `copinance analyze macro` (results should show `"source": "fred"` where applicable).
 
+## Option Greek estimation (BSM)
+
+Optional. Affects analytic delta/gamma/theta/vega/rho attached to options chains when QuantLib is installed.
+
+```bash
+# Annual risk-free rate (decimal e.g. 0.045). Omit to use built-in default.
+COPINANCEOS_OPTION_GREEKS_RISK_FREE_RATE=0.045
+
+# Default dividend yield when chain metadata has no `dividend_yield`. Omit for 0.
+COPINANCEOS_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT=0
+```
+
+Reserved `OptionsChain.metadata` keys and profile preferences are documented in [Options chain metadata](/analytics/options-chain-metadata).
+
 ## Storage and Cache
 
 ```bash

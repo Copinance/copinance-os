@@ -128,6 +128,10 @@ python3 -m copinanceos.cli market search "Apple"
 python3 -m copinanceos.cli market quote AAPL
 python3 -m copinanceos.cli market history AAPL --start 2026-01-01 --end 2026-03-14
 
+# Options chain with BSM Greek columns (QuantLib; use --no-cache if Greeks are missing from cache)
+copinance market options SPY
+copinance market options AAPL -e 2026-06-19 --no-cache
+
 # One-off analysis (results saved to .copinance/results/v2/)
 python3 -m copinanceos.cli analyze equity AAPL --timeframe mid_term
 python3 -m copinanceos.cli analyze equity AAPL --question "What are the key risks?"

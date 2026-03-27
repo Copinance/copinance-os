@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 import typer
@@ -31,7 +32,9 @@ from copinanceos.infrastructure.config import get_storage_path_safe
 from copinanceos.infrastructure.containers import container
 from copinanceos.infrastructure.persistence import get_cache_dir
 
-market_app = typer.Typer(help="Market data commands")
+market_app = typer.Typer(
+    help="Market data: search, quote, history, options (BSM Greeks via QuantLib), fundamentals",
+)
 console = Console()
 SUPPORTED_HISTORY_INTERVALS = ("1d", "1wk", "1mo", "1h", "5m", "15m", "30m", "60m")
 
@@ -276,6 +279,49 @@ async def get_market_history(
         )
 
 
+def _contract_greeks_for_display(contract: Any) -> dict[str, Any | None]:
+    """Extract optional BSM Greeks for CLI display (``OptionContract`` or cached dict).
+
+    Cached payloads use ``model_dump(mode="json")`` (decimals as strings, nested ``greeks``).
+    """
+    g = contract.get("greeks") if isinstance(contract, dict) else getattr(contract, "greeks", None)
+    if g is None:
+        return dict.fromkeys(("delta", "gamma", "theta", "vega", "rho"))
+    if isinstance(g, dict):
+        return {
+            "delta": g.get("delta"),
+            "gamma": g.get("gamma"),
+            "theta": g.get("theta"),
+            "vega": g.get("vega"),
+            "rho": g.get("rho"),
+        }
+    return {
+        "delta": getattr(g, "delta", None),
+        "gamma": getattr(g, "gamma", None),
+        "theta": getattr(g, "theta", None),
+        "vega": getattr(g, "vega", None),
+        "rho": getattr(g, "rho", None),
+    }
+
+
+def _fmt_optional_greek(value: Any) -> str:
+    """Format BSM sensitivities for TTY: avoid `-1.1102…` noise where Delta is ~0."""
+    if value is None:
+        return "-"
+    try:
+        x = float(value) if isinstance(value, (Decimal, int, float)) else float(str(value))
+    except (TypeError, ValueError, OverflowError):
+        return str(value)
+    if x != x:  # NaN
+        return "-"
+    ax = abs(x)
+    if ax < 1e-10:
+        return "0"
+    if ax < 1e-4:
+        return f"{x:.2e}"
+    return f"{x:.4f}"
+
+
 def _options_chain_to_display(
     option_side: OptionSide,
     options_chain: Any,
@@ -299,20 +345,25 @@ def _options_chain_to_display(
             raw = options_chain.puts
         else:
             # Interleave calls and puts so a small limit shows both sides
-            c, p = options_chain.calls, options_chain.puts
-            raw = [x for pair in zip(c, p, strict=False) for x in pair] + c[len(p) :] + p[len(c) :]
-        contracts = [
-            {
-                "contract_symbol": c.contract_symbol,
-                "side": c.side.value,
-                "strike": c.strike,
-                "last_price": c.last_price,
-                "implied_volatility": c.implied_volatility,
-                "open_interest": c.open_interest,
-                "volume": c.volume,
+            calls_legs, puts_legs = options_chain.calls, options_chain.puts
+            raw = (
+                [x for pair in zip(calls_legs, puts_legs, strict=False) for x in pair]
+                + calls_legs[len(puts_legs) :]
+                + puts_legs[len(calls_legs) :]
+            )
+        contracts: list[dict[str, Any]] = []
+        for oc in raw:
+            row: dict[str, Any] = {
+                "contract_symbol": oc.contract_symbol,
+                "side": oc.side.value,
+                "strike": oc.strike,
+                "last_price": oc.last_price,
+                "implied_volatility": oc.implied_volatility,
+                "open_interest": oc.open_interest,
+                "volume": oc.volume,
             }
-            for c in raw
-        ]
+            row.update(_contract_greeks_for_display(oc))
+            contracts.append(row)
         return underlying_price, exp_str, contracts
     # From cache: dict with calls, puts, underlying_price, expiration_date
     data = options_chain
@@ -331,34 +382,37 @@ def _options_chain_to_display(
             + calls_list[len(puts_list) :]
             + puts_list[len(calls_list) :]
         )
-    contracts = [
-        {
-            "contract_symbol": c.get("contract_symbol", ""),
-            "side": c.get("side", ""),
-            "strike": c.get("strike"),
-            "last_price": c.get("last_price"),
-            "implied_volatility": c.get("implied_volatility"),
-            "open_interest": c.get("open_interest"),
-            "volume": c.get("volume"),
+    cache_contracts: list[dict[str, Any]] = []
+    for row_dict in raw_contracts:
+        row = {
+            "contract_symbol": row_dict.get("contract_symbol", ""),
+            "side": row_dict.get("side", ""),
+            "strike": row_dict.get("strike"),
+            "last_price": row_dict.get("last_price"),
+            "implied_volatility": row_dict.get("implied_volatility"),
+            "open_interest": row_dict.get("open_interest"),
+            "volume": row_dict.get("volume"),
         }
-        for c in raw_contracts
-    ]
-    return underlying_price, exp_str, contracts
+        row.update(_contract_greeks_for_display(row_dict))
+        cache_contracts.append(row)
+    return underlying_price, exp_str, cache_contracts
 
 
 @market_app.command("options")
 @async_command
 async def get_options_chain(
-    underlying_symbol: str = typer.Argument(..., help="Underlying symbol"),
+    underlying_symbol: str = typer.Argument(..., help="Underlying symbol (e.g. AAPL, SPY)"),
     expiration_date: str | None = typer.Option(
         None,
         "--expiration",
-        help="Optional expiration date in YYYY-MM-DD format",
+        "-e",
+        help="Expiration in YYYY-MM-DD (default: nearest listed expiry from provider)",
     ),
     option_side: OptionSide = typer.Option(
         OptionSide.ALL,
         "--side",
-        help="Options side to display",
+        "-s",
+        help="call, put, or all (all = interleaved calls/puts for a compact view)",
     ),
     limit: int = typer.Option(
         0,
@@ -369,13 +423,25 @@ async def get_options_chain(
     no_cache: bool = typer.Option(
         False,
         "--no-cache",
-        help="Bypass cache and fetch fresh data",
+        help="Bypass cache (use after upgrades or when Greeks are missing from cached rows)",
+    ),
+    no_greeks: bool = typer.Option(
+        False,
+        "--no-greeks",
+        help="Hide Delta/Gamma/Theta/Vega/Rho columns (default: show with '-' if unavailable)",
     ),
 ) -> None:
-    """Fetch an options chain snapshot for an underlying symbol.
+    """Fetch an options chain and show BSM Greek columns when available (QuantLib).
 
-    Uses the same cache as in question-driven analysis; repeated requests for the same
-    underlying/expiration are served from cache until expiry or cache clear.
+    The default stack estimates analytic European Greeks (delta, gamma, theta, vega, rho)
+    per contract when the chain has an underlying price and each row has implied
+    volatility. Requires the QuantLib Python package. Tune risk-free rate and default
+    dividend yield via ``COPINANCEOS_OPTION_GREEKS_*`` (see docs: Configuration).
+
+    Greek columns are shown by default; values appear as '-' when not computed. Cached
+    chains saved before Greek support may omit them until you pass ``--no-cache``.
+
+    Uses the same cache as question-driven analysis for identical underlying/expiration keys.
     """
     symbol_upper = underlying_symbol.upper()
     cache_manager = container.cache_manager()
@@ -442,6 +508,15 @@ async def get_options_chain(
         console.print("No contracts available", style="yellow")
         return
 
+    show_greeks_columns = not no_greeks
+    any_greeks = any(c.get("delta") is not None for c in contracts)
+    if show_greeks_columns and not any_greeks:
+        console.print(
+            "[dim]Greeks: none on this snapshot (expired expiry vs today, missing spot/IV, "
+            "or QuantLib). Default expiry is the first listed date on or after today; "
+            "override with [bold]-e YYYY-MM-DD[/bold]. Refresh with [bold]--no-cache[/bold].[/dim]"
+        )
+
     table = Table(title=f"{option_side.value.capitalize()} contracts")
     table.add_column("Contract", style="cyan")
     table.add_column("Side", style="magenta")
@@ -451,9 +526,16 @@ async def get_options_chain(
     table.add_column("OI", justify="right")
     table.add_column("Vol", justify="right")
 
+    if show_greeks_columns:
+        table.add_column("Delta", justify="right", style="dim")
+        table.add_column("Gamma", justify="right", style="dim")
+        table.add_column("Theta", justify="right", style="dim")
+        table.add_column("Vega", justify="right", style="dim")
+        table.add_column("Rho", justify="right", style="dim")
+
     to_show = contracts[:limit] if limit else contracts
     for c in to_show:
-        table.add_row(
+        row_cells: list[str] = [
             c["contract_symbol"],
             c["side"],
             str(c["strike"]),
@@ -461,7 +543,18 @@ async def get_options_chain(
             str(c["implied_volatility"]) if c.get("implied_volatility") is not None else "-",
             str(c["open_interest"]) if c.get("open_interest") is not None else "-",
             str(c["volume"]) if c.get("volume") is not None else "-",
-        )
+        ]
+        if show_greeks_columns:
+            row_cells.extend(
+                [
+                    _fmt_optional_greek(c.get("delta")),
+                    _fmt_optional_greek(c.get("gamma")),
+                    _fmt_optional_greek(c.get("theta")),
+                    _fmt_optional_greek(c.get("vega")),
+                    _fmt_optional_greek(c.get("rho")),
+                ]
+            )
+        table.add_row(*row_cells)
 
     console.print(table)
     if limit and len(contracts) > limit:

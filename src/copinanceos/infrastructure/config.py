@@ -82,6 +82,22 @@ class Settings(BaseSettings):
         description="HTTP timeout for FRED API requests",
     )
 
+    # Option Greek estimation (BSM / QuantLib); see docs: Options chain metadata
+    option_greeks_risk_free_rate: float | None = Field(
+        default=None,
+        description=(
+            "Annualized risk-free rate for analytic BSM Greeks when estimating from a chain "
+            "(e.g. 0.045). None uses built-in default. Env: COPINANCEOS_OPTION_GREEKS_RISK_FREE_RATE"
+        ),
+    )
+    option_greeks_dividend_yield_default: float | None = Field(
+        default=None,
+        description=(
+            "Default continuous dividend yield when chain metadata has no `dividend_yield`. "
+            "None means 0. Env: COPINANCEOS_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT"
+        ),
+    )
+
 
 def get_settings() -> Settings:
     """Get application settings singleton."""
