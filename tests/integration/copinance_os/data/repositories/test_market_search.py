@@ -1,0 +1,42 @@
+"""Integration tests for market instrument search functionality."""
+
+import pytest
+
+from copinance_os.domain.models.stock import Stock
+from copinance_os.domain.ports.repositories import StockRepository
+from copinance_os.research.workflows.market import (
+    SearchInstrumentsRequest,
+    SearchInstrumentsUseCase,
+)
+
+
+@pytest.mark.integration
+class TestMarketSearchIntegration:
+    @pytest.fixture
+    def use_case(self, stock_repository: StockRepository) -> SearchInstrumentsUseCase:
+        return SearchInstrumentsUseCase(stock_repository)
+
+    @pytest.mark.asyncio
+    async def test_search_by_symbol_exact_match(
+        self, stock_repository: StockRepository, use_case: SearchInstrumentsUseCase
+    ) -> None:
+        await stock_repository.save(Stock(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ"))
+
+        response = await use_case.execute(SearchInstrumentsRequest(query="AAPL", limit=10))
+
+        assert len(response.instruments) == 1
+        assert response.instruments[0].symbol == "AAPL"
+
+    @pytest.mark.asyncio
+    async def test_search_by_name_partial_match(
+        self, stock_repository: StockRepository, use_case: SearchInstrumentsUseCase
+    ) -> None:
+        await stock_repository.save(Stock(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ"))
+        await stock_repository.save(
+            Stock(symbol="MSFT", name="Microsoft Corporation", exchange="NASDAQ")
+        )
+
+        response = await use_case.execute(SearchInstrumentsRequest(query="Apple", limit=10))
+
+        assert len(response.instruments) == 1
+        assert response.instruments[0].symbol == "AAPL"

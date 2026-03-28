@@ -11,20 +11,20 @@ import pytest
 warnings.filterwarnings("ignore", category=ResourceWarning, message=".*unclosed.*")
 warnings.filterwarnings("ignore", category=ResourceWarning)
 
-from copinanceos.domain.ports.data_providers import FundamentalDataProvider
-from copinanceos.domain.ports.repositories import (
-    AnalysisProfileRepository,
-    StockRepository,
-)
-from copinanceos.domain.ports.storage import Storage
-from copinanceos.infrastructure.data_providers.yfinance import (
+from copinance_os.data.providers.yfinance import (
     YFinanceFundamentalProvider,
 )
-from copinanceos.infrastructure.repositories import (
+from copinance_os.data.repositories import (
     AnalysisProfileRepositoryImpl,
     StockRepositoryImpl,
 )
-from copinanceos.infrastructure.repositories.storage.factory import create_storage
+from copinance_os.data.repositories.storage.factory import create_storage
+from copinance_os.domain.ports.data_providers import FundamentalDataProvider
+from copinance_os.domain.ports.repositories import (
+    AnalysisProfileRepository,
+    StockRepository,
+)
+from copinance_os.domain.ports.storage import Storage
 
 
 @pytest.fixture

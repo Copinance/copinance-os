@@ -60,7 +60,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest -m unit --cov=copinanceos --cov-report=xml --cov-report=term-missing
+          pytest -m unit --cov=copinance_os --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -92,7 +92,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          pytest -m integration --cov=copinanceos --cov-report=xml --cov-report=term-missing --cov-append
+          pytest -m integration --cov=copinance_os --cov-report=xml --cov-report=term-missing --cov-append
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

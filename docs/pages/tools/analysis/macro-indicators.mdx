@@ -1,22 +1,21 @@
-# Comprehensive Macro Economic Indicators
+# Comprehensive macro economic indicators
 
-The macro economic indicators tool provides institutional-grade economic analysis across 9 comprehensive categories, supporting informed investment decision-making with 47+ economic indicators.
+The macro indicators tool aggregates **observable economic series** (rates, credit, labor, housing, and more) for use in deterministic macro runs and in **question-driven** analysis. Numbers are fetched via **`MacroeconomicDataProvider`** implementations (FRED when configured, yfinance fallbacks where applicable)—the LLM interprets tool output; it does not compute FRED prints.
 
 ## Overview
 
-Macro economic indicators are critical for understanding the broader economic environment that impacts all investments. This tool provides comprehensive coverage of economic data from labor markets to global indicators, with intelligent fallbacks from FRED to yfinance when primary data sources are unavailable.
+Macro series help describe the **backdrop** for risk assets. This tool groups 47+ indicators into nine categories, with **FRED-first** behavior and **yfinance** proxies when a series is unavailable or when running without a FRED key.
 
-## Key Features
+## Key features
 
-- **47+ Economic Indicators** across 9 categories
-- **Smart Data Fallbacks**: FRED primary → yfinance secondary
-- **Automated Interpretation**: Economic condition analysis and signals
-- **Comprehensive Coverage**: Institutional-grade economic data
-- **Real-time Updates**: Latest available economic releases
+- **47+ indicators** across nine categories
+- **FRED primary, yfinance secondary** where implemented
+- **Structured interpretation** blocks (signals are derived from fetched data, not from model invention)
+- **Configurable inclusion** via CLI flags or programmatic `include_*` arguments
 
-## Economic Categories
+## Economic categories
 
-### 1. Interest Rates & Yield Curve 📈
+### 1. Interest rates and yield curve
 
 Analyzes the term structure of interest rates and yield curve dynamics.
 
@@ -45,7 +44,7 @@ Analyzes the term structure of interest rates and yield curve dynamics.
 }
 ```
 
-### 2. Credit Spreads & Risk Premiums 💰
+### 2. Credit spreads and risk premiums
 
 Measures credit market conditions and risk appetite.
 
@@ -59,7 +58,7 @@ Measures credit market conditions and risk appetite.
 - **Credit Quality Valuation**: HY vs IG spread differentials
 - **Market Stress**: Elevated spreads signal economic uncertainty
 
-### 3. Commodities & Energy 🛢️
+### 3. Commodities and energy
 
 Tracks commodity prices and energy market trends.
 
@@ -72,7 +71,7 @@ Tracks commodity prices and energy market trends.
 - **Price Momentum**: 20-day percentage changes
 - **Economic Activity**: Energy prices as leading indicators
 
-### 4. Labor Market Indicators 👷
+### 4. Labor market indicators
 
 Comprehensive labor market analysis.
 
@@ -86,7 +85,7 @@ Comprehensive labor market analysis.
 - **Employment Trends**: Payroll growth analysis
 - **Labor Market Health**: Comprehensive labor condition assessment
 
-### 5. Housing Market Data 🏠
+### 5. Housing market data
 
 Residential real estate market analysis.
 
@@ -102,7 +101,7 @@ Residential real estate market analysis.
 - **Housing Demand**: Sales volume analysis
 - **Market Momentum**: Strong/moderate/flat/declining assessments
 
-### 6. Manufacturing Activity 🏭
+### 6. Manufacturing activity
 
 Industrial and manufacturing sector analysis.
 
@@ -118,7 +117,7 @@ Industrial and manufacturing sector analysis.
 - **Production Trends**: Industrial activity momentum
 - **Order Flow**: Durable goods and factory order analysis
 
-### 7. Consumer Spending & Confidence 🛒
+### 7. Consumer spending and confidence
 
 Household spending and sentiment analysis.
 
@@ -133,7 +132,7 @@ Household spending and sentiment analysis.
 - **Spending Trends**: Retail sales momentum
 - **Household Health**: Income, consumption, and savings analysis
 
-### 8. Global Market Indicators 🌍
+### 8. Global market indicators
 
 International markets and currency analysis.
 
@@ -147,7 +146,7 @@ International markets and currency analysis.
 - **Global Risk Appetite**: EM ETF performance
 - **Currency Trends**: Major currency pair analysis
 
-### 9. Advanced Economic Indicators 📊
+### 9. Advanced economic indicators
 
 Forward-looking and specialized economic data.
 
@@ -195,10 +194,10 @@ copinance analyze macro \
 ### Programmatic Usage
 
 ```python
-from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators import (
     create_macro_regime_indicators_tool,
 )
-from copinanceos.infrastructure.data_providers import FredMacroeconomicProvider, YFinanceMarketProvider
+from copinance_os.data.providers import FredMacroeconomicProvider, YFinanceMarketProvider
 
 # Create providers
 fred_provider = FredMacroeconomicProvider(api_key="your-fred-key")
@@ -233,8 +232,8 @@ housing_data = result.data["housing"]
 Create the macro tool from the container's data providers (macro + market). The tool is used internally by analyze executors; you can also build it for direct use:
 
 ```python
-from copinanceos.infrastructure.containers import get_container
-from copinanceos.infrastructure.tools.analysis import create_macro_regime_indicators_tool
+from copinance_os.infra.di import get_container
+from copinance_os.core.pipeline.tools.analysis import create_macro_regime_indicators_tool
 
 container = get_container(
     llm_config=llm_config,  # required for question-driven; optional for macro-only
@@ -330,7 +329,7 @@ The system automatically falls back to yfinance proxies:
 
 ```python
 from fastapi import FastAPI
-from copinanceos.infrastructure.tools.analysis.market_regime.macro_indicators import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators import (
     create_macro_regime_indicators_tool,
 )
 

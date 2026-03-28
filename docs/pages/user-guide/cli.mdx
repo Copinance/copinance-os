@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete guide to using the Copinance OS command-line interface.
+Complete guide to the Copinance OS **Typer** CLI (`copinance_os.interfaces.cli`). Commands resolve services from the **DI container** and run analysis through the same **research workflows** and **`ResearchOrchestrator`** path as library integrations.
 
 ## Command Overview
 
@@ -23,7 +23,7 @@ copinance <command>
 **Without installation:**
 ```bash
 # Run CLI as a module from repo root (no pip install required)
-python -m copinanceos.cli <command>
+python -m copinance_os.interfaces.cli <command>
 ```
 
 **Performance:** `copinance --help` and `copinance version` load quickly because heavy subcommands (analyze, cache, market, profile) are loaded only when you run them. See [Architecture — Container and performance](/developer-guide/architecture#container-and-performance) for the design.

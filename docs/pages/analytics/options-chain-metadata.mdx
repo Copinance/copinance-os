@@ -41,8 +41,8 @@ The default DI container uses `QuantLibBsmGreekEstimator()` with `profile=None`,
 
 ## Layout in code
 
-- Vendor integrations: `infrastructure.data_providers` only.
-- Greek estimation: `infrastructure.analytics.options`.
-- Composed `MarketDataProvider` (source + estimator): `infrastructure.market`.
+- Vendor integrations: `copinance_os.data.providers` (e.g. yfinance).
+- Greek estimation: `copinance_os.data.analytics.options`.
+- Composed `MarketDataProvider` (source + estimator): `copinance_os.data.providers.market`.
 
 See [Architecture](/developer-guide/architecture) for layer rules.

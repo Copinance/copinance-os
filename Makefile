@@ -98,19 +98,19 @@ install-dev: ## Install package in development mode with all dependencies
 	fi
 
 test: ## Run all tests
-	$(PYTEST) --cov=copinanceos --cov-report=html --cov-report=term-missing
+	$(PYTEST) --cov=copinance_os --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 test-unit: ## Run unit tests only
-	$(PYTEST) -m unit --cov=copinanceos --cov-report=html --cov-report=term-missing
+	$(PYTEST) -m unit --cov=copinance_os --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 test-integration: ## Run integration tests only
-	$(PYTEST) -m integration --cov=copinanceos --cov-report=html --cov-report=term-missing
+	$(PYTEST) -m integration --cov=copinance_os --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 coverage: ## Run tests with coverage report
-	$(PYTEST) --cov=copinanceos --cov-report=html --cov-report=term-missing
+	$(PYTEST) --cov=copinance_os --cov-report=html --cov-report=term-missing
 	@echo "" && echo "Coverage report: file://$(CURDIR)/htmlcov/index.html"
 
 lint: ## Run linting checks

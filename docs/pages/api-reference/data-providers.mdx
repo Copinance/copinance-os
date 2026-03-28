@@ -14,17 +14,27 @@ Provides market data for instruments and options.
 - `search_instruments(query, limit) -> list[dict[str, Any]]`
 - `get_options_chain(underlying_symbol, expiration_date=None) -> OptionsChain`
 
-The default app container exposes a **composed** `MarketDataProvider` (`OptionAnalyticsMarketDataProvider`) that returns chains **after** BSM Greek estimation when QuantLib is available; vendor-only adapters live under `infrastructure.data_providers`. See [Analytics — Options chain metadata](/analytics/options-chain-metadata).
+The default app container exposes a **composed** `MarketDataProvider` (`OptionAnalyticsMarketDataProvider`) that returns chains **after** BSM Greek estimation when QuantLib is available; vendor-only adapters live under `copinance_os.data.providers`. See [Analytics — Options chain metadata](/analytics/options-chain-metadata).
 
 ## FundamentalDataProvider
 
-Provides equity fundamentals.
+Provides equity fundamentals (statements, SEC metadata, aggregates).
 
 ### Methods
 
 - `get_financial_statements(symbol, statement_type, period) -> dict[str, Any]`
 - `get_sec_filings(symbol, filing_types, limit) -> list[dict[str, Any]]`
 - `get_detailed_fundamentals(symbol, periods, period_type) -> StockFundamentals`
+- Implementations may also expose **`get_sec_filing_content(cik, accession_number, document_type)`** for agent tools (not part of the abstract port; tools check with `hasattr`).
+
+### Built-in implementations
+
+| Implementation | Role |
+|----------------|------|
+| **`YFinanceFundamentalProvider`** | Default **fundamental** provider in DI: quotes-driven fundamentals, statements via Yahoo; SEC filing tools return empty stubs unless another provider is selected. |
+| **`EdgarToolsFundamentalProvider`** (`copinance_os.data.providers.sec.edgartools`) | Wired as **`sec_filings_provider`** for question-driven analysis: EDGAR filing lists, full text/HTML, XBRL-based statements via [edgartools](https://edgartools.readthedocs.io/). Uses **`CacheManager`** with per-entry TTLs to avoid hammering SEC. |
+
+Instrument fundamentals **use cases** use the default fundamental provider (yfinance) unless you override the container.
 
 ## AlternativeDataProvider
 

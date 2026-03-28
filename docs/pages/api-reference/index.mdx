@@ -2,15 +2,20 @@
 
 Reference for interfaces and extension points when integrating or extending Copinance OS.
 
-## Data Providers
+## Data providers
 
 Implement these interfaces to plug in custom market, fundamental, alternative, or macro data sources:
 
-- [Data Provider Interfaces](data-providers) — `MarketDataProvider`, `FundamentalDataProvider`, `AlternativeDataProvider`, `MacroeconomicDataProvider`
+- [Data Provider Interfaces](data-providers) — `MarketDataProvider`, `FundamentalDataProvider`, `AlternativeDataProvider`, `MacroeconomicDataProvider`. Built-in **SEC/EDGAR** support uses **`EdgarToolsFundamentalProvider`** (`data.providers.sec.edgartools`).
 
 Implementation guide: [Extending](/developer-guide/extending).
 
-## Other Extension Points
+## Orchestration and workflows
 
-- **Architecture and ports**: [Architecture](/developer-guide/architecture) — layers, ports (repositories, job runner, analysis executors, storage).
-- **Container and use cases**: [Using as a Library](/getting-started/library#library-api-reference) — container entry points, request/response types, domain types.
+- **`ResearchOrchestrator`** — `copinance_os.core.orchestrator.research_orchestrator`; use `container.research_orchestrator()` for `run_job`. See [Architecture](/developer-guide/architecture).
+- **Use cases and requests** — `copinance_os.research.workflows.*`; see [Using as a Library](/getting-started/library#library-api-reference).
+
+## Other extension points
+
+- **Architecture and ports**: [Architecture](/developer-guide/architecture) — domain ports (repositories, `JobRunner`, analysis executors, tools, storage).
+- **Container**: [Using as a Library](/getting-started/library#library-api-reference) — `get_container()` entry points, request/response types, domain types.

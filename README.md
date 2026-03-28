@@ -17,7 +17,7 @@ Open-source market analysis platform and framework with question-driven AI and d
 - **Dual Analysis Modes**: Deterministic instrument/market analysis and AI-powered question-driven analysis
 - **Comprehensive Macro Analysis**: 47+ economic indicators across 9 categories (rates, credit, labor, housing, manufacturing, consumer, global, advanced)
 - **Extensible Framework**: Easy to add new analysis strategies and data sources
-- **Data Provider Integration**: Built-in yfinance and SEC EDGAR support + easy custom provider integration
+- **Data Provider Integration**: yfinance (market & fundamentals), FRED (macro), **SEC EDGAR via [edgartools](https://edgartools.readthedocs.io/)** (filings & filing text for agent tools), plus pluggable providers
 - **Multiple LLM Providers**: Support for Gemini and Ollama (local LLMs) with extensible provider architecture
 - **Intelligent Caching**: Built-in caching system to reduce API calls and improve performance
 - **Pure Library**: Framework-agnostic, integrate into any Python application
@@ -30,19 +30,20 @@ Open-source market analysis platform and framework with question-driven AI and d
 Copinance OS is a **pure Python library** following clean hexagonal architecture:
 
 ```
-copinanceos/
-├── domain/              # Core business logic (no dependencies)
-│   ├── models/          # Entities: AnalysisProfile, Stock; Job (analysis execution context)
-│   └── ports/           # 23 interfaces for extensibility
-├── application/         # Use cases, default job runner (replaceable)
-│   ├── use_cases/       # Business operations
-│   └── run_job.py       # DefaultJobRunner (optional; implement JobRunner for custom orchestration)
-├── infrastructure/      # Implementations
-│   ├── repositories/    # Data persistence (in-memory included)
-│   ├── executors/       # Analysis executors (deterministic and question-driven)
-│   ├── containers/      # Dependency injection containers
-│   └── config.py        # Configuration
-└── cli/                 # CLI implementation (modular)
+copinance_os/
+├── domain/                 # Entities, validation, strategy protocols (deterministic core)
+│   ├── models/             # Pydantic entities (Job, Stock, market data, …)
+│   ├── ports/              # Interfaces (data providers, repositories, tools, …)
+│   └── strategies/         # ABCs for pluggable strategies (screening, valuation, …)
+├── research/workflows/   # Application workflows (market, analyze, profile, fundamentals)
+├── core/                   # Orchestration and execution
+│   ├── orchestrator/       # ResearchOrchestrator, DefaultJobRunner, analyze runners
+│   ├── execution_engine/   # Analysis executors
+│   └── pipeline/tools/     # Tool registry and LLM-callable tools
+├── data/                   # Data layer (providers, cache, repositories, analytics, schemas)
+├── ai/llm/                 # LLM providers and analyzers (explanation layer)
+├── infra/                  # Config, logging, DI container wiring, factories
+└── interfaces/cli/         # Typer CLI
 ```
 
 **Extension interfaces:** See [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture) for the full list. Key extension points:
@@ -95,7 +96,7 @@ pip install -e ".[dev,ollama]"
 **No Installation Needed:**
 You can run the CLI directly without installing:
 ```bash
-python -m copinanceos.cli version
+python -m copinance_os.interfaces.cli version
 ```
 
 ### Using the CLI
@@ -103,9 +104,9 @@ python -m copinanceos.cli version
 **Without installation (from project root):**
 ```bash
 # Run directly as a module
-python3 -m copinanceos.cli analyze equity AAPL --timeframe mid_term
-python -m copinanceos.cli profile list
-python3 -m copinanceos.cli market search "Apple"
+python3 -m copinance_os.interfaces.cli analyze equity AAPL --timeframe mid_term
+python -m copinance_os.interfaces.cli profile list
+python3 -m copinance_os.interfaces.cli market search "Apple"
 ```
 
 **After installation:**
@@ -119,23 +120,23 @@ copinance cache info
 **Examples:**
 ```bash
 # Profile management
-python -m copinanceos.cli profile create --literacy intermediate --name "My Profile"
-python -m copinanceos.cli profile list
-python -m copinanceos.cli profile get <profile-id>
+python -m copinance_os.interfaces.cli profile create --literacy intermediate --name "My Profile"
+python -m copinance_os.interfaces.cli profile list
+python -m copinance_os.interfaces.cli profile get <profile-id>
 
 # Instrument search
-python3 -m copinanceos.cli market search "Apple"
-python3 -m copinanceos.cli market quote AAPL
-python3 -m copinanceos.cli market history AAPL --start 2026-01-01 --end 2026-03-14
+python3 -m copinance_os.interfaces.cli market search "Apple"
+python3 -m copinance_os.interfaces.cli market quote AAPL
+python3 -m copinance_os.interfaces.cli market history AAPL --start 2026-01-01 --end 2026-03-14
 
 # Options chain with BSM Greek columns (QuantLib; use --no-cache if Greeks are missing from cache)
 copinance market options SPY
 copinance market options AAPL -e 2026-06-19 --no-cache
 
 # One-off analysis (results saved to .copinance/results/v2/)
-python3 -m copinanceos.cli analyze equity AAPL --timeframe mid_term
-python3 -m copinanceos.cli analyze equity AAPL --question "What are the key risks?"
-python3 -m copinanceos.cli analyze options AAPL --expiration 2026-06-19
+python3 -m copinance_os.interfaces.cli analyze equity AAPL --timeframe mid_term
+python3 -m copinance_os.interfaces.cli analyze equity AAPL --question "What are the key risks?"
+python3 -m copinance_os.interfaces.cli analyze options AAPL --expiration 2026-06-19
 
 # Question-driven analysis (AI uses the relevant market and fundamentals tools)
 copinance analyze options AAPL --question "What's the put/call open interest?" --expiration 2026-06-19
@@ -166,7 +167,7 @@ pytest -m unit
 pytest -m integration
 
 # With coverage report
-pytest --cov=copinanceos --cov-report=html
+pytest --cov=copinance_os --cov-report=html
 ```
 
 ## Development
@@ -253,7 +254,7 @@ Copinance OS is designed as a **pure library** that integrates into any Python a
 
 ### Library capabilities (what you can call)
 
-From the container (`get_container(...)` from `copinanceos.infrastructure.containers`), you get:
+From the container (`get_container(...)` from `copinance_os.infra.di`), you get:
 
 | Category | Entry point | Purpose |
 |----------|-------------|---------|
@@ -267,31 +268,31 @@ From the container (`get_container(...)` from `copinanceos.infrastructure.contai
 | **Profiles** | `create_profile_use_case()`, `get_profile_use_case()`, `list_profiles_use_case()` | Create, get, list profiles |
 | | `get_current_profile_use_case()`, `set_current_profile_use_case()`, `delete_profile_use_case()` | Current profile and delete |
 | **Fundamentals** | `get_stock_fundamentals_use_case()` | Fundamentals for a symbol |
-| **Job execution** | `job_runner()` | Run a `Job`; override for queues/custom orchestration |
+| **Research orchestration** | `research_orchestrator()` | Run jobs (`run_job`) and workflows; inject a custom `JobRunner` via `ResearchOrchestrator` if needed |
 | **Override points** | `analyze_instrument_runner()`, `analyze_market_runner()` | Replace with your own executor (see library docs) |
 
-Request/response types live in `copinanceos.application.use_cases.market`, `copinanceos.application.use_cases.analyze`, `copinanceos.application.use_cases.fundamentals`, and `copinanceos.application.use_cases.profile`. The [Library API Reference](https://copinance.github.io/copinance-os/getting-started/library#library-api-reference) lists every request field and module path.
+Request/response types live in `copinance_os.research.workflows.market`, `copinance_os.research.workflows.analyze`, `copinance_os.research.workflows.fundamentals`, and `copinance_os.research.workflows.profile`. The [Library API Reference](https://copinance.github.io/copinance-os/getting-started/library#library-api-reference) lists every request field and module path.
 
 **Quick usage:**
 
 1. **Install** in your project: `pip install copinance-os` (or `pip install -e .` from source).
 2. **Configure the container:** pass `LLMConfig` for question-driven analysis; optionally `fred_api_key` for macro. See [Configuration](https://copinance.github.io/copinance-os/getting-started/configuration).
 3. **Use cases (no jobs):** `uc = container.get_quote_use_case()` then `await uc.execute(GetQuoteRequest(symbol="AAPL"))`. The same pattern applies to search, historical data, options chain, fundamentals, and progressive analyze — see the library doc for all request types.
-4. **Or run analysis via jobs:** `runner = container.job_runner()`, build a `Job`, then `await runner.run(job, {})`. Use `result.success`, `result.results`, `result.error_message`.
+4. **Or run analysis via the orchestrator:** `orch = container.research_orchestrator()`, build a `Job`, then `await orch.run_job(job, {})`. Use `result.success`, `result.results`, `result.error_message`.
 
 ```python
 import asyncio
-from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
-from copinanceos.infrastructure.containers import get_container
-from copinanceos.domain.models.job import Job, JobScope, JobTimeframe
-from copinanceos.domain.models.market import MarketType
+from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
+from copinance_os.domain.models.market import MarketType
 
 async def main():
     container = get_container(
         llm_config=LLMConfig(provider="gemini", api_key="your-api-key", model="gemini-1.5-pro"),
         fred_api_key="your-fred-api-key",  # optional
     )
-    runner = container.job_runner()
+    orchestrator = container.research_orchestrator()
     job = Job(
         scope=JobScope.INSTRUMENT,
         market_type=MarketType.EQUITY,
@@ -299,7 +300,7 @@ async def main():
         timeframe=JobTimeframe.MID_TERM,
         execution_type="deterministic_instrument_analysis",
     )
-    result = await runner.run(job, {})
+    result = await orchestrator.run_job(job, {})
     # result.success, result.results, result.error_message
 
 asyncio.run(main())

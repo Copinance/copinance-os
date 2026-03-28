@@ -2,7 +2,7 @@
 
 Documentation for **derived** market analytics in Copinance OS—starting with **listed options**: Black–Scholes–Merton sensitivities (Greeks) and the **`OptionsChain.metadata`** contract shared by data providers and estimators.
 
-Raw vendor data lives under **Data providers** ([Architecture](/developer-guide/architecture)); implementation code under `infrastructure.analytics`, `infrastructure.market`, and `infrastructure.data_providers`.
+Implementation code lives under **`copinance_os.data`**: vendor adapters in **`data.providers`**, Greek estimation in **`data.analytics.options`**, and the composed options-aware market provider in **`data.providers.market`**. See [Architecture](/developer-guide/architecture) for layer rules.
 
 ## In this section
 

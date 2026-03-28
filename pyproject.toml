@@ -38,6 +38,7 @@ dependencies = [
     "httpx>=0.27.0",
     "dependency-injector>=4.48.3",
     "QuantLib>=1.41",
+    "edgartools==5.26.1",
 ]
 
 [project.optional-dependencies]
@@ -50,7 +51,10 @@ dev = [
     "ruff>=0.14.10",
     "mypy>=1.19.1",
     "pandas-stubs>=2.2.0",
+    "types-PyYAML>=6.0.12",
     "pre-commit>=4.5.1",
+    "fastapi>=0.115.0",
+    "pyyaml>=6.0.1",
 ]
 
 
@@ -58,8 +62,16 @@ ollama = [
     "httpx>=0.27.0",
 ]
 
+api = [
+    "fastapi>=0.115.0",
+]
+
+plugins = [
+    "pyyaml>=6.0.1",
+]
+
 [project.scripts]
-copinance = "copinanceos.cli:app"
+copinance = "copinance_os.interfaces.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/copinance/copinance-os"
@@ -69,12 +81,12 @@ Issues = "https://github.com/copinance/copinance-os/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["copinanceos*"]
+include = ["copinance_os*"]
 
 [tool.setuptools.package-data]
-copinanceos = [
+copinance_os = [
     "py.typed",
-    "infrastructure/analyzers/llm/resources/*.json",
+    "ai/llm/resources/*.json",
 ]
 
 [tool.pytest.ini_options]
@@ -86,7 +98,7 @@ asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=copinanceos",
+    "--cov=copinance_os",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
@@ -164,7 +176,7 @@ ignore = [
 # Imports in try/except blocks at module level are acceptable for optional dependencies.
 
 [tool.ruff.lint.isort]
-known-first-party = ["copinanceos"]
+known-first-party = ["copinance_os"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -192,6 +204,11 @@ module = [
 ]
 ignore_missing_imports = true
 
+# edgartools exposes `edgar` with no py.typed; import-untyped is raised in our provider file.
+[[tool.mypy.overrides]]
+module = "copinance_os.data.providers.sec.edgartools"
+disable_error_code = ["import-untyped"]
+
 # QuantLib publishes no types / py.typed; local mypy reports import-untyped. Pre-commit
 # mypy runs without QuantLib installed, so an inline ignore there becomes unused-ignore.
 [[tool.mypy.overrides]]
@@ -200,15 +217,15 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "copinanceos.infrastructure.analyzers.llm.providers.ollama",
-    "copinanceos.infrastructure.analyzers.llm.providers.gemini",
+    "copinance_os.ai.llm.providers.ollama",
+    "copinance_os.ai.llm.providers.gemini",
 ]
 disable_error_code = ["unused-ignore"]
 
 [[tool.mypy.overrides]]
 module = [
-    "copinanceos.infrastructure.data_providers.yfinance",
-    "copinanceos.application.use_cases.market",
+    "copinance_os.data.providers.yfinance",
+    "copinance_os.research.workflows.market",
 ]
 disable_error_code = ["unused-ignore"]
 

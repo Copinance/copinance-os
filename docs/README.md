@@ -1,67 +1,41 @@
-# Documentation
+# Documentation site
 
-This project uses [Nextra](https://nextra.site/) for documentation, built on Next.js.
+This site is built with [Nextra](https://nextra.site/) on Next.js. **Page content** lives in `docs/pages/` as MDX; navigation titles and order are set in `_meta.tsx` files per folder.
 
-## Quick Start
+## Philosophy (what the docs describe)
 
-1. **Navigate to the docs directory:**
-   ```bash
-   cd docs
-   ```
+The docs track the **`copinance_os`** package: **domain** contracts, **data** providers (including **SEC/EDGAR** via `edgartools` under `data.providers.sec`) and analytics, **core** orchestration (`ResearchOrchestrator`, execution engine, pipeline tools), **ai/llm** for explanation and tool use, **infra** for DI, and **interfaces/cli**. Deterministic finance stays in data and domain; LLMs explain and route, they do not replace pricing engines.
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+## Local development
 
-3. **Run development server:**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+```bash
+cd docs
+npm install
+npm run dev
+```
 
-## Building for Production
+Open [http://localhost:3000](http://localhost:3000).
+
+## Production build
 
 ```bash
 cd docs
 npm run build
 ```
 
-The static site will be generated in the `docs/out/` directory.
+Static output is written to `docs/out/`.
 
-## Project Structure
+## Configuration files
 
-Documentation lives under `docs/pages/` in MDX. Sidebar order and titles are set in `_meta.tsx` files in each section.
-
-```
-docs/
-├── pages/
-│   ├── index.mdx              # Introduction
-│   ├── _meta.tsx              # Root nav: Getting Started, User Guide, Tools, Analytics, Developer, API Reference
-│   ├── getting-started/      # Installation, Quick Start, Configuration, Using as a Library
-│   ├── user-guide/           # CLI Reference, Analysis Modes
-│   ├── tools/                 # Overview (analysis + data-provider tools), analysis/market-regime, analysis/macro-indicators, data-providers
-│   ├── analytics/             # BSM & Greeks, options chain metadata (assumptions, provider inputs)
-│   ├── developer-guide/      # Architecture, Extending, Testing
-│   └── api-reference/        # Overview, Data Provider Interfaces
-├── next.config.mjs
-├── theme.config.tsx
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Configuration
-
-- `next.config.mjs` - Next.js and Nextra configuration
-- `theme.config.tsx` - Theme customization
-- `package.json` - Dependencies and scripts
-- `tsconfig.json` - TypeScript configuration
-
-The documentation is configured for GitHub Pages deployment with the base path `/copinance-os`. This is set in `next.config.mjs` and adjusts automatically based on `NODE_ENV`.
+| File | Purpose |
+|------|---------|
+| `next.config.mjs` | Next.js / Nextra, base path for GitHub Pages (`/copinance-os`) |
+| `theme.config.tsx` | Theme (logo, footer, search) |
+| `package.json` | Scripts and dependencies |
+| `tsconfig.json` | TypeScript |
 
 ## Customization
 
-- **Theme**: Edit `theme.config.tsx` to customize colors, logo, footer, etc.
-- **Navigation**: Edit `_meta.tsx` files in `pages/` directories to change the sidebar structure
-- **Styling**: Nextra uses Tailwind CSS - you can add custom styles if needed
+- **Theme**: `theme.config.tsx`
+- **Sidebar**: `_meta.tsx` under `pages/` and subfolders
+- **Styling**: Nextra uses Tailwind CSS

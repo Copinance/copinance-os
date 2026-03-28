@@ -1,34 +1,53 @@
 # Copinance OS
 
-Open-source market analysis platform and framework: deterministic instrument/market analysis and question-driven AI analysis.
+**Copinance OS** is a Python **financial research operating system**: a library and CLI for deterministic, data-grounded market and macro analysis, plus optional **question-driven** workflows where an LLM **uses tools** to explain and synthesize—not to invent numbers.
 
-## What You Get
+The product vision is in the [Manifesto](https://github.com/copinance/copinance-os/blob/main/MANIFESTO.md) on the repository: research that meets people at their literacy level, with clear assumptions and traceable methodology.
 
-- **Dual analysis modes**: Deterministic pipelines (equity, options, macro) and question-driven analysis (AI uses tools to answer your questions).
-- **Adaptive presentation**: Results adapt to financial literacy level (beginner, intermediate, advanced).
-- **Extensible architecture**: Clean hexagonal design; plug in custom data providers and analyzers.
-- **CLI and library**: Use from the command line or integrate into any Python application.
+## What this system is
 
-## Quick Links
+| Idea | What it means in practice |
+|------|---------------------------|
+| **Deterministic core** | Quotes, history, fundamentals, regime tools, macro series, and QuantLib BSM Greeks are computed in **domain + data + core** layers. Results are structured (Pydantic models), not ad hoc prose. |
+| **AI as an explanation layer** | LLMs summarize, compare, and answer natural-language questions **using registered tools** that fetch or compute from real providers. They are not the source of truth for prices, Greeks, or macro prints. |
+| **Orchestration first** | Analysis runs flow through **`ResearchOrchestrator`** (and the **research workflows** built on it). Custom **JobRunner** implementations remain available for queues and advanced routing. |
+| **Pluggable boundaries** | **Ports** in `copinance_os.domain.ports` define data providers, tools, repositories, executors, and strategies; **infra** wires implementations via dependency injection. |
+
+## Repository layout (mental model)
+
+```
+copinance_os/
+  domain/              # Models, ports, strategies (pure contracts; no I/O)
+  research/workflows/  # Use cases: analyze, market, profile, fundamentals, backtest
+  core/                # Orchestrator, execution engine, pipeline tools
+  data/                # Providers, cache, repositories, loaders, analytics (QuantLib, etc.)
+  ai/llm/              # LLM providers, prompts (explanation / agent loop)
+  infra/               # Settings, logging, DI container
+  interfaces/cli/      # Typer CLI
+```
+
+Details: [Architecture](developer-guide/architecture).
+
+## Quick links
 
 | I want to… | Go to |
 |------------|--------|
-| Install and run my first analysis | [Installation](getting-started/installation) → [Quick Start](getting-started/quickstart) |
-| Use the CLI (all commands) | [CLI Reference](user-guide/cli) |
-| Integrate in my app | [Using as a Library](getting-started/library) |
-| Configure API keys and options | [Configuration](getting-started/configuration) |
-| Understand analysis types | [Analysis Modes](user-guide/analysis-modes) |
-| BSM Greek estimates & chain metadata | [Analytics](analytics) |
-| Extend or contribute | [Architecture](developer-guide/architecture), [Extending](developer-guide/extending), [Testing](developer-guide/testing) |
-| Implement a data provider | [API Reference](api-reference/data-providers) |
+| Install and run a first analysis | [Installation](getting-started/installation) → [Quick Start](getting-started/quickstart) |
+| Use the CLI | [CLI Reference](user-guide/cli) |
+| Integrate in an application | [Using as a Library](getting-started/library) |
+| Keys, cache, storage, EDGAR identity, Greeks env vars | [Configuration](getting-started/configuration) |
+| Deterministic vs question-driven behavior | [Analysis Modes](user-guide/analysis-modes) |
+| BSM Greeks and chain metadata | [Analytics](analytics) |
+| Extend providers, tools, or executors | [Architecture](developer-guide/architecture), [Extending](developer-guide/extending), [Data provider interfaces](api-reference/data-providers) |
 
-## Core Concepts
+## Core concepts
 
-- **Analysis profiles**: Context for runs (literacy level, preferences). Not user accounts—your app owns users; we own analysis context.
-- **Deterministic analysis**: Fixed pipeline (quote, history, fundamentals, regime, etc.).
-- **Question-driven analysis**: You ask in natural language; the AI uses tools (quote, history, options, macro, etc.) to answer.
+- **Analysis profile** — Context for a run (financial literacy, preferences). Not a user account; your application owns identity if you need it.
+- **Deterministic analysis** — Fixed pipelines (instrument, options, macro/regime) with explicit steps and structured outputs.
+- **Question-driven analysis** — You ask a question; the model selects **tools** (market data, fundamentals, regime, macro) and returns an answer grounded in tool outputs.
+- **Research orchestration** — Prefer `ResearchOrchestrator.run_job` (via the DI container) over calling executor internals directly; see the [architecture guide](developer-guide/architecture).
 
-## Need Help?
+## Help and community
 
-- [GitHub Issues](https://github.com/copinance/copinance-os/issues) — bugs and feature requests
+- [Issues](https://github.com/copinance/copinance-os/issues) — bugs and features
 - [Discussions](https://github.com/copinance/copinance-os/discussions) — questions and ideas

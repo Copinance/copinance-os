@@ -1,6 +1,6 @@
 # Configuration
 
-Configure Copinance OS for CLI or library use.
+Configure **settings** (LLM, FRED, storage, cache, BSM inputs) for CLI via **environment variables** / `.env`, or for library use by passing objects into **`get_container()`**. Configuration does not change domain math; it selects providers, keys, and paths only.
 
 ## Configuration Methods
 
@@ -49,6 +49,18 @@ Optional. Improves macro analysis; yfinance fallback is used without it.
 2. Set: `COPINANCEOS_FRED_API_KEY=your-fred-api-key`
 3. Verify: `copinance analyze macro` (results should show `"source": "fred"` where applicable).
 
+## SEC EDGAR (edgartools)
+
+Question-driven analysis routes **SEC filing metadata and filing body** tools to **`EdgarToolsFundamentalProvider`** (`copinance_os.data.providers.sec.edgartools`), built on **[edgartools](https://edgartools.readthedocs.io/)** (import name `edgar`). The SEC requires a **User-Agent identity** (name and email) for programmatic access.
+
+**Configure identity (pick one):**
+
+- **Environment:** `EDGAR_IDENTITY` — e.g. `Your Name you@example.com` (common with edgartools docs).
+- **Copinance-prefixed:** `COPINANCEOS_EDGAR_IDENTITY` — same format.
+- **Default:** If unset, settings use a built-in project identity so local runs work; **override in production** with your own contact string.
+
+Responses are **cached** under the same cache as other tools (see below), with per-operation TTLs (e.g. filing lists vs. filing text) to limit repeat requests to SEC servers.
+
 ## Option Greek estimation (BSM)
 
 Optional. Affects analytic delta/gamma/theta/vega/rho attached to options chains when QuantLib is installed.
@@ -68,13 +80,15 @@ Reserved `OptionsChain.metadata` keys and profile preferences are documented in 
 ```bash
 # Storage (optional)
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinanceos
+COPINANCEOS_STORAGE_PATH=~/.copinance
 
 # Cache (optional, default: true)
 COPINANCEOS_CACHE_ENABLED=true
 ```
 
 - **Library:** Use `get_container(..., cache_enabled=False)` or `cache_manager=...`. See [Using as a Library](library#cache).
+
+**SEC / edgartools:** Filing metadata and filing content from EDGAR are stored in the same file cache as tool results (versioned under your persistence/cache paths). Disabling cache or using a custom `cache_manager` applies to EDGAR-backed calls as well.
 
 ## Complete .env Examples
 
@@ -84,8 +98,10 @@ COPINANCEOS_LLM_PROVIDER=gemini
 COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-key
 COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro
 COPINANCEOS_FRED_API_KEY=your-fred-key
+# Optional — SEC/EDGAR (edgartools); override default identity for production
+# EDGAR_IDENTITY="Your Name you@company.com"
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinanceos
+COPINANCEOS_STORAGE_PATH=~/.copinance
 ```
 
 **Ollama:**
@@ -94,7 +110,7 @@ COPINANCEOS_LLM_PROVIDER=ollama
 COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
 COPINANCEOS_OLLAMA_MODEL=llama2
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinanceos
+COPINANCEOS_STORAGE_PATH=~/.copinance
 ```
 
 ## Security

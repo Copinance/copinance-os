@@ -1,6 +1,6 @@
 # Testing
 
-Testing guidelines and structure for Copinance OS.
+Testing guidelines for Copinance OS. Favor **unit tests** on pure domain and tool logic; **integration tests** with mocked providers for I/O; use the DI container’s overrides to inject fakes for **`ResearchOrchestrator`** / **`JobRunner`** when testing orchestration.
 
 ## Test Structure
 
@@ -9,13 +9,18 @@ Tests are organized to mirror the source code structure:
 ```
 tests/
 ├── unit/                    # Unit tests
-│   └── copinanceos/
+│   └── copinance_os/
 │       ├── domain/
-│       ├── application/
-│       └── infrastructure/
+│       ├── research/workflows/
+│       ├── data/
+│       ├── core/
+│       ├── ai/
+│       ├── infra/
+│       └── interfaces/cli/
 └── integration/             # Integration tests
-    └── copinanceos/
-        └── infrastructure/
+    └── copinance_os/
+        ├── data/
+        └── core/execution_engine/
 ```
 
 ## Running Tests
@@ -31,7 +36,7 @@ pytest -m unit
 pytest -m integration
 
 # With coverage
-pytest --cov=copinanceos --cov-report=html
+pytest --cov=copinance_os --cov-report=html
 ```
 
 ## Writing Tests
@@ -42,8 +47,8 @@ Test individual components in isolation:
 
 ```python
 import pytest
-from copinanceos.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
-from copinanceos.domain.models.market import MarketType
+from copinance_os.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
+from copinance_os.domain.models.market import MarketType
 
 def test_job_creation():
     job = Job(
@@ -63,8 +68,8 @@ Test component interactions using fixtures from `tests/conftest.py`:
 
 ```python
 import pytest
-from copinanceos.infrastructure.repositories import StockRepositoryImpl
-from copinanceos.domain.models.stock import Stock
+from copinance_os.data.repositories import StockRepositoryImpl
+from copinance_os.domain.models.stock import Stock
 
 @pytest.mark.integration
 async def test_stock_repository_save_and_get(isolated_storage):

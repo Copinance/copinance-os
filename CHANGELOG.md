@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **SEC / EDGAR**: **`edgartools`** dependency and **`EdgarToolsFundamentalProvider`** in `copinance_os.data.providers.sec.edgartools`; DI **`sec_filings_provider`** for question-driven agent tools (`get_sec_filings`, `get_sec_filing_content`). SEC identity via **`EDGAR_IDENTITY`** / **`COPINANCEOS_EDGAR_IDENTITY`** (defaults in settings). **Cache** integration with per-entry TTL via `CacheManager` to limit EDGAR traffic.
 - **Container/DI**: Optional `storage_type` and `storage_path` on `get_container()` for library integrators; pass `storage_type="memory"` to avoid creating a `.copinance` directory on disk without using `COPINANCEOS_STORAGE_TYPE`. Unit tests for container storage overrides.
 - **Market search**: `EXCHANGE_DISPLAY_NAMES` and `format_exchange()` for human-readable market names (e.g. NMS → NASDAQ, NYQ → NYSE); "Market" column in search results; `longName`, `shortName`, and `exch_disp` from yfinance in results.
 - **Container/DI**: Lazy container proxy so no container is created at import time; first `get_container()` or attribute access wins. Unit tests for container cache configuration.
@@ -30,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Documentation & metadata**: Package description (`pyproject.toml`) and `copinanceos` module docstring aligned with README and docs: “market analysis” and “question-driven AI” (replacing “market research” / “agent AI” in those metadata strings). Extension point count raised to **23** and `OptionsChainGreeksEstimator` documented in architecture and extending guides; README architecture tree and MANIFESTO updated to match.
+- **Documentation & metadata**: Package description (`pyproject.toml`) and `copinance_os` module docstring aligned with README and docs: “market analysis” and “question-driven AI” (replacing “market research” / “agent AI” in those metadata strings). Extension point count raised to **23** and `OptionsChainGreeksEstimator` documented in architecture and extending guides; README architecture tree and MANIFESTO updated to match.
 - **CLI / user guide**: Root `copinance --help` `market` summary aligned with the `market` Typer app (“options (BSM Greeks via QuantLib)”); `market options --expiration` Typer help aligned with the user guide default wording. CLI reference table (`market`, `cache`) and macro `--timeframe` default (`mid_term`) clarified.
 - **Contributing**: `pip install -e ".[dev]"` only — removed nonexistent `.[dev,docs]` extra from the setup example.
 - **Yahoo options:** Default `--expiration` now picks the earliest listed expiry **on or after today** (not raw `ticker.options[0]`), avoiding expired front months and missing BSM Greeks the day after expiry.

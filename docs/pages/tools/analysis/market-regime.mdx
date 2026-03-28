@@ -1,10 +1,14 @@
-# Market Regime Detection Tools
+# Market regime detection tools
 
-Market regime detection tools identify different market conditions and phases, helping investors understand the current state of a stock and make informed decisions. They are part of the [Tools](..) suite.
+Regime tools classify **price and volatility behavior** from historical series (trend, vol, cycles, VIX, breadth, sector rotation). They live in **`copinance_os.core.pipeline.tools.analysis.market_regime`** and are invoked by executors alongside data-provider tools. Outputs are **structured tool results** suitable for deterministic dashboards and for LLM consumption in question-driven mode—classification logic is rule-based or statistical code, not model hallucination.
+
+They are part of the [Tools](..) suite.
 
 ## Overview
 
-Market regimes represent distinct periods characterized by different statistical properties, trends, and behaviors. Identifying these regimes is crucial for:
+Market regimes represent distinct periods characterized by different statistical properties, trends, and behaviors. Regime signals are inputs to risk and allocation decisions; always treat them as **heuristic** and validate against your own assumptions ([Architecture](/developer-guide/architecture)).
+
+Identifying regimes supports:
 
 - **Risk Management**: Adjusting position sizes based on volatility regimes
 - **Strategy Selection**: Choosing appropriate strategies for different market phases
@@ -37,11 +41,11 @@ Statistical methods will use probabilistic models like Hidden Markov Models (HMM
 **Usage:**
 ```python
 # Rule-based tools (default, current)
-from copinanceos.infrastructure.tools.analysis import create_rule_based_regime_tools
+from copinance_os.core.pipeline.tools.analysis import create_rule_based_regime_tools
 tools = create_rule_based_regime_tools(provider)
 
 # Or explicitly specify rule-based
-from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.registry import (
     create_regime_tools_by_type,
 )
 rule_tools = create_regime_tools_by_type(provider, "rule_based")
@@ -50,7 +54,7 @@ rule_tools = create_regime_tools_by_type(provider, "rule_based")
 stat_tools = create_regime_tools_by_type(provider, "statistical")
 
 # Get all available tools
-from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.registry import (
     create_all_regime_tools,
 )
 all_tools = create_all_regime_tools(provider, methods=["rule_based", "statistical"])
@@ -97,8 +101,8 @@ Detects market trend regimes (bull, bear, or neutral) using moving averages and 
 
 **Example:**
 ```python
-from copinanceos.infrastructure.tools.analysis import MarketRegimeDetectTrendTool
-from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+from copinance_os.core.pipeline.tools.analysis import MarketRegimeDetectTrendTool
+from copinance_os.data.providers import YFinanceMarketProvider
 
 provider = YFinanceMarketProvider()
 tool = MarketRegimeDetectTrendTool(provider)
@@ -156,7 +160,7 @@ While GARCH models are theoretically superior, we use rolling volatility because
 
 **Example:**
 ```python
-from copinanceos.infrastructure.tools.analysis import MarketRegimeDetectVolatilityTool
+from copinance_os.core.pipeline.tools.analysis import MarketRegimeDetectVolatilityTool
 
 tool = MarketRegimeDetectVolatilityTool(provider)
 result = await tool.execute(symbol="AAPL", lookback_days=252)
@@ -212,7 +216,7 @@ Detects market cycles and regime transitions, identifying accumulation, markup, 
 
 **Example:**
 ```python
-from copinanceos.infrastructure.tools.analysis import MarketRegimeDetectCyclesTool
+from copinance_os.core.pipeline.tools.analysis import MarketRegimeDetectCyclesTool
 
 tool = MarketRegimeDetectCyclesTool(provider)
 result = await tool.execute(symbol="AAPL", lookback_days=252)
@@ -338,8 +342,8 @@ Each sector in the rotation data includes:
 
 **Example:**
 ```python
-from copinanceos.infrastructure.tools.analysis import MarketRegimeIndicatorsTool
-from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+from copinance_os.core.pipeline.tools.analysis import MarketRegimeIndicatorsTool
+from copinance_os.data.providers import YFinanceMarketProvider
 
 provider = YFinanceMarketProvider()
 tool = MarketRegimeIndicatorsTool(provider)
@@ -502,11 +506,11 @@ The LLM will automatically use the appropriate tools (`detect_market_trend`, `de
 ### Programmatic Usage
 
 ```python
-from copinanceos.infrastructure.tools.analysis import (
+from copinance_os.core.pipeline.tools.analysis import (
     create_rule_based_regime_tools,
     MarketRegimeIndicatorsTool,
 )
-from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+from copinance_os.data.providers import YFinanceMarketProvider
 
 # Create rule-based detection tools
 provider = YFinanceMarketProvider()
@@ -526,8 +530,8 @@ indicators_result = await indicators_tool.execute(market_index="SPY")
 Tools can also be registered in a tool registry for centralized management:
 
 ```python
-from copinanceos.infrastructure.tools import ToolRegistry
-from copinanceos.infrastructure.tools.analysis import create_rule_based_regime_tools
+from copinance_os.core.pipeline.tools import ToolRegistry
+from copinance_os.core.pipeline.tools.analysis import create_rule_based_regime_tools
 
 registry = ToolRegistry()
 tools = create_rule_based_regime_tools(provider)
@@ -586,7 +590,7 @@ The market regime detection tools are organized in a modular structure to suppor
 ### Current Structure
 
 ```
-infrastructure/tools/analysis/market_regime/
+core/pipeline/tools/analysis/market_regime/
 ├── __init__.py          # Public API exports
 ├── base.py              # Common interfaces and base classes
 ├── rule_based.py        # Rule-based detection (current implementation)
@@ -608,7 +612,7 @@ To add a new detection method (e.g., machine learning-based):
 
 1. **Create a new module** (e.g., `machine_learning.py`):
 ```python
-from copinanceos.infrastructure.tools.analysis.market_regime.base import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.base import (
     BaseRegimeDetectionTool,
 )
 
@@ -639,7 +643,7 @@ def create_ml_regime_tools(provider: MarketDataProvider) -> list[Tool]:
 
 ```python
 # Rule-based tools (default, current)
-from copinanceos.infrastructure.tools.analysis import (
+from copinance_os.core.pipeline.tools.analysis import (
     create_rule_based_regime_tools,
     MarketRegimeIndicatorsTool,
 )
@@ -649,14 +653,14 @@ tools = create_rule_based_regime_tools(provider)
 indicators_tool = MarketRegimeIndicatorsTool(provider)
 
 # Explicitly specify method type
-from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.registry import (
     create_regime_tools_by_type,
 )
 rule_tools = create_regime_tools_by_type(provider, "rule_based")
 stat_tools = create_regime_tools_by_type(provider, "statistical")  # When implemented
 
 # Get all available tools from multiple methods
-from copinanceos.infrastructure.tools.analysis.market_regime.registry import (
+from copinance_os.core.pipeline.tools.analysis.market_regime.registry import (
     create_all_regime_tools,
 )
 all_tools = create_all_regime_tools(

@@ -1,142 +1,98 @@
 # Architecture
 
-Copinance OS follows **Clean Architecture (Hexagonal Architecture)** with clear separation of concerns.
+Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: **domain** contracts, **data** and **infra** adapters, **core** orchestration and pipelines, **AI** for language and tool use only, and **interfaces** (CLI) at the edge.
 
-## Overview
+## Design principles
+
+1. **Financial and quantitative work is deterministic** — Implemented in domain models, data providers, analytics (e.g. QuantLib), and `core.execution_engine` executors. Outputs are structured and testable.
+2. **LLMs do not replace computation** — They explain, route questions to tools, and format answers. Tool implementations perform fetches and numeric work.
+3. **Contracts over raw blobs** — Prefer Pydantic models and explicit result types between layers; avoid passing untyped pandas frames across module boundaries in new code.
+4. **One front door for job execution** — **`ResearchOrchestrator`** wraps the **`JobRunner`** port so workflows and integrations do not scatter direct calls to executors. Override **`JobRunner`** only when you need custom orchestration (retries, queues, multi-tenant routing).
+
+## Layer map
 
 ```
-┌─────────────────────────────────────────┐
-│           CLI Layer                     │
-│  (User Interface)                       │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│      Application Layer                  │
-│  (Use Cases - Business Operations)      │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│         Domain Layer                    │
-│  (Core Business Logic - No Dependencies)│
-│  • Models (Entities, Value Objects)     │
-│  • Ports (Interfaces)                   │
-│  • Services (Business Logic)            │
-│  • Validation                           │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│      Infrastructure Layer               │
-│  (Implementations - Adapters)           │
-│  • Repositories                         │
-│  • Data Providers                       │
-│  • Analysis executors                   │
-│  • Container (Dependency Injection)     │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  interfaces/cli          Typer CLI, human-readable output   │
+└───────────────────────────────┬─────────────────────────────┘
+                                │
+┌───────────────────────────────▼──────────────────────────────────────┐
+│  research/workflows     Use cases (analyze, market, profile)         │
+│                           Build requests / jobs; call orchestrator   │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │
+┌───────────────────────────────▼─────────────────────────────────┐
+│  core/orchestrator        ResearchOrchestrator → JobRunner      │
+│  core/execution_engine    AnalysisExecutor implementations      │
+│  core/pipeline/tools      ToolRegistry, regime & data tools     │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+┌───────────────────────────────▼───────────────────────────────┐
+│  domain                   Models, ports, strategy protocols   │
+│  (no external I/O)                                            │
+└───────────────────────────────┬───────────────────────────────┘
+                                │
+┌───────────────────────────────▼─────────────────────────────────┐
+│  data                     Providers, cache, repositories,       │
+│                           loaders, analytics (options Greeks)   │
+│  ai/llm                   Providers, prompts (explanation)      │
+│  infra                    Settings, logging, DI container       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Core Vocabulary
+## Package layout (source)
 
-Copinance OS centers on **analysis** as the main user-facing concept. The canonical terms are:
+| Area | Role |
+|------|------|
+| `copinance_os.domain` | Entities and value objects (`Job`, `Stock`, market types, profiles). **Ports**: data providers, repositories, storage, `JobRunner`, `AnalysisExecutor`, tools, analytics estimators, `LLMAnalyzer`. Strategy protocols for future screening / valuation flows. |
+| `copinance_os.research.workflows` | Application-facing use cases and request types (`AnalyzeInstrumentRequest`, market search, profile CRUD, backtest workflow inputs). |
+| `copinance_os.core.orchestrator` | **`ResearchOrchestrator`**: `run_job`, and workflow helpers (e.g. simple backtest entry). Default analyze runners delegate here. |
+| `copinance_os.core.execution_engine` | Executors: deterministic instrument/market analysis, question-driven analysis. |
+| `copinance_os.core.pipeline.tools` | Tool implementations (market data, fundamentals, regime, macro) and registry. |
+| `copinance_os.data` | **Providers** (yfinance, FRED; **SEC/EDGAR** in `data.providers.sec` via edgartools), **cache**, **repositories**, **loaders**, **analytics** (e.g. `data.analytics.options` for BSM Greeks). |
+| `copinance_os.ai.llm` | LLM provider adapters, configuration, prompt resources. |
+| `copinance_os.infra.di` | Dependency injection: `get_container()`, lazy container proxy, singletons. |
+| `copinance_os.interfaces.cli` | CLI entry (`copinance` script). |
 
-| Term | Description | In code |
-|------|-------------|---------|
-| **Analysis request** | What the user wants to know (target, mode, options). | `AnalyzeInstrumentRequest`, `AnalyzeMarketRequest` (`application.use_cases.analyze`) |
-| **Analysis mode** | How the analysis runs: deterministic (fixed pipeline) or question-driven (AI with tools). | `AnalyzeMode` (`auto`, `deterministic`, `question_driven`) |
-| **Analysis result** | Outcome of a single run: success, payload, or error. | `RunJobResult` (`success`, `results`, `error_message`) |
-| **Job** | Optional orchestration envelope: scope, target, timeframe, and internal execution type. Used for job-based execution (e.g. queues, batch). Not persisted. | `Job` (`domain.models.job`) |
-| **Executor** | Internal component that performs one kind of analysis (deterministic instrument, deterministic market, question-driven). Selected by the runner from the job. | `AnalysisExecutor` port; implementations in `infrastructure.executors` |
+## Vocabulary
 
-The public API is **analysis requests and use cases**; **Job** and **AnalysisExecutor** are for library integrators who need custom orchestration or new execution strategies.
+| Term | Meaning | Typical code location |
+|------|---------|------------------------|
+| **Analysis request** | Typed input for progressive analyze flows (`AnalyzeInstrumentRequest`, `AnalyzeMarketRequest`). | `copinance_os.research.workflows.analyze` |
+| **Analysis mode** | `auto`, `deterministic`, or `question_driven`; resolves how a job is built. | Same module + `resolve_analyze_mode` |
+| **Job** | Non-persisted execution envelope: scope, symbols, timeframe, **`execution_type`**. | `copinance_os.domain.models.job` |
+| **Execution type** | String discriminator for which executor runs (e.g. `deterministic_instrument_analysis`). Derive with `execution_type_from_scope_and_mode`. | `research.workflows.analyze` |
+| **ResearchOrchestrator** | Facade over **`JobRunner.run`**: the supported entry for running a constructed `Job` with context. | `copinance_os.core.orchestrator.research_orchestrator` |
+| **AnalysisExecutor** | Implements one analysis style; validates and executes a `Job`. | `copinance_os.core.execution_engine` |
+| **Tool** | Callable unit exposed to the LLM with schema and structured results. | `copinance_os.core.pipeline.tools`, `domain.ports.tools` |
 
-**Routing:** Executor selection is based on the job’s `execution_type`. Derive it from scope + analysis mode via `execution_type_from_scope_and_mode(scope, mode)` in `application.use_cases.analyze` when building jobs from requests.
+## Orchestration: what to call
 
-## Layer Responsibilities
+- **Recommended:** `container.research_orchestrator()` then `await orchestrator.run_job(job, context)`. This matches how default analyze runners work.
+- **Advanced:** `container.job_runner()` returns the same **`JobRunner`** port **`ResearchOrchestrator`** uses; override it for custom global behavior (e.g. middleware, alternate routing).
 
-### Domain Layer
-- **Core business logic** with zero external dependencies
-- **Entities**: Job, Stock, AnalysisProfile
-- **Ports**: Interfaces for data providers, repositories, job execution (JobRunner, AnalysisExecutor)
-- **Services**: Complex business logic
-- **Validation**: Domain validation rules
+## Dependency injection and startup
 
-### Application Layer
-- **Use cases**: Business operations (CreateProfile, GetInstrument, etc.)
-- **Default job runner**: Optional implementation of `JobRunner`; consumers can replace it for custom orchestration (queues, retries, routing)
-- **Orchestration**: Coordinates domain objects and infrastructure
+The global container is a **lazy proxy**: nothing heavy runs at import time. Resolving `get_container()` or attributes like `container.research_orchestrator()` builds the real container once; many services are **singletons** per process.
 
-### Infrastructure Layer
-- **Implementations**: Concrete implementations of domain ports
-- **Repositories**: Data persistence (memory, file, database)
-- **Data providers** (`infrastructure.data_providers`): Vendor-only adapters (yfinance, EDGAR, FRED)
-- **Market composition** (`infrastructure.market`): Composes a raw `MarketDataProvider` with derived option analytics without changing vendor modules
-- **Analytics** (`infrastructure.analytics`): Derived quantities (e.g. QuantLib BSM Greeks); see [Analytics](/analytics) in the docs (BSM & Greeks, chain metadata)
-- **Analysis executors**: Deterministic and question-driven execution (implement `AnalysisExecutor`)
-- **Container**: Dependency injection configuration
+See [Using as a Library](/getting-started/library#configuration) for `get_container(...)` options (LLM, FRED, cache, storage, prompts).
 
-### CLI Layer
-- **User interface**: Command-line interface
-- **Error handling**: User-friendly error messages
-- **Output formatting**: Rich terminal output
+## Extension points (ports)
 
-## Design Patterns
+Implementations live in `data`, `ai`, and `infra`; contracts live under **`copinance_os.domain.ports`** and related domain modules:
 
-### Repository Pattern
-Abstracts data access:
-```python
-# Port (Domain)
-class StockRepository(ABC):
-    async def get_by_symbol(self, symbol: str) -> Stock | None
+- **Data:** `MarketDataProvider`, `FundamentalDataProvider`, `MacroeconomicDataProvider`, `AlternativeDataProvider`
+- **Analytics:** `OptionsChainGreeksEstimator` (default QuantLib BSM path)
+- **AI:** `LLMAnalyzer`
+- **Execution:** `JobRunner`, `AnalysisExecutor`
+- **Persistence:** `StockRepository`, `AnalysisProfileRepository`, `Storage`, cache backends
+- **Tools:** `Tool`, `ToolSchema`, `ToolParameter`
+- **Strategies:** screening, due diligence, valuation, risk, thematic, monitoring (protocols for future workflows)
 
-# Implementation (Infrastructure)
-class StockRepositoryImpl(StockRepository):
-    async def get_by_symbol(self, symbol: str) -> Stock | None:
-        # Implementation using storage backend
-```
-
-### Job Runner (optional)
-Running a job is the consumer’s responsibility; the library provides a default implementation you can replace:
-```python
-class JobRunner(ABC):
-    async def run(self, job: Job, context: dict[str, Any]) -> RunJobResult:
-        # Find executor, build context, execute
-```
-
-### Dependency Injection
-Manages dependencies through container:
-```python
-# Default job runner (replaceable)
-runner = container.job_runner()
-result = await runner.run(job, context)
-```
-
-### Container and performance
-
-The global `container` used in library and CLI code is a **lazy proxy** (`_ContainerProxy`): no real container is created at import time. The actual container is instantiated only on first use—either when you call `get_container(...)` or when you first access an attribute (e.g. `container.job_runner()`).
-
-- **Use cases and providers** are created by the DI container when first requested (e.g. `container.job_runner()`, `container.create_profile_use_case()`). The container uses **singletons** where appropriate, so each service is built once and reused.
-- For **normal library usage** there is no need for extra lazy loading; the proxy plus singleton pattern keeps startup and first-call cost predictable without additional wiring.
-
-See [Using as a Library](/getting-started/library#configuration) for container configuration options.
-
-## Extension Points
-
-The architecture provides 23 port interfaces for extension:
-
-- **5 Data Provider interfaces**: Market, Alternative, Fundamental, Macro, Base DataProvider
-- **1 Analytics port**: `OptionsChainGreeksEstimator` (options-chain BSM Greeks; default QuantLib implementation)
-- **1 Analyzer interface**: LLM
-- **6 Strategy interfaces**: Screening, Due Diligence, Valuation, Risk, Thematic, Monitoring
-- **4 Tool interfaces**: Tool, ToolParameter, ToolSchema, ToolResult
-- **2 Repository interfaces**: Stock, AnalysisProfile
-- **Job runner**: JobRunner (default implementation provided; replace for custom orchestration)
-- **Analysis executor**: AnalysisExecutor (one implementation per analysis mode)
-- **2 Storage interfaces**: CacheBackend, Storage
-
-See [Extending](extending) for how to implement these.
+Step-by-step: [Extending](extending). Interface listing: [API Reference](/api-reference/data-providers) and `src/copinance_os/domain/ports/`.
 
 ## Benefits
 
-- ✅ **Testability**: All layers are easily testable
-- ✅ **Flexibility**: Swap implementations without changing business logic
-- ✅ **Maintainability**: Clear separation of concerns
-- ✅ **Extensibility**: Easy to add new features
+- **Testability** — Ports are easy to fake; executors and tools are isolated.
+- **Replaceability** — Swap providers or LLM backends without changing domain rules.
+- **Clarity** — Numbers and series come from data and analytics layers; prose and routing from AI and CLI.

@@ -1,22 +1,22 @@
 # Extending Copinance OS
 
-Add custom data providers, analyzers, and strategies.
+Add custom data providers, LLM adapters, executors, and strategies. Keep **I/O and vendor code** in `data` and `infra`; keep **contracts** in `domain.ports`; register replacements through **`get_container()`** overrides so **`ResearchOrchestrator`** and CLI paths stay consistent.
 
 ## Adding a Custom Data Provider
 
 ### Step 1: Choose Interface
 
-Select the appropriate interface from `copinanceos.domain.ports.data_providers`:
+Select the appropriate interface from `copinance_os.domain.ports.data_providers`:
 - `MarketDataProvider` - Market data (quotes, historical prices)
-- `FundamentalDataProvider` - Financial statements, SEC filings
+- `FundamentalDataProvider` - Financial statements, SEC filings (reference implementation for EDGAR: `copinance_os.data.providers.sec.edgartools`)
 - `AlternativeDataProvider` - Sentiment, web traffic, alternative data
 - `MacroeconomicDataProvider` - Economic indicators
 
 ### Step 2: Implement the Interface
 
 ```python
-from copinanceos.domain.ports.data_providers import MarketDataProvider
-from copinanceos.domain.models.market import MarketDataPoint, OptionsChain
+from copinance_os.domain.ports.data_providers import MarketDataProvider
+from copinance_os.domain.models.market import MarketDataPoint, OptionsChain
 from datetime import datetime
 from typing import Any
 import httpx
@@ -100,7 +100,7 @@ class AlphaVantageProvider(MarketDataProvider):
 ### Step 3: Register in Container
 
 ```python
-from copinanceos.infrastructure.containers import get_container
+from copinance_os.infra.di import get_container
 from dependency_injector import providers
 
 # Use get_container(llm_config=...) if you need question-driven analysis
@@ -119,7 +119,7 @@ The provider will automatically be used by analysis that needs market data.
 ### 1. Implement the Interface
 
 ```python
-from copinanceos.domain.ports.analyzers import LLMAnalyzer
+from copinance_os.domain.ports.analyzers import LLMAnalyzer
 from typing import Any
 
 class MyCustomAnalyzer(LLMAnalyzer):
@@ -136,8 +136,8 @@ class MyCustomAnalyzer(LLMAnalyzer):
 Similar to data providers, override the analyzer in your container:
 
 ```python
-from copinanceos.infrastructure.containers import get_container
-from copinanceos.infrastructure.analyzers.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+from copinance_os.ai.llm.config import LLMConfig
 from dependency_injector import providers
 
 container = get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))
@@ -153,8 +153,8 @@ container.llm_analyzer.override(
 ### 1. Extend BaseAnalysisExecutor
 
 ```python
-from copinanceos.infrastructure.executors.base import BaseAnalysisExecutor
-from copinanceos.domain.models.job import Job
+from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
+from copinance_os.domain.models.job import Job
 from typing import Any
 
 class MyCustomExecutor(BaseAnalysisExecutor):
@@ -185,14 +185,14 @@ Question-driven (and other LLM) analysis resolves prompts through a **PromptMana
 
 - **Overlay via `get_container()`:** Pass `prompt_templates={ "analyze_question_driven": { "system_prompt": "...", "user_prompt": "..." } }`. Only the keys you provide are overridden; the rest use package defaults.
 - **Custom `PromptManager`:** Pass `prompt_manager=PromptManager(templates=...)` or `PromptManager(resources_dir=Path("..."))` to `get_container()`. With `resources_dir`, use one JSON file per prompt (e.g. `analyze_question_driven.json`) containing `system_prompt` and `user_prompt` strings.
-- **Prompt name:** The built-in question-driven analyze flow uses the name `analyze_question_driven`; import `ANALYZE_QUESTION_DRIVEN_PROMPT_NAME` from `copinanceos.infrastructure.analyzers.llm.resources`.
+- **Prompt name:** The built-in question-driven analyze flow uses the name `analyze_question_driven`; import `ANALYZE_QUESTION_DRIVEN_PROMPT_NAME` from `copinance_os.ai.llm.resources`.
 
 ## Cache
 
 The default container uses a file-based cache for tool results and agent prompts. When using the library you can disable it or supply your own:
 
 - **Disable:** `get_container(..., cache_enabled=False)`.
-- **Custom cache:** `get_container(..., cache_manager=my_cache_manager)`. Your instance must match the `CacheManager` interface (see `copinanceos.infrastructure.cache`). The cache is used for tool outputs and for rendered agent prompts.
+- **Custom cache:** `get_container(..., cache_manager=my_cache_manager)`. Your instance must match the `CacheManager` interface (see `copinance_os.data.cache`). The cache is used for tool outputs and for rendered agent prompts.
 
 You can also set `COPINANCEOS_CACHE_ENABLED=false` (see [Configuration](/getting-started/configuration#cache)).
 
@@ -206,7 +206,7 @@ You can also set `COPINANCEOS_CACHE_ENABLED=false` (see [Configuration](/getting
 
 ## Available Interfaces
 
-See `src/copinanceos/domain/ports/` for all available interfaces:
+See `src/copinance_os/domain/ports/` for all available interfaces:
 - `data_providers.py` - Data provider interfaces
 - `analytics.py` - Options chain Greeks estimator (`OptionsChainGreeksEstimator`)
 - `analyzers.py` - Analyzer interfaces

@@ -1,68 +1,67 @@
 # Tools Overview
 
-Tools are executable functions used in analysis—especially question-driven analysis, where the AI selects and runs tools to answer questions. They also power deterministic runs (e.g. `copinance analyze macro`).
+**Tools** are typed, schema-backed callables used in analysis—especially **question-driven** flows, where the LLM selects tools to fetch quotes, history, fundamentals, regime signals, and macro series. Deterministic runs (for example `copinance analyze macro`) use the same machinery inside **`core.execution_engine`** and **`core.pipeline.tools`**.
 
-## Analysis Tools
+Copinance OS treats tools as **data and computation adapters**, not as free-form reasoning: the model proposes tool calls; implementations return structured results aligned with domain models.
+
+## Analysis tools
 
 Market regime detection and macroeconomic indicators (trend, volatility, cycles, VIX, breadth, sector rotation, 47+ macro indicators). Used automatically in question-driven and macro analysis.
 
 - [Market Regime Detection](analysis/market-regime) — Trend, volatility, cycle detection; VIX, breadth, sector rotation
 - [Macro Economic Indicators](analysis/macro-indicators) — Rates, credit, labor, housing, manufacturing, consumer, global, advanced (FRED + yfinance)
 
-## Data Provider Tools
+## Data provider tools
 
 Tools that wrap provider methods (quotes, history, search, options, fundamentals). Available to the AI in question-driven runs.
 
 - [Data Provider Tools](data-providers) — Market and fundamental tool reference
 
-## Using Tools
+## Using tools
 
 ### In question-driven analysis
 
-Tools are automatically available when using question-driven analyze:
+Tools are registered automatically when you use question-driven analyze:
 
 ```bash
-# Question-driven analysis: AI selects and uses tools (e.g. quote, history) to answer
 copinance analyze equity AAPL --question "What is the current market trend?"
 ```
 
-The AI will automatically select and use the appropriate tools to answer your question.
+The model selects tools; outputs are grounded in provider and tool results.
 
-### Programmatic Usage
+### Programmatic usage
 
 ```python
-from copinanceos.infrastructure.tools import (
+from copinance_os.core.pipeline.tools import (
     create_rule_based_regime_tools,
     create_market_data_tools,
     ToolRegistry,
 )
-from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+from copinance_os.data.providers import YFinanceMarketProvider
 
 provider = YFinanceMarketProvider()
 regime_tools = create_rule_based_regime_tools(provider)
 data_tools = create_market_data_tools(provider)
 
-# Use a tool
 result = await regime_tools[0].execute(symbol="AAPL")
 
-# Optional: central registry
 registry = ToolRegistry()
 registry.register_many(regime_tools)
 registry.register_many(data_tools)
 tool = registry.get("detect_market_trend")
 ```
 
-## Tool Architecture
+## Tool architecture
 
-All tools implement the `Tool` interface, which provides:
+All tools implement the **`Tool`** port (`copinance_os.domain.ports.tools`):
 
-- **Schema Definition**: JSON Schema for LLM function calling
-- **Parameter Validation**: Automatic validation of inputs
-- **Error Handling**: Structured error responses
-- **Metadata**: Additional context in results
+- **Schema** — JSON Schema for LLM function calling
+- **Validation** — Typed parameters
+- **Structured results** — Errors and payloads suitable for prompts and logs
 
-## See Also
+## See also
 
-- [Analysis Modes](/user-guide/analysis-modes) — Using tools in analysis
-- [API Reference](/api-reference/data-providers) — Data provider interfaces
-- [Extending](/developer-guide/extending) — Custom tools
+- [Analysis Modes](/user-guide/analysis-modes)
+- [API Reference — Data providers](/api-reference/data-providers)
+- [Extending](/developer-guide/extending)
+- [Architecture — Core pipeline](/developer-guide/architecture)

@@ -32,17 +32,17 @@ Get income statement, balance sheet, or cash flow data for an equity.
 
 ### `get_sec_filings`
 
-Get SEC filing metadata.
+Get SEC filing metadata (form, dates, accession number, CIK, URL). In question-driven runs, calls are routed to **`EdgarToolsFundamentalProvider`** (edgartools / EDGAR) when configured; results are **cached** with a time-to-live to limit repeat traffic to SEC servers.
 
 ### `get_sec_filing_content`
 
-Get the full text of a specific filing.
+Download filing body for a CIK + accession (full text, HTML, or index URL depending on `document_type`). Served by the same SEC provider as `get_sec_filings`; large bodies may be truncated with metadata; responses are **cached** (longer TTL than filing lists, since a given accession is immutable).
 
 ## Creating Tools
 
 ```python
-from copinanceos.infrastructure.tools.data_provider import create_market_data_tools
-from copinanceos.infrastructure.data_providers import YFinanceMarketProvider
+from copinance_os.core.pipeline.tools.data_provider import create_market_data_tools
+from copinance_os.data.providers import YFinanceMarketProvider
 
 provider = YFinanceMarketProvider()
 tools = create_market_data_tools(provider, cache_manager=cache_manager)

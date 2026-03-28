@@ -58,7 +58,7 @@ pytest
 
 # With coverage
 make coverage
-# or: pytest --cov=copinanceos --cov-report=html --cov-report=term-missing
+# or: pytest --cov=copinance_os --cov-report=html --cov-report=term-missing
 # Open report: file://<project-root>/htmlcov/index.html
 
 # Specific markers
@@ -91,26 +91,28 @@ Prefixes:
 ### Layer Responsibilities
 
 1. **Domain Layer** (`domain/`)
-   - Core business logic
-   - No external dependencies
-   - Defines ports (interfaces)
+   - Entities, validation, pure strategy protocols
+   - No I/O; defines ports (interfaces)
 
-2. **Application Layer** (`application/`)
-   - Use cases and orchestration
-   - Depends only on domain layer
-   - Coordinates domain entities
+2. **Research Workflows** (`research/workflows/`)
+   - Typed workflows (market, analyze, profile, fundamentals, backtest)
+   - Prefer YAML/JSON for reproducible simple long-only backtests (`backtest_config.py`); orchestration stays in `ResearchOrchestrator`
 
-3. **Infrastructure Layer** (`infrastructure/`)
-   - External integrations
-   - Implements domain ports
-   - Configuration and logging
-   - Dependency injection containers
+3. **Data Layer** (`data/`)
+   - Providers, cache, repositories, analytics adapters
+   - Implements domain ports; ingestion and persistence only
 
-4. **CLI Layer** (`cli/`)
-   - Command-line interface
-   - User-friendly error handling
-   - Rich terminal output
-   - Depends on application layer
+4. **Core** (`core/`)
+   - Orchestrator (`ResearchOrchestrator`, `DefaultJobRunner`, runners), execution engine (executors), pipeline tools
+
+5. **AI Layer** (`ai/`)
+   - LLM providers and analyzers (explanation/summarization; not numerical truth)
+
+6. **Infra** (`infra/`)
+   - Settings (`infra/config/`), logging, DI wiring (`infra/di/`), factories
+
+7. **Interfaces** (`interfaces/cli/`)
+   - Typer CLI; maps user input to workflows and container
 
 ### Best Practices
 
@@ -126,11 +128,11 @@ Prefixes:
 
 When adding features, follow these steps:
 
-1. **Domain Layer**: Define entities and ports if needed
-2. **Application Layer**: Implement use cases
-3. **Infrastructure Layer**: Implement adapters and repositories
-4. **CLI Layer**: Add commands if needed
-5. **Tests**: Write comprehensive tests for all layers
+1. **Domain**: Define entities and ports if needed
+2. **Research workflows**: Add or extend workflow modules in `research/workflows/`
+3. **Data / core / ai**: Implement adapters, executors, or LLM wiring as appropriate
+4. **Interfaces**: Add CLI commands if needed
+5. **Tests**: Mirror package layout under `tests/unit/copinance_os/`
 6. **Documentation**: Update README and docstrings
 
 ## Pull Request Process
@@ -163,13 +165,13 @@ To add a new executor:
 1. Create a class implementing `AnalysisExecutor` interface
 2. Implement `execute()`, `validate()`, and `get_executor_id()`
 3. Add tests for the executor
-4. Register in dependency injection container (`infrastructure/containers/use_cases.py`)
+4. Register in dependency injection (`infra/di/use_cases.py` and `infra/factories/analysis_executor.py` as needed)
 
 Example:
 
 ```python
-from copinanceos.domain.ports.analysis_execution import AnalysisExecutor
-from copinanceos.domain.models.job import Job
+from copinance_os.domain.ports.analysis_execution import AnalysisExecutor
+from copinance_os.domain.models.job import Job
 
 class MyAnalysisExecutor(AnalysisExecutor):
     async def execute(self, job: Job, context: dict) -> dict:
@@ -199,9 +201,9 @@ If your tool wraps a data provider, extend `BaseDataProviderTool`:
 ```python
 from typing import Any
 
-from copinanceos.domain.ports.data_providers import MarketDataProvider
-from copinanceos.domain.ports.tools import ToolResult, ToolSchema
-from copinanceos.infrastructure.tools.data_provider.base import BaseDataProviderTool
+from copinance_os.domain.ports.data_providers import MarketDataProvider
+from copinance_os.domain.ports.tools import ToolResult, ToolSchema
+from copinance_os.core.pipeline.tools.data_provider.base import BaseDataProviderTool
 
 class MyDataProviderTool(BaseDataProviderTool[MarketDataProvider]):
     """Tool for getting custom data."""
@@ -247,7 +249,7 @@ class MyDataProviderTool(BaseDataProviderTool[MarketDataProvider]):
 For tools that don't wrap data providers, implement `Tool` directly:
 
 ```python
-from copinanceos.domain.ports.tools import Tool, ToolResult, ToolSchema
+from copinance_os.domain.ports.tools import Tool, ToolResult, ToolSchema
 
 class MyStandaloneTool(Tool):
     """Tool for performing custom operations."""
@@ -285,9 +287,9 @@ class MyStandaloneTool(Tool):
 
 To add a new repository (e.g., PostgreSQL):
 
-1. Create implementation in `infrastructure/repositories/`
+1. Create implementation in `data/repositories/`
 2. Implement the appropriate repository interface from `domain/ports/`
-3. Add configuration in `infrastructure/config.py`
+3. Wire settings in `infra/config/` (pydantic-settings) and `infra/di/` if needed
 4. Add tests
 5. Update dependency injection
 
