@@ -1,15 +1,71 @@
-# Copinance OS
+<p align="center">
+  <a href="https://github.com/copinance/copinance-os">
+    <img src="docs/images/copinance-os-logo.png" alt="Copinance OS logo" height="80">
+  </a>
+</p>
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
-[![CI](https://github.com/copinance/copinance-os/actions/workflows/ci.yml/badge.svg)](https://github.com/copinance/copinance-os/actions/workflows/ci.yml)
-[![Docs](https://github.com/copinance/copinance-os/actions/workflows/docs.yml/badge.svg)](https://github.com/copinance/copinance-os/actions/workflows/docs.yml)
+<h1 align="center">Copinance OS</h1>
+<h3 align="center">Open-source market analysis platform and financial research operating system</h3>
 
-Open-source market analysis platform and framework with question-driven AI and deterministic instrument/market analysis.
+<p align="center">
+  <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
+  <a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style: black"></a>
+  <a href="CODE_OF_CONDUCT.md"><img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg" alt="Contributor Covenant"></a>
+  <a href="https://github.com/copinance/copinance-os/actions/workflows/ci.yml"><img src="https://github.com/copinance/copinance-os/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/copinance/copinance-os/actions/workflows/docs.yml"><img src="https://github.com/copinance/copinance-os/actions/workflows/docs.yml/badge.svg" alt="Docs"></a>
+</p>
+
+<p align="center">
+  <b>Question-driven AI, deterministic instrument and market analysis, and macro research — as a composable Python library with a rich CLI.</b>
+</p>
 
 **Read [Manifesto](MANIFESTO.md)** to understand my vision for democratizing financial research.
+
+---
+
+## Why Copinance OS?
+
+Copinance OS treats **financial computation and research orchestration as first-class concerns**. Numbers, indicators, and regime logic live in a **deterministic domain layer** with explicit data contracts — not in prompt text. LLMs sit in an **explanation and question-driven layer**: they reason over tool outputs and narrative context, while prices, macro series, and filing-derived facts come from **providers and domain code** you can test and audit.
+
+<table align="center">
+<tr>
+  <td align="center" width="33%">
+    <b>Deterministic domain</b><br>
+    Pure strategies, indicators, and portfolio logic — composable pipelines with predictable outputs for the same inputs.<br>
+    Pydantic models at boundaries; avoid passing untyped DataFrames across modules.
+  </td>
+  <td align="center" width="33%">
+    <b>AI that explains, not invents</b><br>
+    Question-driven analysis grounded in tools and structured results.<br>
+    LLMs summarize and explore; they do not replace pricing, risk math, or data ingestion.
+  </td>
+  <td align="center" width="33%">
+    <b>Orchestrated research</b><br>
+    Workflows run through a research orchestrator — task decomposition, ordering, and clear extension points.<br>
+    Swap runners, providers, and storage without rewriting the core.
+  </td>
+</tr>
+<tr>
+  <td align="center" width="33%">
+    <b>Macro to micro</b><br>
+    Broad macro dashboards (e.g. FRED-backed indicators) alongside equities, options (QuantLib), and fundamentals.<br>
+    SEC EDGAR access via <a href="https://edgartools.readthedocs.io/">edgartools</a> for filings and text-aware agent tools.
+  </td>
+  <td align="center" width="33%">
+    <b>Audience-aware output</b><br>
+    Analysis profiles adapt depth and language to financial literacy (beginner → advanced).<br>
+    Same engine; presentation tuned to who is reading.
+  </td>
+  <td align="center" width="33%">
+    <b>Library + CLI</b><br>
+    Hexagonal layout: use as a Python library in your app or ship analysis via the Typer/Rich CLI.<br>
+    Apache 2.0 — integrate, extend, and contribute without vendor lock-in.
+  </td>
+</tr>
+</table>
+
+---
 
 ## Features
 
@@ -328,6 +384,10 @@ We welcome contributions! Read my [Manifesto](MANIFESTO.md) to understand my phi
 ## License
 
 This project is licensed under the Apache License 2.0. See the LICENSE file for details.
+
+## Star history
+
+[![Star history chart](https://api.star-history.com/svg?repos=copinance/copinance-os&type=Timeline)](https://star-history.com/#copinance/copinance-os&Timeline)
 
 ## Support
 
