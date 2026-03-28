@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **README**: Centered hero (logo, title, subtitle, HTML badge row), bold tagline, and new **Why Copinance OS?** section with a value-proposition table (deterministic domain, AI explanation layer, orchestration, macro-to-micro scope, literacy-aware output, library + CLI); Manifesto link and horizontal rules preserved before **Features**.
+- **README**: Centered hero (logo at 60px height, title, subtitle, HTML badge row), bold tagline, centered Manifesto call-to-action (HTML), and **Why Copinance OS?** value-proposition table (deterministic domain, AI explanation layer, orchestration, macro-to-micro scope, literacy-aware output, library + CLI); horizontal rules preserved before **Features**.
 - **Documentation & metadata**: Package description (`pyproject.toml`) and `copinance_os` module docstring aligned with README and docs: “market analysis” and “question-driven AI” (replacing “market research” / “agent AI” in those metadata strings). Extension point count raised to **23** and `OptionsChainGreeksEstimator` documented in architecture and extending guides; README architecture tree and MANIFESTO updated to match.
 - **CLI / user guide**: Root `copinance --help` `market` summary aligned with the `market` Typer app (“options (BSM Greeks via QuantLib)”); `market options --expiration` Typer help aligned with the user guide default wording. CLI reference table (`market`, `cache`) and macro `--timeframe` default (`mid_term`) clarified.
 - **Contributing**: `pip install -e ".[dev]"` only — removed nonexistent `.[dev,docs]` extra from the setup example.

@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/copinance/copinance-os">
-    <img src="docs/images/copinance-os-logo.png" alt="Copinance OS logo" height="80">
+    <img src="docs/images/copinance-os-logo.png" alt="Copinance OS logo" height="60">
   </a>
 </p>
 
@@ -20,7 +20,9 @@
   <b>Question-driven AI, deterministic instrument and market analysis, and macro research — as a composable Python library with a rich CLI.</b>
 </p>
 
-**Read [Manifesto](MANIFESTO.md)** to understand my vision for democratizing financial research.
+<p align="center">
+  <b>Read <a href="MANIFESTO.md">Manifesto</a></b> to understand my vision for democratizing financial research.
+</p>
 
 ---
 
