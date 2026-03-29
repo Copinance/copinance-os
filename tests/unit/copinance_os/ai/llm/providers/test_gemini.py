@@ -1,6 +1,7 @@
 """Unit tests for Gemini LLM provider expectations."""
 
 import asyncio
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -765,3 +766,54 @@ class TestGeminiProvider:
                     # Should fall through to string conversion
                     result = await provider.generate_text("test")
                     assert isinstance(result, str)
+
+    @pytest.mark.asyncio
+    async def test_native_text_stream_emits_cumulative_deltas(self) -> None:
+        """Stream chunks may be cumulative; public API yields incremental text."""
+
+        class _Chunk:
+            __slots__ = ("text",)
+
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+        def _fake_stream() -> Any:
+            yield _Chunk("Hello")
+            yield _Chunk("Hello world")
+
+        with patch("copinance_os.ai.llm.providers.gemini.GEMINI_AVAILABLE", True):
+            provider = GeminiProvider(api_key="test-key")
+            provider._client = MagicMock()
+            with patch.object(
+                provider,
+                "_sync_generate_content_stream",
+                return_value=_fake_stream(),
+            ):
+                deltas: list[str] = []
+                last_usage = None
+                async for ev in provider.generate_text_stream("q", stream_mode="native"):
+                    if ev.kind == "text_delta":
+                        deltas.append(ev.text_delta)
+                    if ev.kind == "done":
+                        last_usage = ev.usage
+
+                assert "".join(deltas) == "Hello world"
+                assert last_usage is None or isinstance(last_usage, dict)
+
+    @pytest.mark.asyncio
+    async def test_auto_mode_buffered_when_native_disabled(self) -> None:
+        with patch("copinance_os.ai.llm.providers.gemini.GEMINI_AVAILABLE", True):
+            provider = GeminiProvider(api_key="test-key", disable_native_text_stream=True)
+            provider._client = MagicMock()
+
+            async def fake_gt(*_a: Any, **_k: Any) -> str:
+                return "sync"
+
+            provider.generate_text = fake_gt  # type: ignore[method-assign]
+
+            flags: list[tuple[str, bool]] = []
+            async for ev in provider.generate_text_stream("q", stream_mode="auto"):
+                flags.append((ev.kind, ev.native_streaming))
+
+            assert ("text_delta", False) in flags
+            assert any(k == "done" and not n for k, n in flags)

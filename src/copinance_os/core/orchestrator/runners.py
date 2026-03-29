@@ -42,7 +42,10 @@ class DefaultAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
             "expiration_date": request.expiration_date,
             "option_side": request.option_side.value,
             "include_prompt": request.include_prompt_in_results,
+            "stream": request.stream,
         }
+        if request.conversation_history:
+            context["conversation_history"] = [t.model_dump() for t in request.conversation_history]
         return await self._orchestrator.run_job(job, context)
 
 
@@ -82,5 +85,8 @@ class DefaultAnalyzeMarketRunner(AnalyzeMarketRunner):
             "include_consumer": request.include_consumer,
             "include_global": request.include_global,
             "include_advanced": request.include_advanced,
+            "stream": request.stream,
         }
+        if request.conversation_history:
+            context["conversation_history"] = [t.model_dump() for t in request.conversation_history]
         return await self._orchestrator.run_job(job, context)

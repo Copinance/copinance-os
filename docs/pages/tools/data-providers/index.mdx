@@ -24,19 +24,45 @@ Get an options chain for an underlying instrument, including expirations, calls,
 
 ### `get_equity_fundamentals`
 
-Get comprehensive fundamentals for an equity.
+Get comprehensive fundamentals for an equity (statements, ratios, and key metrics from the configured fundamentals provider).
 
 ### `get_financial_statements`
 
-Get income statement, balance sheet, or cash flow data for an equity.
+Get income statement, balance sheet, or cash flow statement grids for a single symbol (annual or quarterly).
 
 ### `get_sec_filings`
 
-Get SEC filing metadata (form, dates, accession number, CIK, URL). In question-driven runs, calls are routed to **`EdgarToolsFundamentalProvider`** (edgartools / EDGAR) when configured; results are **cached** with a time-to-live to limit repeat traffic to SEC servers.
+List **SEC EDGAR** filing metadata for a symbol: form type, dates, accession number, CIK, URL. Use to discover filings before downloading content. Cached with a short TTL.
 
 ### `get_sec_filing_content`
 
-Download filing body for a CIK + accession (full text, HTML, or index URL depending on `document_type`). Served by the same SEC provider as `get_sec_filings`; large bodies may be truncated with metadata; responses are **cached** (longer TTL than filing lists, since a given accession is immutable).
+Download filing body text or HTML for a **CIK + accession number** (e.g. after listing filings). Large bodies may be truncated with metadata in the result. Cached.
+
+### `get_sec_company_edgar_profile`
+
+Resolve **entity metadata** from EDGAR for a ticker or CIK: name, CIK, SIC, shares outstanding, public float—useful to confirm the right issuer or filer before other SEC tools.
+
+### `get_sec_company_facts_statement`
+
+Multi-period **company facts** for one symbol (e.g. income, balance sheet, or cash flow across several annual or quarterly periods). Suited to long history for a single company.
+
+### `get_sec_compare_financials_metrics`
+
+Compare **standardized headline metrics** across multiple tickers (e.g. revenue, net income) for cross-company questions.
+
+### `get_sec_xbrl_statement_table`
+
+Extract a **primary financial statement table** from the latest filing of a given form (e.g. 10-K) with optional detailed (dimensional) view—use when you need segment-style rows or filing-native presentation.
+
+### `get_sec_insider_form4`
+
+Recent **Form 4** insider filings for an issuer, with structured ownership summaries and capped transaction rows.
+
+### `get_sec_13f_institutional_holdings`
+
+Latest **13F-HR** portfolio for an **institutional filer** (manager CIK/ticker you specify), including position tables and optional quarter-over-quarter comparison. Values are reported in **thousands of dollars** in SEC data; the tool response documents scaling. Not a substitute for scanning all institutions that hold a given stock.
+
+Tools that call **SEC/EDGAR** are registered when your app wires a **SEC-capable** fundamentals provider for question-driven analysis; otherwise those tools may error or return empty data depending on the deployment.
 
 ## Creating Tools
 

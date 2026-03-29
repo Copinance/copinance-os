@@ -7,25 +7,26 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 1. **Financial and quantitative work is deterministic** — Implemented in domain models, data providers, analytics (e.g. QuantLib), and `core.execution_engine` executors. Outputs are structured and testable.
 2. **LLMs do not replace computation** — They explain, route questions to tools, and format answers. Tool implementations perform fetches and numeric work.
 3. **Contracts over raw blobs** — Prefer Pydantic models and explicit result types between layers; avoid passing untyped pandas frames across module boundaries in new code.
-4. **One front door for job execution** — **`ResearchOrchestrator`** wraps the **`JobRunner`** port so workflows and integrations do not scatter direct calls to executors. Override **`JobRunner`** only when you need custom orchestration (retries, queues, multi-tenant routing).
+4. **One front door for job execution** — **`ResearchOrchestrator`** wraps the **`JobRunner`** port so use cases, CLI, and integrations do not scatter direct calls to executors. Override **`JobRunner`** only when you need custom orchestration (retries, queues, multi-tenant routing).
 
 ## Layer map
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  interfaces/cli          Typer CLI, human-readable output   │
-└───────────────────────────────┬─────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  interfaces/cli          `main` → dispatch: Typer vs generic question;   │
+│                          Rich output or `--json` on analyze/market       │
+└───────────────────────────────┬──────────────────────────────────────────┘
                                 │
-┌───────────────────────────────▼──────────────────────────────────────┐
-│  research/workflows     Use cases (analyze, market, profile)         │
-│                           Build requests / jobs; call orchestrator   │
-└───────────────────────────────┬──────────────────────────────────────┘
+┌───────────────────────────────▼─────────────────────────────────────────┐
+│  research/workflows     Use cases (analyze, market, profile, backtest)  │
+│                           Build requests / jobs; call orchestrator      │
+└───────────────────────────────┬─────────────────────────────────────────┘
                                 │
-┌───────────────────────────────▼─────────────────────────────────┐
-│  core/orchestrator        ResearchOrchestrator → JobRunner      │
-│  core/execution_engine    AnalysisExecutor implementations      │
-│  core/pipeline/tools      ToolRegistry, regime & data tools     │
-└───────────────────────────────┬─────────────────────────────────┘
+┌───────────────────────────────▼───────────────────────────────┐
+│  core/orchestrator        ResearchOrchestrator → JobRunner    │
+│  core/execution_engine    AnalysisExecutor implementations    │
+│  core/pipeline/tools      ToolRegistry, regime & data tools   │
+└───────────────────────────────┬───────────────────────────────┘
                                 │
 ┌───────────────────────────────▼───────────────────────────────┐
 │  domain                   Models, ports, strategy protocols   │
@@ -40,19 +41,84 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+Optional **`interfaces/api`** (FastAPI) lives next to **`interfaces/cli`**; **`ai/agents`**, **`ai/reasoning`**, **`ai/summarization`**, **`core/events`**, **`domain/portfolio`**, and **`domain/risk`** are reserved placeholders—see the package tree below.
+
+## Package tree (source)
+
+Full `src/copinance_os/` layout with **reserved**, **in progress**, **optional**, and **scaffold** labels (same as the repository README).
+
+```
+copinance_os/
+├── ai/
+│   ├── agents/                         # [reserved — future multi-agent workflows]
+│   ├── llm/                            # Providers (Gemini, Ollama), prompts, resources
+│   ├── reasoning/                      # [reserved]
+│   └── summarization/                  # [reserved]
+├── core/
+│   ├── events/                         # [reserved — event bus / domain events]
+│   ├── execution_engine/               # Instrument, market, question-driven executors
+│   │   └── backtest/                   # Simple long-only executor wiring
+│   ├── orchestrator/                   # ResearchOrchestrator, DefaultJobRunner, analyze runners
+│   └── pipeline/tools/                 # ToolRegistry, tool executor, context tools
+│       ├── data_provider/              # Market & fundamental tools (cached provider calls)
+│       └── analysis/market_regime/
+│           ├── rule_based.py           # Trend, volatility, cycle tools (live)
+│           ├── indicators.py           # VIX, breadth, sector rotation tools (live)
+│           ├── macro_indicators.py     # FRED/yfinance macro aggregation (live)
+│           └── statistical.py          # [in progress — HMM / regime-switching stubs; returns no tools yet]
+├── data/
+│   ├── analytics/options/              # QuantLib BSM Greek estimation
+│   ├── cache/
+│   ├── loaders/
+│   ├── providers/                      # yfinance, FRED, market/ (option analytics), sec/edgartools
+│   ├── repositories/
+│   └── schemas/                        # MarketDataPoint coercion, price series, …
+├── domain/
+│   ├── backtest/                       # Deterministic simple long-only backtest models
+│   ├── indicators/                     # Trend, volatility, oscillators, returns
+│   ├── models/                         # Job, market, fundamentals, regime, profile, …
+│   ├── plugins/                        # PluginSpec, PluginRegistry
+│   ├── portfolio/                      # [reserved]
+│   ├── ports/                          # Data, tools, execution, analytics, storage, …
+│   ├── risk/                           # [reserved]
+│   ├── services/                       # Analysis report builders (instrument, market, question-driven)
+│   ├── strategies/                     # Protocols for screening / valuation / future workflows
+│   └── validation/
+├── infra/
+│   ├── config/                         # Settings (pydantic-settings)
+│   ├── di/                             # Container, use cases, repositories, providers
+│   ├── factories/                      # Analysis executors, LLM analyzer
+│   └── plugins/                        # Load plugin specs (YAML/JSON) → callable registries
+├── interfaces/
+│   ├── api/                            # [optional — minimal FastAPI app; requires `pip install fastapi`]
+│   └── cli/                            # `__main__`→`main`; `dispatch/` (Typer vs generic research); `root` (lazy Typer); `commands/`; `shared/`
+└── research/
+    ├── experiments/                    # [scaffold — docstring-only; links to backtest domain/API]
+    ├── reports/                        # Re-exports of domain report builders
+    └── workflows/                      # analyze, market, profile, fundamentals, backtest
+```
+
+Legend: **`[reserved]`** = placeholder package for future work · **`[in progress]`** = partial implementation · **`[optional]`** = extra dependency · **`[scaffold]`** = minimal stub only
+
 ## Package layout (source)
 
 | Area | Role |
 |------|------|
 | `copinance_os.domain` | Entities and value objects (`Job`, `Stock`, market types, profiles). **Ports**: data providers, repositories, storage, `JobRunner`, `AnalysisExecutor`, tools, analytics estimators, `LLMAnalyzer`. Strategy protocols for future screening / valuation flows. |
 | `copinance_os.research.workflows` | Application-facing use cases and request types (`AnalyzeInstrumentRequest`, market search, profile CRUD, backtest workflow inputs). |
-| `copinance_os.core.orchestrator` | **`ResearchOrchestrator`**: `run_job`, and workflow helpers (e.g. simple backtest entry). Default analyze runners delegate here. |
+| `copinance_os.core.orchestrator` | **`ResearchOrchestrator`**: `run_job`, and helpers (e.g. simple backtest entry). **`DefaultJobRunner`** resolves **`Job`** → **`AnalysisExecutor`**. Use cases in `research.workflows` call here. |
 | `copinance_os.core.execution_engine` | Executors: deterministic instrument/market analysis, question-driven analysis. |
 | `copinance_os.core.pipeline.tools` | Tool implementations (market data, fundamentals, regime, macro) and registry. |
 | `copinance_os.data` | **Providers** (yfinance, FRED; **SEC/EDGAR** in `data.providers.sec` via edgartools), **cache**, **repositories**, **loaders**, **analytics** (e.g. `data.analytics.options` for BSM Greeks). |
 | `copinance_os.ai.llm` | LLM provider adapters, configuration, prompt resources. |
 | `copinance_os.infra.di` | Dependency injection: `get_container()`, lazy container proxy, singletons. |
-| `copinance_os.interfaces.cli` | CLI entry (`copinance` script). |
+| `copinance_os.interfaces.cli` | Console script → **`main`**: **`dispatch.parse_root_argv`** (Typer vs generic research), lazy Typer **`root`**, **`commands/*`**. |
+| `copinance_os.interfaces.api` | Optional **`create_app`** FastAPI factory (install `fastapi`). |
+| `copinance_os.research.reports` | Re-exports of domain report builders for research-facing imports. |
+| `copinance_os.research.experiments` | Scaffold only (package docstring); links to backtest / optional API. |
+| `copinance_os.ai` (except `llm/`) | **`agents/`**, **`reasoning/`**, **`summarization/`** — reserved placeholders. |
+| `copinance_os.core.events` | Reserved — future event bus. |
+| `copinance_os.domain.portfolio`, `domain.risk` | Reserved — future portfolio/risk modules. |
 
 ## Vocabulary
 
@@ -69,7 +135,7 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 ## Orchestration: what to call
 
 - **Recommended:** `container.research_orchestrator()` then `await orchestrator.run_job(job, context)`. This matches how default analyze runners work.
-- **Advanced:** `container.job_runner()` returns the same **`JobRunner`** port **`ResearchOrchestrator`** uses; override it for custom global behavior (e.g. middleware, alternate routing).
+- **Advanced:** Implement the **`JobRunner`** port and pass it to **`ResearchOrchestrator(job_runner=...)`**. The stock **`Container`** does **not** expose `job_runner()` as a getter—custom routing uses a custom orchestrator, a custom **`Container`** wiring, or `set_container()` (see [Extending](extending)).
 
 ## Dependency injection and startup
 

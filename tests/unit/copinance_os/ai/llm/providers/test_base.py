@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from copinance_os.ai.llm.providers.base import LLMProvider
+from copinance_os.ai.llm.streaming import LLMTextStreamEvent
 
 
 class MockLLMProvider(LLMProvider):
@@ -22,7 +23,7 @@ class MockLLMProvider(LLMProvider):
         self,
         prompt: str,
         system_prompt: str | None = None,
-        temperature: float = 0.7,
+        temperature: float | None = None,
         max_tokens: int | None = None,
         **kwargs: Any,
     ) -> str:
@@ -203,3 +204,48 @@ class TestLLMProviderInterface:
 
         assert result1 == result2
         assert result1 is True
+
+    @pytest.mark.asyncio
+    async def test_generate_text_stream_buffered_mode(self) -> None:
+        """Buffered streaming wraps generate_text."""
+        provider = MockLLMProvider()
+        provider._generate_text_response = "full answer"
+
+        events: list[LLMTextStreamEvent] = []
+        async for ev in provider.generate_text_stream("q", stream_mode="buffered"):
+            events.append(ev)
+
+        assert [e.kind for e in events] == ["text_delta", "done"]
+        assert events[0].text_delta == "full answer"
+        assert events[0].native_streaming is False
+        assert events[1].native_streaming is False
+
+    @pytest.mark.asyncio
+    async def test_generate_text_stream_native_unsupported_raises(self) -> None:
+        """native mode raises when the provider has no native streaming."""
+        provider = MockLLMProvider()
+
+        events: list[LLMTextStreamEvent] = []
+        with pytest.raises(RuntimeError, match="stream_mode=native not supported"):
+            async for ev in provider.generate_text_stream("q", stream_mode="native"):
+                events.append(ev)
+
+        assert events == []
+
+    @pytest.mark.asyncio
+    async def test_generate_text_stream_error_event(self) -> None:
+        """Errors surface as error events in buffered mode."""
+        provider = MockLLMProvider()
+
+        async def boom(*args: Any, **kwargs: Any) -> str:
+            raise ValueError("fail")
+
+        provider.generate_text = boom  # type: ignore[method-assign]
+
+        events: list[LLMTextStreamEvent] = []
+        async for ev in provider.generate_text_stream("q", stream_mode="buffered"):
+            events.append(ev)
+
+        assert len(events) == 1
+        assert events[0].kind == "error"
+        assert "fail" in (events[0].error_message or "")

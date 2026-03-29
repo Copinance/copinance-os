@@ -10,10 +10,15 @@ Implement these interfaces to plug in custom market, fundamental, alternative, o
 
 Implementation guide: [Extending](/developer-guide/extending).
 
-## Orchestration and workflows
+## Orchestration and use cases
 
-- **`ResearchOrchestrator`** — `copinance_os.core.orchestrator.research_orchestrator`; use `container.research_orchestrator()` for `run_job`. See [Architecture](/developer-guide/architecture).
-- **Use cases and requests** — `copinance_os.research.workflows.*`; see [Using as a Library](/getting-started/library#library-api-reference).
+- **`ResearchOrchestrator`** — `copinance_os.core.orchestrator.research_orchestrator`; use `container.research_orchestrator()` for `run_job`. **`DefaultJobRunner`** dispatches **`Job`** instances to **`AnalysisExecutor`** implementations. See [Architecture](/developer-guide/architecture).
+- **Use cases and requests** — `copinance_os.research.workflows.*` (analyze, market, profile, fundamentals); see [Using as a Library](/getting-started/library#library-api-reference).
+
+## LLM providers
+
+- **`LLMProvider`** (`copinance_os.ai.llm.providers.base`) — **`generate_text`**, **`generate_with_tools`**, **`generate_text_stream`** (async iteration of **`LLMTextStreamEvent`**). Factories: **`LLMProviderFactory`**, config: **`LLMConfig`** (`text_streaming_mode`, **`provider_config["disable_native_text_stream"]`**). **Gemini** and **Ollama** support native streaming in **`auto`** mode with buffered fallback.
+- Details: [Using as a Library — LLM text streaming](/getting-started/library#llm-text-streaming-library--llmprovider).
 
 ## Other extension points
 

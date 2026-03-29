@@ -35,6 +35,7 @@ dependencies = [
     "rich>=14.2.0",
     "yfinance>=0.2.66",
     "google-genai>=1.56.0",
+    "openai>=2.30.0",
     "httpx>=0.27.0",
     "dependency-injector>=4.48.3",
     "QuantLib>=1.41",
@@ -71,7 +72,7 @@ plugins = [
 ]
 
 [project.scripts]
-copinance = "copinance_os.interfaces.cli:app"
+copinance = "copinance_os.interfaces.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/copinance/copinance-os"
@@ -174,6 +175,8 @@ ignore = [
 # Note: PLC0415 (import-outside-top-level) will flag imports inside functions/methods.
 # This helps enforce PEP 8 style: imports should be at module level, not inside functions.
 # Imports in try/except blocks at module level are acceptable for optional dependencies.
+"src/copinance_os/interfaces/cli/__init__.py" = ["PLC0415"]  # lazy root app via module __getattr__
+"src/copinance_os/interfaces/cli/main.py" = ["PLC0415"]  # lazy imports for fast help / Typer dispatch
 
 [tool.ruff.lint.isort]
 known-first-party = ["copinance_os"]

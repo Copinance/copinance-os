@@ -7,6 +7,9 @@ from copinance_os.domain.services.instrument_analysis_report import (
     build_instrument_analysis_report,
 )
 from copinance_os.domain.services.market_analysis_report import build_market_analysis_report
+from copinance_os.domain.services.question_driven_analysis_report import (
+    build_question_driven_analysis_report,
+)
 
 
 def build_run_job_analysis_report(results: dict[str, Any]) -> AnalysisReport | None:
@@ -16,4 +19,6 @@ def build_run_job_analysis_report(results: dict[str, Any]) -> AnalysisReport | N
         return build_instrument_analysis_report(results)
     if et == "market_analysis":
         return build_market_analysis_report(results)
+    if et == "question_driven_analysis":
+        return build_question_driven_analysis_report(results)
     return None

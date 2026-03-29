@@ -33,5 +33,39 @@ def test_dispatch_market() -> None:
 
 
 @pytest.mark.unit
-def test_dispatch_unknown() -> None:
-    assert build_run_job_analysis_report({"execution_type": "question_driven_analysis"}) is None
+def test_dispatch_question_driven() -> None:
+    r = build_run_job_analysis_report(
+        {
+            "execution_type": "question_driven_analysis",
+            "analysis": "Summary of findings.",
+            "status": "completed",
+            "iterations": 2,
+            "tools_used": ["get_quote"],
+            "tool_calls": [{"tool": "get_quote"}],
+            "llm_provider": "test",
+            "llm_model": "test-model",
+            "numeric_grounding_policy": "policy text",
+        }
+    )
+    assert r is not None
+    assert "findings" in r.summary
+    assert r.key_metrics.get("tool_calls_count") == 1
+
+
+@pytest.mark.unit
+def test_dispatch_question_driven_failed() -> None:
+    r = build_run_job_analysis_report(
+        {
+            "execution_type": "question_driven_analysis",
+            "status": "failed",
+            "error": "LLM analyzer not configured",
+            "message": "LLM analyzer is required for question-driven analysis",
+        }
+    )
+    assert r is not None
+    assert "required" in r.summary.lower() or "LLM" in r.summary
+
+
+@pytest.mark.unit
+def test_dispatch_unknown_executor_type() -> None:
+    assert build_run_job_analysis_report({"execution_type": "future_executor"}) is None

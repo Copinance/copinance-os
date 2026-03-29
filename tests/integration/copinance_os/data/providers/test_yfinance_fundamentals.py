@@ -21,6 +21,14 @@ from copinance_os.research.workflows.fundamentals import (
 )
 
 
+def _maybe_skip_yfinance_transient_error(exc: BaseException) -> None:
+    """Skip when Yahoo/yfinance is unreachable or returns transient errors (integration only)."""
+    if isinstance(exc, (ValueError, OSError, ConnectionError)):
+        msg = str(exc)
+        if "Failed to fetch" in msg or "Connection" in msg or "curl" in msg:
+            pytest.skip(f"Network unavailable or transient error: {exc}")
+
+
 @pytest.mark.integration
 class TestYFinanceFundamentalProvider:
     """Integration tests for YFinanceFundamentalProvider."""
@@ -43,11 +51,15 @@ class TestYFinanceFundamentalProvider:
         This fixture ensures all tests using AAPL annual data share the same cached result,
         significantly reducing API calls and test execution time.
         """
-        return await provider.get_detailed_fundamentals(
-            symbol="AAPL",
-            periods=3,  # Use 3 periods to cover most test needs
-            period_type="annual",
-        )
+        try:
+            return await provider.get_detailed_fundamentals(
+                symbol="AAPL",
+                periods=3,  # Use 3 periods to cover most test needs
+                period_type="annual",
+            )
+        except (ValueError, OSError, ConnectionError) as e:
+            _maybe_skip_yfinance_transient_error(e)
+            raise
 
     @pytest.mark.asyncio
     async def test_provider_availability(self, provider: YFinanceFundamentalProvider) -> None:
@@ -65,11 +77,15 @@ class TestYFinanceFundamentalProvider:
         self, provider: YFinanceFundamentalProvider
     ) -> None:
         """Test retrieving detailed fundamentals with annual data."""
-        fundamentals = await provider.get_detailed_fundamentals(
-            symbol="AAPL",
-            periods=3,
-            period_type="annual",
-        )
+        try:
+            fundamentals = await provider.get_detailed_fundamentals(
+                symbol="AAPL",
+                periods=3,
+                period_type="annual",
+            )
+        except (ValueError, OSError, ConnectionError) as e:
+            _maybe_skip_yfinance_transient_error(e)
+            raise
 
         # Basic assertions
         assert isinstance(fundamentals, StockFundamentals)
@@ -108,8 +124,7 @@ class TestYFinanceFundamentalProvider:
                 period_type="quarterly",
             )
         except (ValueError, OSError, ConnectionError) as e:
-            if "Failed to fetch" in str(e) or "Connection" in str(e) or "curl" in str(e):
-                pytest.skip(f"Network unavailable or transient error: {e}")
+            _maybe_skip_yfinance_transient_error(e)
             raise
 
         assert isinstance(fundamentals, StockFundamentals)
@@ -489,7 +504,11 @@ class TestGetStockFundamentalsUseCase:
             period_type="annual",
         )
 
-        response = await use_case.execute(request)
+        try:
+            response = await use_case.execute(request)
+        except (ValueError, OSError, ConnectionError) as e:
+            _maybe_skip_yfinance_transient_error(e)
+            raise
 
         assert response.fundamentals is not None
         assert response.fundamentals.symbol == "AAPL"
@@ -548,5 +567,10 @@ class TestGetStockFundamentalsUseCase:
             period_type="annual",
         )
 
-        response = await use_case.execute(request)
+        try:
+            response = await use_case.execute(request)
+        except (ValueError, OSError, ConnectionError) as e:
+            _maybe_skip_yfinance_transient_error(e)
+            raise
+
         assert response.fundamentals.symbol == "AAPL"

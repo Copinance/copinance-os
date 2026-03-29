@@ -40,7 +40,13 @@ copinance analyze options AAPL --expiration 2026-06-19
 
 ## Question-Driven Analysis
 
-Question-driven analysis uses AI to dynamically analyze market instruments or the market based on your question. The AI can use tools (quotes, historical data, options chain, fundamentals, macro indicators) to answer.
+Question-driven analysis uses AI to dynamically analyze market instruments or the market based on your question. The model can call tools for quotes, historical data, options chains, fundamentals, SEC public filing data (when configured), regime signals, and macro indicators—outputs stay grounded in tool results.
+
+The executor uses **`generate_with_tools`** (multi-turn **tool** loops inside one analysis). With **`--stream`** on **`copinance analyze …`** or **`copinance --stream "…"`**, tokens are printed during each LLM turn; if a turn contains tool calls, a short notice is printed on stderr and the next round continues. For custom handlers, use **`LLMProvider.generate_text_stream`** or pass **`stream`** / **`on_llm_stream`** in job context—see [Library — LLM text streaming](/getting-started/library#llm-text-streaming-library--llmprovider).
+
+**Multi-turn user conversations** (a follow-up question that should see prior Q&A) are supported only through the **library**: pass **`conversation_history`** on **`AnalyzeInstrumentRequest`** or **`AnalyzeMarketRequest`**, and use **`question`** for the new user message. After a successful run, **`results["conversation_turns"]`** lists the full transcript for chaining. The **`copinance`** CLI does **not** expose conversation state—neither **`analyze`** nor **root** **`copinance "…"`**—each invocation is one user question. Details: [Library — Multi-turn question-driven analysis](/getting-started/library#multi-turn-question-driven-analysis).
+
+For example prompts (filings, comparisons, insiders, institutions), see [CLI — Question-driven examples](cli#question-driven-examples).
 
 **Equity:**
 ```bash
@@ -62,7 +68,11 @@ copinance analyze options AAPL --question "What are the most active calls?" --si
 copinance analyze macro --question "What is the current market sentiment?" --market-index SPY
 ```
 
+**Root natural-language (no `analyze` subcommand):** `copinance "Your question"` runs question-driven analysis with default macro-style market context and the full tool suite—see [CLI — Natural language at the root](cli#natural-language-at-the-root).
+
 See [CLI Reference - Analyze](cli#analyze-commands) for all options. Use `--include-prompt` to include the rendered prompts in saved results for question-driven runs.
+
+**Structured reports:** When you use the library or orchestrator, **`RunJobResult.report`** is populated with an **`AnalysisReport`** (summary, key metrics, methodology, assumptions, limitations) for deterministic instrument/market runs and for **question-driven** runs, so outputs follow the same envelope across modes. For question-driven success paths, **`key_metrics`** may include iteration counts, LLM provider/model, tool-call counts, numeric-grounding policy, and partial-synthesis flags when the executor provides them. Use **`--json`** on the `analyze` group to print the full **`RunJobResult`** as JSON from the CLI ([CLI — machine-readable output](cli#machine-readable-output-json)).
 
 ## Timeframes
 

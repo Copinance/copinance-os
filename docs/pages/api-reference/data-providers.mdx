@@ -2,9 +2,11 @@
 
 Interfaces for implementing custom data providers. See [API Reference Overview](index) for other extension points.
 
+Unless noted, provider methods are **`async`** and defined on `copinance_os.domain.ports.data_providers`.
+
 ## MarketDataProvider
 
-Provides market data for instruments and options.
+Provides market data for instruments and options. Extends **`DataProvider`** (`is_available`, `get_provider_name`).
 
 ### Methods
 
@@ -20,30 +22,48 @@ The default app container exposes a **composed** `MarketDataProvider` (`OptionAn
 
 Provides equity fundamentals (statements, SEC metadata, aggregates).
 
-### Methods
+### Methods (abstract port)
 
 - `get_financial_statements(symbol, statement_type, period) -> dict[str, Any]`
 - `get_sec_filings(symbol, filing_types, limit) -> list[dict[str, Any]]`
+- `get_earnings_transcripts(symbol, limit) -> list[dict[str, Any]]`
+- `get_esg_metrics(symbol) -> dict[str, Any]`
+- `get_insider_trading(symbol, lookback_days) -> list[dict[str, Any]]`
 - `get_detailed_fundamentals(symbol, periods, period_type) -> StockFundamentals`
-- Implementations may also expose **`get_sec_filing_content(cik, accession_number, document_type)`** for agent tools (not part of the abstract port; tools check with `hasattr`).
+
+Concrete SEC-heavy implementations often add **`get_sec_filing_content`**, **`get_sec_company_facts_statement`**, and related helpers for agent tools—the abstract port does not require them; tools use `hasattr` when registering.
 
 ### Built-in implementations
 
 | Implementation | Role |
 |----------------|------|
-| **`YFinanceFundamentalProvider`** | Default **fundamental** provider in DI: quotes-driven fundamentals, statements via Yahoo; SEC filing tools return empty stubs unless another provider is selected. |
-| **`EdgarToolsFundamentalProvider`** (`copinance_os.data.providers.sec.edgartools`) | Wired as **`sec_filings_provider`** for question-driven analysis: EDGAR filing lists, full text/HTML, XBRL-based statements via [edgartools](https://edgartools.readthedocs.io/). Uses **`CacheManager`** with per-entry TTLs to avoid hammering SEC. |
+| **`YFinanceFundamentalProvider`** | Default **fundamental** provider in DI: market-driven fundamentals and statements; SEC-oriented tools may return empty data unless a SEC provider is also wired. |
+| **`EdgarToolsFundamentalProvider`** (`copinance_os.data.providers.sec.edgartools`) | Optional **`sec_filings_provider`**: SEC EDGAR filing lists, filing body, entity profile, extended financial and SEC tools for question-driven analysis. Uses **`CacheManager`** with per-entry TTLs. |
 
-Instrument fundamentals **use cases** use the default fundamental provider (yfinance) unless you override the container.
+Instrument fundamentals **use cases** use the default fundamental provider unless you override the container. SEC-heavy tools are routed to the SEC provider when registered—see [Configuration — SEC EDGAR](/getting-started/configuration).
 
 ## AlternativeDataProvider
 
-Provides sentiment, web traffic, satellite imagery, and other alternative data.
+Provides sentiment, web traffic, satellite imagery, supply-chain, and transaction-style alternative data. Abstract methods include `get_sentiment_data`, `get_web_traffic_metrics`, `get_satellite_imagery_insights`, `get_supply_chain_data`, and `get_transaction_data` (see `data_providers.py` for full signatures).
 
 ## MacroeconomicDataProvider
 
 Provides macroeconomic time-series data such as FRED series.
 
+### Methods
+
+- `get_time_series(series_id, start_date, end_date, *, frequency=None) -> list[MacroDataPoint]`
+
 ## Implementation Guide
 
 See [Extending](/developer-guide/extending) for step-by-step implementation and container registration.
+
+## Market data point coercion
+
+Helpers in **`copinance_os.data.schemas.market_data_conversions`** normalize mixed sequences (e.g. dicts and `MarketDataPoint` instances) into sorted **`MarketDataPoint`** lists:
+
+- **`coerce_sorted_market_data_points(..., strict=False)`** — drops invalid entries and logs a **warning** with skip counts when anything was omitted.
+- **`coerce_sorted_market_data_points_detailed`** — returns **`CoerceMarketDataPointsResult`** with per-category counts (`accepted_as_model`, `accepted_from_dict`, `skipped_invalid_dict`, `skipped_unsupported_type`).
+- **`strict=True`** — raises on the first invalid dict (**`ValueError`**) or unsupported type (**`TypeError`**) instead of skipping.
+
+Use strict mode in pipelines where silent data loss is unacceptable.

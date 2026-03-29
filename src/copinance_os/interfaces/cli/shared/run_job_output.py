@@ -1,39 +1,25 @@
-"""Analyze CLI: progressive instrument and market analysis."""
+"""Rich rendering for ``RunJobResult`` (analyze and natural-language research entry)."""
 
 from __future__ import annotations
 
+from collections.abc import Sized
 from typing import Any
-from uuid import UUID
 
-import typer
 from rich.console import Console, Group
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from copinance_os.domain.models.job import JobTimeframe
-from copinance_os.domain.models.market import MarketType, OptionSide
+from copinance_os.domain.models.job import RunJobResult
 from copinance_os.infra.config import get_storage_path_safe
-from copinance_os.infra.di import container
-from copinance_os.interfaces.cli.error_handler import handle_cli_error
-from copinance_os.interfaces.cli.formatting import format_price, format_volume
-from copinance_os.interfaces.cli.profile_context import ensure_profile_with_literacy
-from copinance_os.interfaces.cli.utils import async_command, save_analysis_results
-from copinance_os.research.workflows.analyze import (
-    AnalyzeInstrumentRequest,
-    AnalyzeInstrumentUseCase,
-    AnalyzeMarketRequest,
-    AnalyzeMarketUseCase,
-    AnalyzeMode,
+from copinance_os.interfaces.cli.shared.formatting import format_price, format_volume
+from copinance_os.interfaces.cli.shared.utils import (
+    print_run_job_result_json,
+    save_analysis_results,
 )
 
-analyze_app = typer.Typer(
-    help="Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis."
-)
 console = Console()
 
-
-# Keys we show in the run-info panel (metadata); rest are internal or shown elsewhere.
 _RUN_INFO_KEYS = (
     "execution_type",
     "scope",
@@ -48,6 +34,9 @@ _RUN_INFO_KEYS = (
     "llm_model",
     "llm_usage",
     "tools_used",
+    "analysis_streamed",
+    "synthesis_status",
+    "llm_synthesis_error",
     "status",
     "message",
 )
@@ -215,7 +204,11 @@ def _render_market_analysis_summary(results: dict[str, Any]) -> Group | None:
     return Group(*parts)
 
 
-def _render_results(response: Any) -> None:
+def render_run_job_results(response: RunJobResult, *, json_output: bool = False) -> None:
+    """Print ``RunJobResult`` to the console or as JSON."""
+    if json_output:
+        print_run_job_result_json(response)
+        return
     if not response.success:
         console.print("\n✗ Failed", style="bold red")
         console.print(f"Error: {response.error_message}")
@@ -229,7 +222,7 @@ def _render_results(response: Any) -> None:
 
         # Run info (above results): tool calls count + execution metadata
         tool_calls = results.get("tool_calls")
-        tool_calls_line = f"Tool calls: {len(tool_calls)}" if tool_calls else ""
+        tool_calls_line = f"Tool calls: {len(tool_calls)}" if isinstance(tool_calls, Sized) else ""
         run_lines = []
         for key in _RUN_INFO_KEYS:
             if key not in results:
@@ -242,7 +235,7 @@ def _render_results(response: Any) -> None:
             elif isinstance(value, list):
                 value = value if len(value) <= 8 else value[:8] + [f"...+{len(value) - 8} more"]
             run_lines.append(f"  [cyan]{key}[/cyan]: {value}")
-        if tool_calls_line:
+        if tool_calls_line and isinstance(tool_calls, Sized):
             run_lines.insert(0, f"  [cyan]tool_calls_count[/cyan]: {len(tool_calls)}")
         run_body = "\n".join(run_lines) if run_lines else "  (no metadata)"
         console.print(
@@ -282,13 +275,38 @@ def _render_results(response: Any) -> None:
 
         # Analysis: tabular for options dict, Markdown for string
         analysis = results.get("analysis")
+        analysis_streamed = bool(results.get("analysis_streamed"))
+        synthesis_partial = results.get("synthesis_status") == "partial"
+        if synthesis_partial:
+            warn_lines = [
+                "[yellow]The model did not return a final narrative; "
+                "the text below is built from tool output so you still get the data.[/yellow]"
+            ]
+            if results.get("llm_synthesis_error"):
+                warn_lines.append(
+                    f"[dim]LLM error:[/dim] [red]{results['llm_synthesis_error']}[/red]"
+                )
+            console.print(
+                Panel(
+                    "\n".join(warn_lines),
+                    title="[bold yellow]Synthesis[/bold yellow]",
+                    border_style="yellow",
+                    padding=(1, 2),
+                )
+            )
         if analysis:
+            if analysis_streamed:
+                console.print(
+                    "[dim]Tokens were printed live above. Full answer (markdown) follows for readability "
+                    "and copy-paste.[/dim]\n"
+                )
+            _analysis_border = "yellow" if synthesis_partial else "green"
             if _is_options_analysis_dict(analysis):
                 console.print(
                     Panel(
                         _render_options_analysis_tables(analysis),
                         title="[bold]Analysis[/bold]",
-                        border_style="green",
+                        border_style=_analysis_border,
                         padding=(1, 2),
                     )
                 )
@@ -300,7 +318,12 @@ def _render_results(response: Any) -> None:
                 for k, v in sorted(analysis.items()):
                     gen.add_row(k, str(v)[:200] + ("..." if len(str(v)) > 200 else ""))
                 console.print(
-                    Panel(gen, title="[bold]Analysis[/bold]", border_style="green", padding=(1, 2))
+                    Panel(
+                        gen,
+                        title="[bold]Analysis[/bold]",
+                        border_style=_analysis_border,
+                        padding=(1, 2),
+                    )
                 )
             else:
                 analysis_text = str(analysis).strip()
@@ -309,283 +332,23 @@ def _render_results(response: Any) -> None:
                     Panel(
                         renderable,
                         title="[bold]Analysis[/bold]",
-                        border_style="green",
+                        border_style=_analysis_border,
                         padding=(1, 2),
                     )
                 )
             # Summary shown; full data is in the saved file
             if saved:
-                console.print("[dim]Full analysis and tool results are in the saved file.[/dim]")
+                if analysis_streamed:
+                    console.print(
+                        "[dim]Saved file also contains tool payloads, token usage, and raw fields.[/dim]"
+                    )
+                else:
+                    console.print(
+                        "[dim]Full analysis and tool results are in the saved file.[/dim]"
+                    )
                 if not printed_saved_path:
                     console.print(f"Results saved to [cyan]{saved}[/cyan]")
                     printed_saved_path = True
 
         if saved and not printed_saved_path:
             console.print(f"Results saved to [cyan]{saved}[/cyan]")
-
-
-@analyze_app.command("equity")
-@async_command
-async def analyze_equity(
-    symbol: str = typer.Argument(..., help="Equity symbol"),
-    timeframe: JobTimeframe | None = typer.Option(
-        None,
-        help="Analysis timeframe. Defaults to mid_term.",
-    ),
-    question: str | None = typer.Option(
-        None,
-        "--question",
-        "-q",
-        help="Optional question. Providing a question triggers question-driven analysis in auto mode.",
-    ),
-    mode: AnalyzeMode = typer.Option(
-        AnalyzeMode.AUTO,
-        "--mode",
-        help="Execution mode: auto, deterministic, or question_driven",
-    ),
-    profile_id: UUID | None = typer.Option(None, help="Profile ID for context (optional)"),
-    include_prompt_in_results: bool = typer.Option(
-        False,
-        "--include-prompt",
-        help="Include rendered prompts in the saved results for question-driven runs",
-    ),
-) -> None:
-    """Analyze an equity with deterministic or question-driven execution."""
-    final_profile_id = await ensure_profile_with_literacy(profile_id)
-    use_case: AnalyzeInstrumentUseCase = container.analyze_instrument_use_case()
-    request = AnalyzeInstrumentRequest(
-        symbol=symbol,
-        market_type=MarketType.EQUITY,
-        timeframe=timeframe,
-        question=question,
-        mode=mode,
-        expiration_date=None,
-        option_side=OptionSide.ALL,
-        profile_id=final_profile_id,
-        include_prompt_in_results=include_prompt_in_results,
-    )
-    try:
-        status_text = (
-            "[bold blue]Analyzing equity with tools...[/bold blue]"
-            if request.question
-            else "[bold blue]Analyzing equity...[/bold blue]"
-        )
-        with console.status(status_text):
-            response = await use_case.execute(request)
-        _render_results(response)
-    except Exception as e:
-        handle_cli_error(
-            e,
-            context={"instrument_symbol": symbol, "market_type": MarketType.EQUITY.value},
-        )
-
-
-@analyze_app.command("options")
-@async_command
-async def analyze_options(
-    underlying_symbol: str = typer.Argument(..., help="Underlying symbol"),
-    expiration_date: str | None = typer.Option(
-        None,
-        "--expiration",
-        help="Optional expiration date in YYYY-MM-DD format",
-    ),
-    option_side: OptionSide = typer.Option(
-        OptionSide.ALL,
-        "--side",
-        help="Options side context",
-    ),
-    timeframe: JobTimeframe | None = typer.Option(
-        None,
-        help="Analysis timeframe. Defaults to short_term.",
-    ),
-    question: str | None = typer.Option(
-        None,
-        "--question",
-        "-q",
-        help="Optional question. Providing a question triggers question-driven analysis in auto mode.",
-    ),
-    mode: AnalyzeMode = typer.Option(
-        AnalyzeMode.AUTO,
-        "--mode",
-        help="Execution mode: auto, deterministic, or question_driven",
-    ),
-    profile_id: UUID | None = typer.Option(None, help="Profile ID for context (optional)"),
-    include_prompt_in_results: bool = typer.Option(
-        False,
-        "--include-prompt",
-        help="Include rendered prompts in the saved results for question-driven runs",
-    ),
-) -> None:
-    """Analyze options with deterministic or question-driven execution."""
-    final_profile_id = await ensure_profile_with_literacy(profile_id)
-    use_case: AnalyzeInstrumentUseCase = container.analyze_instrument_use_case()
-    request = AnalyzeInstrumentRequest(
-        symbol=underlying_symbol,
-        market_type=MarketType.OPTIONS,
-        timeframe=timeframe,
-        question=question,
-        mode=mode,
-        expiration_date=expiration_date,
-        option_side=option_side,
-        profile_id=final_profile_id,
-        include_prompt_in_results=include_prompt_in_results,
-    )
-    try:
-        status_text = (
-            "[bold blue]Analyzing options with tools...[/bold blue]"
-            if request.question
-            else "[bold blue]Analyzing options...[/bold blue]"
-        )
-        with console.status(status_text):
-            response = await use_case.execute(request)
-        _render_results(response)
-    except Exception as e:
-        handle_cli_error(
-            e,
-            context={
-                "instrument_symbol": underlying_symbol,
-                "market_type": MarketType.OPTIONS.value,
-                "expiration_date": expiration_date,
-            },
-        )
-
-
-@analyze_app.command("macro")
-@async_command
-async def analyze_macro(
-    market_index: str = typer.Option(
-        "SPY",
-        "--market-index",
-        "-m",
-        help="Reference index for trend/volatility and sector comparison (e.g. SPY, QQQ, DIA). "
-        "Breadth and rotation always use the 11 S&P sector ETFs (XLK, XLE, ...) and VIX.",
-    ),
-    timeframe: JobTimeframe = typer.Option(
-        JobTimeframe.MID_TERM,
-        help="Analysis timeframe context",
-    ),
-    question: str | None = typer.Option(
-        None,
-        "--question",
-        "-q",
-        help="Optional question. Providing a question triggers question-driven analysis in auto mode.",
-    ),
-    mode: AnalyzeMode = typer.Option(
-        AnalyzeMode.AUTO,
-        "--mode",
-        help="Execution mode: auto, deterministic, or question_driven",
-    ),
-    lookback_days: int = typer.Option(
-        252,
-        "--lookback-days",
-        "-d",
-        help="Number of days to look back. Default: 252",
-    ),
-    include_vix: bool = typer.Option(
-        True,
-        "--include-vix/--no-include-vix",
-        help="Include VIX analysis",
-    ),
-    include_market_breadth: bool = typer.Option(
-        True,
-        "--include-market-breadth/--no-include-market-breadth",
-        help="Include market breadth indicators",
-    ),
-    include_sector_rotation: bool = typer.Option(
-        True,
-        "--include-sector-rotation/--no-include-sector-rotation",
-        help="Include sector rotation analysis",
-    ),
-    include_rates: bool = typer.Option(
-        True,
-        "--include-rates/--no-include-rates",
-        help="Include interest rates analysis",
-    ),
-    include_credit: bool = typer.Option(
-        True,
-        "--include-credit/--no-include-credit",
-        help="Include credit spreads analysis",
-    ),
-    include_commodities: bool = typer.Option(
-        True,
-        "--include-commodities/--no-include-commodities",
-        help="Include commodities and energy analysis",
-    ),
-    include_labor: bool = typer.Option(
-        True,
-        "--include-labor/--no-include-labor",
-        help="Include labor market indicators",
-    ),
-    include_housing: bool = typer.Option(
-        True,
-        "--include-housing/--no-include-housing",
-        help="Include housing indicators",
-    ),
-    include_manufacturing: bool = typer.Option(
-        True,
-        "--include-manufacturing/--no-include-manufacturing",
-        help="Include manufacturing indicators",
-    ),
-    include_consumer: bool = typer.Option(
-        True,
-        "--include-consumer/--no-include-consumer",
-        help="Include consumer spending and confidence indicators",
-    ),
-    include_global: bool = typer.Option(
-        True,
-        "--include-global/--no-include-global",
-        help="Include global indicators",
-    ),
-    include_advanced: bool = typer.Option(
-        True,
-        "--include-advanced/--no-include-advanced",
-        help="Include advanced indicators",
-    ),
-    profile_id: UUID | None = typer.Option(None, help="Profile ID for context (optional)"),
-    include_prompt_in_results: bool = typer.Option(
-        False,
-        "--include-prompt",
-        help="Include rendered prompts in the saved results for question-driven runs",
-    ),
-) -> None:
-    """Analyze the broader market with deterministic or question-driven execution.
-
-    The --market-index (e.g. SPY, QQQ, DIA) is the reference index: it is used for
-    trend/volatility detection and as the benchmark for sector comparison. VIX and
-    the 11 S&P sector ETFs (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE)
-    are always fetched for breadth and rotation; they do not change with --market-index.
-    """
-    final_profile_id = await ensure_profile_with_literacy(profile_id)
-    use_case: AnalyzeMarketUseCase = container.analyze_market_use_case()
-    request = AnalyzeMarketRequest(
-        market_index=market_index,
-        timeframe=timeframe,
-        question=question,
-        mode=mode,
-        lookback_days=lookback_days,
-        include_vix=include_vix,
-        include_market_breadth=include_market_breadth,
-        include_sector_rotation=include_sector_rotation,
-        include_rates=include_rates,
-        include_credit=include_credit,
-        include_commodities=include_commodities,
-        include_labor=include_labor,
-        include_housing=include_housing,
-        include_manufacturing=include_manufacturing,
-        include_consumer=include_consumer,
-        include_global=include_global,
-        include_advanced=include_advanced,
-        profile_id=final_profile_id,
-        include_prompt_in_results=include_prompt_in_results,
-    )
-    try:
-        status_text = (
-            "[bold blue]Analyzing the market with tools...[/bold blue]"
-            if request.question
-            else "[bold blue]Running market analysis...[/bold blue]"
-        )
-        with console.status(status_text):
-            response = await use_case.execute(request)
-        _render_results(response)
-    except Exception as e:
-        handle_cli_error(e, context={"scope": "market", "market_index": market_index})

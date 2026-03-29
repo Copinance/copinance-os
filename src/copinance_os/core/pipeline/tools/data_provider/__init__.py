@@ -5,10 +5,21 @@ and other tool-based systems. Tools are organized by data provider type.
 """
 
 from copinance_os.core.pipeline.tools.data_provider.fundamental_data import (
+    FundamentalDataFindSecFundsTool,
     FundamentalDataGetFinancialStatementsTool,
     FundamentalDataGetFundamentalsTool,
+    FundamentalDataGetSEC13FInstitutionalHoldingsTool,
+    FundamentalDataGetSECCompanyEdgarProfileTool,
+    FundamentalDataGetSECCompanyFactsStatementTool,
+    FundamentalDataGetSECCompareFinancialsTool,
     FundamentalDataGetSECFilingContentTool,
     FundamentalDataGetSECFilingsTool,
+    FundamentalDataGetSecFundEntityTool,
+    FundamentalDataGetSecFundFilingsTool,
+    FundamentalDataGetSecFundLatestReportTool,
+    FundamentalDataGetSecFundPortfolioTool,
+    FundamentalDataGetSECInsiderForm4Tool,
+    FundamentalDataGetSECXbrlStatementTableTool,
 )
 from copinance_os.core.pipeline.tools.data_provider.market_data import (
     MarketDataGetHistoricalDataTool,
@@ -34,6 +45,17 @@ __all__ = [
     "FundamentalDataGetFinancialStatementsTool",
     "FundamentalDataGetSECFilingsTool",
     "FundamentalDataGetSECFilingContentTool",
+    "FundamentalDataGetSECCompanyFactsStatementTool",
+    "FundamentalDataGetSECCompareFinancialsTool",
+    "FundamentalDataGetSECXbrlStatementTableTool",
+    "FundamentalDataGetSECInsiderForm4Tool",
+    "FundamentalDataGetSEC13FInstitutionalHoldingsTool",
+    "FundamentalDataGetSECCompanyEdgarProfileTool",
+    "FundamentalDataFindSecFundsTool",
+    "FundamentalDataGetSecFundEntityTool",
+    "FundamentalDataGetSecFundFilingsTool",
+    "FundamentalDataGetSecFundPortfolioTool",
+    "FundamentalDataGetSecFundLatestReportTool",
     # Factory functions
     "create_market_data_tools",
     "create_fundamental_data_tools",

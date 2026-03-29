@@ -22,8 +22,6 @@ def load_llm_config_from_env() -> LLMConfig | None:
         COPINANCEOS_OPENAI_API_KEY: OpenAI API key
         COPINANCEOS_OPENAI_MODEL: OpenAI model name
         COPINANCEOS_OPENAI_BASE_URL: OpenAI base URL
-        COPINANCEOS_ANTHROPIC_API_KEY: Anthropic API key
-        COPINANCEOS_ANTHROPIC_MODEL: Anthropic model name
         COPINANCEOS_OLLAMA_BASE_URL: Ollama base URL
         COPINANCEOS_OLLAMA_MODEL: Ollama model name
         COPINANCEOS_LLM_TEMPERATURE: Temperature (default: 0.7)
@@ -43,7 +41,6 @@ def load_llm_config_from_env() -> LLMConfig | None:
             "COPINANCEOS_LLM_PROVIDER",
             "COPINANCEOS_GEMINI_API_KEY",
             "COPINANCEOS_OPENAI_API_KEY",
-            "COPINANCEOS_ANTHROPIC_API_KEY",
             "COPINANCEOS_OLLAMA_BASE_URL",
             "COPINANCEOS_OLLAMA_MODEL",
         ]
@@ -64,9 +61,6 @@ def load_llm_config_from_env() -> LLMConfig | None:
         api_key = os.getenv("COPINANCEOS_OPENAI_API_KEY")
         model = os.getenv("COPINANCEOS_OPENAI_MODEL", "gpt-4")
         base_url = os.getenv("COPINANCEOS_OPENAI_BASE_URL")
-    elif provider_lower == "anthropic":
-        api_key = os.getenv("COPINANCEOS_ANTHROPIC_API_KEY")
-        model = os.getenv("COPINANCEOS_ANTHROPIC_MODEL", "claude-3-opus-20240229")
     elif provider_lower == "ollama":
         base_url = os.getenv("COPINANCEOS_OLLAMA_BASE_URL", "http://localhost:11434")
         model = os.getenv("COPINANCEOS_OLLAMA_MODEL", "llama2")

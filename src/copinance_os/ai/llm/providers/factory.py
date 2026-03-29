@@ -8,6 +8,8 @@ from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.ai.llm.providers.base import LLMProvider
 from copinance_os.ai.llm.providers.gemini import GeminiProvider
 from copinance_os.ai.llm.providers.ollama import OllamaProvider
+from copinance_os.ai.llm.providers.openai import OpenAIProvider
+from copinance_os.ai.llm.streaming import TextStreamingMode, normalize_text_streaming_mode
 
 logger = structlog.get_logger(__name__)
 
@@ -43,6 +45,9 @@ class LLMProviderFactory:
         temperature = override_kwargs.get("temperature")
         max_output_tokens = override_kwargs.get("max_output_tokens")
 
+        text_streaming_mode = override_kwargs.get("text_streaming_mode")
+        disable_native_text_stream = override_kwargs.get("disable_native_text_stream")
+
         if llm_config:
             # Use config values if not overridden
             if api_key is None:
@@ -55,6 +60,21 @@ class LLMProviderFactory:
                 temperature = llm_config.temperature
             if max_output_tokens is None:
                 max_output_tokens = llm_config.max_tokens
+            if text_streaming_mode is None:
+                text_streaming_mode = llm_config.text_streaming_mode
+            if disable_native_text_stream is None:
+                disable_native_text_stream = bool(
+                    llm_config.provider_config.get("disable_native_text_stream", False)
+                )
+
+        if text_streaming_mode is None:
+            text_streaming_mode = "auto"
+        if disable_native_text_stream is None:
+            disable_native_text_stream = False
+
+        resolved_streaming: TextStreamingMode = normalize_text_streaming_mode(
+            text_streaming_mode if isinstance(text_streaming_mode, str) else None
+        )
 
         if provider_name_lower == "gemini":
             return GeminiProvider(
@@ -62,6 +82,8 @@ class LLMProviderFactory:
                 model_name=model_name or "gemini-1.5-pro",
                 temperature=temperature or 0.7,
                 max_output_tokens=max_output_tokens,
+                text_streaming_mode=resolved_streaming,
+                disable_native_text_stream=disable_native_text_stream,
             )
 
         elif provider_name_lower == "ollama":
@@ -70,24 +92,25 @@ class LLMProviderFactory:
                 model_name=model_name or "llama2",
                 temperature=temperature or 0.7,
                 max_output_tokens=max_output_tokens,
+                text_streaming_mode=resolved_streaming,
+                disable_native_text_stream=disable_native_text_stream,
             )
 
-        # TODO: Add OpenAI and Anthropic providers when implemented
         elif provider_name_lower == "openai":
-            raise ValueError(
-                "OpenAI provider is not yet implemented. "
-                "Please use 'gemini' or 'ollama' for now."
-            )
-        elif provider_name_lower == "anthropic":
-            raise ValueError(
-                "Anthropic provider is not yet implemented. "
-                "Please use 'gemini' or 'ollama' for now."
+            return OpenAIProvider(
+                api_key=api_key,
+                model_name=model_name or "gpt-4o-mini",
+                base_url=base_url,
+                temperature=temperature or 0.7,
+                max_output_tokens=max_output_tokens,
+                text_streaming_mode=resolved_streaming,
+                disable_native_text_stream=disable_native_text_stream,
             )
 
         else:
             raise ValueError(
                 f"Unsupported LLM provider: {provider_name}. "
-                f"Supported providers: gemini, ollama"
+                f"Supported providers: gemini, ollama, openai"
             )
 
     @staticmethod

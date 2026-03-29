@@ -18,6 +18,12 @@ from copinance_os.domain.models.base import Entity
 from copinance_os.domain.models.market import MarketType
 
 
+class ReportExclusionReason(StrEnum):
+    """When no ``AnalysisReport`` was produced despite having executor results."""
+
+    UNKNOWN_EXECUTOR_TYPE = "unknown_executor_type"
+
+
 class RunJobResult(BaseModel):
     """Result of running a single job via a JobRunner."""
 
@@ -27,6 +33,10 @@ class RunJobResult(BaseModel):
     report: AnalysisReport | None = Field(
         default=None,
         description="Structured analysis envelope when the executor supports it",
+    )
+    report_exclusion_reason: ReportExclusionReason | None = Field(
+        default=None,
+        description="Set when results were returned but no report envelope is registered for execution_type",
     )
 
 

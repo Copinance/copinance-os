@@ -8,7 +8,7 @@ from typing import Any
 from rich.table import Table
 
 from copinance_os.domain.models.market import MarketDataPoint, OptionsChain, OptionSide
-from copinance_os.interfaces.cli.formatting import format_compact_number
+from copinance_os.interfaces.cli.shared.formatting import format_compact_number
 
 SUPPORTED_HISTORY_INTERVALS = ("1d", "1wk", "1mo", "1h", "5m", "15m", "30m", "60m")
 

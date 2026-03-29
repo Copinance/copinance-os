@@ -8,6 +8,7 @@ from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.ai.llm.providers.factory import LLMProviderFactory
 from copinance_os.ai.llm.providers.gemini import GeminiProvider
 from copinance_os.ai.llm.providers.ollama import OllamaProvider
+from copinance_os.ai.llm.providers.openai import OpenAIProvider
 
 
 @pytest.mark.unit
@@ -101,17 +102,37 @@ class TestLLMProviderFactory:
 
             assert isinstance(provider, OllamaProvider)
 
-    def test_create_provider_openai_raises_error(self) -> None:
-        """Test that creating OpenAI provider raises ValueError."""
-        llm_config = LLMConfig(provider="openai", api_key="test-key")
-        with pytest.raises(ValueError, match="OpenAI provider is not yet implemented"):
-            LLMProviderFactory.create_provider("openai", llm_config=llm_config)
+    def test_create_provider_openai(self) -> None:
+        """Test creating OpenAI provider."""
+        llm_config = LLMConfig(provider="openai", api_key="sk-test")
+        with (
+            patch("copinance_os.ai.llm.providers.openai.OPENAI_AVAILABLE", True),
+            patch("copinance_os.ai.llm.providers.openai.AsyncOpenAI") as mock_acls,
+        ):
+            mock_acls.return_value = MagicMock()
+            provider = LLMProviderFactory.create_provider("openai", llm_config=llm_config)
 
-    def test_create_provider_anthropic_raises_error(self) -> None:
-        """Test that creating Anthropic provider raises ValueError."""
-        llm_config = LLMConfig(provider="anthropic", api_key="test-key")
-        with pytest.raises(ValueError, match="Anthropic provider is not yet implemented"):
-            LLMProviderFactory.create_provider("anthropic", llm_config=llm_config)
+        assert isinstance(provider, OpenAIProvider)
+        assert provider._api_key == "sk-test"
+        assert provider._model_name == "gpt-4o-mini"
+
+    def test_create_provider_openai_with_overrides(self) -> None:
+        """OpenAI provider respects config model and base_url."""
+        llm_config = LLMConfig(
+            provider="openai",
+            api_key="sk-x",
+            model="gpt-4o",
+            base_url="https://example.invalid/v1",
+        )
+        with (
+            patch("copinance_os.ai.llm.providers.openai.OPENAI_AVAILABLE", True),
+            patch("copinance_os.ai.llm.providers.openai.AsyncOpenAI") as mock_acls,
+        ):
+            mock_acls.return_value = MagicMock()
+            provider = LLMProviderFactory.create_provider("openai", llm_config=llm_config)
+
+        assert provider._model_name == "gpt-4o"
+        assert provider._base_url == "https://example.invalid/v1"
 
     def test_create_provider_unsupported_raises_error(self) -> None:
         """Test that creating unsupported provider raises ValueError."""

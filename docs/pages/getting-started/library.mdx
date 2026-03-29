@@ -2,6 +2,8 @@
 
 This guide is for developers who want to integrate Copinance OS into their own Python application (web app, script, or service). The project is a **pure Python library**: no built-in HTTP API or frontend. You get analysis execution, use cases, and data providers; you choose how to expose them.
 
+**Multi-turn question-driven conversations** (prior user/assistant turns via **`conversation_history`**) are **library-only**: the **`copinance`** CLI never loads a transcript—neither on **`analyze …`**, nor on **root** **`copinance "…"`** natural-language entry (each of those accepts **one** question per run).
+
 ## Table of Contents
 
 - [Requirements](#requirements)
@@ -34,10 +36,7 @@ This guide is for developers who want to integrate Copinance OS into their own P
 
 Install Copinance OS as a dependency in your project.
 
-**From PyPI (when published):**
-```bash
-pip install copinance-os
-```
+**From PyPI:** When **`copinance-os`** is published, `pip install copinance-os`. Until then, use **from source** (below).
 
 **From source (development or git clone):**
 ```bash
@@ -51,7 +50,7 @@ pip install -e .
 pip install copinance-os[ollama]
 ```
 
-Add to your `requirements.txt` or `pyproject.toml`:
+Add to your `requirements.txt` or `pyproject.toml` after **PyPI** release, or depend on a **path / git** URL until then:
 ```
 copinance-os>=0.1.0
 # Optional:
@@ -75,7 +74,7 @@ copinance-os>=0.1.0
 
 ## Quick Start: Run an Analysis
 
-1. **Configure the container** with at least an LLM config if you use question-driven analysis.
+1. **Configure the container** — pass **`LLMConfig`** only if you need **question-driven** analysis; for deterministic instrument/market runs you can use `get_container(llm_config=None, load_from_env=False)` so no LLM is wired.
 2. **Get `ResearchOrchestrator`** from the container (recommended entry point for jobs).
 3. **Build a `Job`** and run it with `await orchestrator.run_job(job, {})`.
 
@@ -87,7 +86,10 @@ from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType
 
 async def main():
-    # 1. LLM config is REQUIRED for question-driven analysis; optional for equity/options/macro only
+    # Deterministic-only: no LLM (question-driven routes will not be available)
+    # container = get_container(llm_config=None, load_from_env=False)
+
+    # Question-driven-capable: supply Gemini or Ollama (see LLMConfig section)
     llm_config = LLMConfig(
         provider="gemini",
         api_key="your-gemini-api-key",
@@ -95,10 +97,8 @@ async def main():
     )
     container = get_container(llm_config=llm_config)
 
-    # 2. Orchestrator (wraps JobRunner; same path analyze use cases use)
     orchestrator = container.research_orchestrator()
 
-    # 3. Run an equity analysis for AAPL
     job = Job(
         scope=JobScope.INSTRUMENT,
         market_type=MarketType.EQUITY,
@@ -110,6 +110,8 @@ async def main():
 
     if result.success:
         print(result.results)
+        if result.report:
+            print(result.report.summary)
     else:
         print("Error:", result.error_message)
 
@@ -152,24 +154,56 @@ container = get_container(
 
 ### LLMConfig (required for question-driven analysis)
 
-For **question-driven** analysis you must supply `LLMConfig` when creating the container:
+For **question-driven** analysis you must supply `LLMConfig` when creating the container.
+
+**Implemented providers:** the factory currently supports **`gemini`** and **`ollama`** only. Selecting **`openai`** or **`anthropic`** raises `ValueError` until those backends are added.
 
 ```python
 from copinance_os.ai.llm.config import LLMConfig
 
 llm_config = LLMConfig(
-    provider="gemini",           # "gemini" | "ollama" | "openai" | "anthropic"
-    api_key="your-api-key",     # required for cloud providers
+    provider="gemini",           # "gemini" | "ollama"
+    api_key="your-api-key",     # required for Gemini; optional for Ollama
     model="gemini-1.5-pro",     # optional; provider default if omitted
     temperature=0.7,
     max_tokens=4096,
-    base_url=None,              # for custom endpoints (e.g. Ollama)
+    base_url=None,              # e.g. Ollama base URL when provider is "ollama"
+    text_streaming_mode="auto", # "auto" | "native" | "buffered" — see LLM text streaming below
     execution_type_providers={},  # e.g. {"question_driven_analysis": "gemini"}
-    provider_config={},
+    provider_config={},         # e.g. {"disable_native_text_stream": True}
 )
 ```
 
 See [Configuration](configuration) for provider-specific details and environment variables used by the CLI.
+
+#### LLM text streaming (library / `LLMProvider`)
+
+For **plain text** generation (no tool-calling loop), each backend implements **`LLMProvider.generate_text_stream`**, which yields structured **`LLMTextStreamEvent`** objects (`kind`: `text_delta`, `done`, or `error`). Import from **`copinance_os.ai.llm`** or **`copinance_os.ai.llm.streaming`**.
+
+| `stream_mode` / `text_streaming_mode` | Behavior |
+|---------------------------------------|----------|
+| **`auto`** (default) | Use **native** HTTP/API streaming when the provider supports it (**Gemini** and **Ollama** do); if native streaming fails, fall back to a single **`generate_text`** call and emit one delta. |
+| **`native`** | Require native streaming; raises if disabled or unsupported, or emits an **`error`** event if the stream fails after starting. |
+| **`buffered`** | Always call **`generate_text`** once, then emit one **`text_delta`** and **`done`** (works for any model; `native_streaming=False` on events). |
+
+- **Default mode** on the provider comes from **`LLMConfig.text_streaming_mode`**. You can override per call: `await provider.generate_text_stream("…", stream_mode="buffered")`.
+- **Disable native streaming** (e.g. model or proxy quirks): set **`provider_config={"disable_native_text_stream": True}`** in **`LLMConfig`**, or construct **`GeminiProvider`** / **`OllamaProvider`** with **`disable_native_text_stream=True`**. In **`auto`** mode, the provider then uses the buffered path only.
+- **Question-driven analysis** uses **`generate_with_tools`** with optional **`stream=True`** and **`on_stream_event`** (the CLI sets **`stream`** via job context and uses a stdout handler). Results include **`analysis_streamed`** when streaming was enabled. You can still call **`generate_text_stream`** on the **`LLMProvider`** directly for plain-text-only use cases.
+
+```python
+from copinance_os.ai.llm.providers.factory import LLMProviderFactory
+from copinance_os.ai.llm.config import LLMConfig
+
+provider = LLMProviderFactory.create_provider(
+    "gemini",
+    LLMConfig(provider="gemini", api_key="...", text_streaming_mode="auto"),
+)
+async for event in provider.generate_text_stream("Briefly explain beta."):
+    if event.kind == "text_delta":
+        print(event.text_delta, end="", flush=True)
+    elif event.kind == "error":
+        print("Error:", event.error_message)
+```
 
 ### Cache
 
@@ -230,10 +264,11 @@ Each template is an object with exactly two string fields:
 
 | Variable | Description |
 |----------|-------------|
-| `question` | The user's question (may be prefixed with symbol context by the executor). |
+| `question` | The user's question for this call (may be prefixed with symbol context by the executor). Prior Q&A for **multi-turn** sessions are **not** pasted into this template; they are supplied separately via **`prior_conversation`** to each LLM provider. |
 | `tools_description` | Text describing available tools. |
 | `tool_examples` | Example tool-call snippets. |
 | `financial_literacy` | `"beginner"`, `"intermediate"`, or `"advanced"`. |
+| `current_date` | **UTC** calendar date as `YYYY-MM-DD` (for relative ranges in prompts). |
 
 You can import the constant for the prompt name: `ANALYZE_QUESTION_DRIVEN_PROMPT_NAME` from `copinance_os.ai.llm.resources`.
 
@@ -298,8 +333,8 @@ Built-in executors read mode-specific options from the **context** dict (second 
 
 - **`deterministic_instrument_analysis`** — Instrument scope, deterministic equity/options analysis. Context may include `expiration_date` and `option_side` for options.
 - **`deterministic_market_analysis`** — Market scope, deterministic macro regime dashboard. Context includes `market_index`, `lookback_days`, and `include_*` booleans.
-- **`question_driven_instrument_analysis`** — Instrument scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, optional options context, and `include_prompt`.
-- **`question_driven_market_analysis`** — Market scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, `market_index`, and `include_prompt`.
+- **`question_driven_instrument_analysis`** — Instrument scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, optional **`conversation_history`** (list of `{"role","content"}` dicts: alternating user/assistant, ending with assistant), optional options context, `stream`, and `include_prompt`.
+- **`question_driven_market_analysis`** — Market scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, optional **`conversation_history`** (same shape), `market_index`, `stream`, and `include_prompt`.
 
 ### Example: deterministic and question-driven jobs
 
@@ -344,6 +379,9 @@ job_agent = Job(
     execution_type="question_driven_instrument_analysis",
 )
 context_agent = {"question": "What are the key risks?"}
+
+# Optional follow-up: pass prior turns as dicts (see multi-turn section below)
+# context_followup = {"question": "What mitigations does the 10-K mention?", "conversation_history": [...]}
 ```
 
 ### Run and read result
@@ -357,8 +395,10 @@ result = await orchestrator.run_job(job_equity, {})
 
 # result is RunJobResult
 # result.success: bool
-# result.results: dict | None  — analysis output
+# result.results: dict | None  — analysis output (question-driven success may include "conversation_turns" for multi-turn chaining)
 # result.error_message: str | None
+# result.report: AnalysisReport | None  — summary, key_metrics, methodology, assumptions, limitations
+# result.report_exclusion_reason: ReportExclusionReason | None  — set if no report envelope exists for the executor type
 ```
 
 All analysis execution is **async**; use `asyncio.run()` or run inside an async framework.
@@ -480,6 +520,56 @@ market_question_res = await market_uc.execute(
 )
 ```
 
+### Multi-turn question-driven analysis
+
+This section is **Python-only**; the CLI cannot supply **`conversation_history`** (see the note at the top of this page). Use this when the user’s **new** question should see **prior** user/assistant messages from an earlier run (same symbol / market scope). Each LLM provider maps history to its native chat API (**Gemini** `Content` list + **systemInstruction**; **Ollama** `/api/chat` **messages**).
+
+- Set **`conversation_history`** to a list of **`LLMConversationTurn`** that **alternates** `user` → `assistant` → … and **ends with `assistant`**.
+- Set **`question`** to the **new** user message only (do not duplicate the latest user turn inside `conversation_history`).
+- After a successful question-driven run, **`results["conversation_turns"]`** may contain the full transcript (including the latest assistant reply) as serializable dicts — reuse them to build the next request’s **`conversation_history`**.
+
+`conversation_history` is invalid in **`mode=deterministic`**.
+
+```python
+import asyncio
+
+from copinance_os.domain.models.llm_conversation import LLMConversationTurn
+from copinance_os.infra.di import get_container
+from copinance_os.research.workflows.analyze import (
+    AnalyzeInstrumentRequest,
+    AnalyzeMode,
+)
+
+async def follow_up_example() -> None:
+    container = get_container(load_from_env=True)
+    uc = container.analyze_instrument_use_case()
+
+    first = await uc.execute(
+        AnalyzeInstrumentRequest(
+            symbol="AAPL",
+            question="What was the most recent closing price?",
+            mode=AnalyzeMode.QUESTION_DRIVEN,
+        )
+    )
+    if not first.success or not first.results:
+        return
+
+    turns = first.results.get("conversation_turns") or []
+    history = [LLMConversationTurn.model_validate(t) for t in turns]
+
+    second = await uc.execute(
+        AnalyzeInstrumentRequest(
+            symbol="AAPL",
+            question="How does that compare to the 52-week high?",
+            mode=AnalyzeMode.QUESTION_DRIVEN,
+            conversation_history=history,
+        )
+    )
+    _ = second  # use second.results, second.report, etc.
+
+asyncio.run(follow_up_example())
+```
+
 ---
 
 ## Library API Reference
@@ -488,7 +578,7 @@ Use this section as a single reference for every option available when using Cop
 
 ### Container entry points
 
-Get the container with `get_container(...)` from `copinance_os.infra.di`. You can pass `prompt_templates` or `prompt_manager` for custom prompts (see [Prompt templates](#prompt-templates)), `cache_enabled` or `cache_manager` for cache control (see [Cache](#cache)), and `storage_type` or `storage_path` to avoid or customize disk usage (see [Storage and Persistence](#storage-and-persistence)). Then call these methods to obtain use cases, **`ResearchOrchestrator`**, analyze runners, or (advanced) the raw `JobRunner`:
+Get the container with `get_container(...)` from `copinance_os.infra.di`. You can pass `prompt_templates` or `prompt_manager` for custom prompts (see [Prompt templates](#prompt-templates)), `cache_enabled` or `cache_manager` for cache control (see [Cache](#cache)), and `storage_type` or `storage_path` to avoid or customize disk usage (see [Storage and Persistence](#storage-and-persistence)). Then call these methods to obtain use cases, **`ResearchOrchestrator`**, analyze runners, and (advanced) **`analysis_executors`**:
 
 | Entry point | Method | Returns | Purpose |
 |-------------|--------|---------|--------|
@@ -502,9 +592,8 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 | | `container.analyze_market_use_case()` | `AnalyzeMarketUseCase` | Progressive market analysis |
 | **Runners (override these)** | `container.analyze_instrument_runner()` | `AnalyzeInstrumentRunner` impl | Default: builds Job, calls `ResearchOrchestrator.run_job` |
 | | `container.analyze_market_runner()` | `AnalyzeMarketRunner` impl | Default: builds Job, calls `ResearchOrchestrator.run_job` |
-| **Orchestration** | `container.research_orchestrator()` | `ResearchOrchestrator` | **Preferred:** `run_job(job, context)` |
-| **Job execution (advanced)** | `container.job_runner()` | `JobRunner` | Same port the orchestrator uses; override for custom global routing |
-| | `container.analysis_executors()` | `list[AnalysisExecutor]` | All registered analysis executors (for custom routing) |
+| **Orchestration** | `container.research_orchestrator()` | `ResearchOrchestrator` | **Preferred:** `run_job(job, context)` (wraps `JobRunner` internally) |
+| | `container.analysis_executors()` | `list[AnalysisExecutor]` | Registered analysis executors (advanced: validate/execute yourself) |
 | **Profiles** | `container.create_profile_use_case()` | `CreateProfileUseCase` | Create analysis profile |
 | | `container.get_profile_use_case()` | `GetProfileUseCase` | Get profile by ID |
 | | `container.list_profiles_use_case()` | `ListProfilesUseCase` | List profiles (paginated) |
@@ -513,6 +602,8 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 | | `container.delete_profile_use_case()` | `DeleteProfileUseCase` | Delete profile |
 | **Infrastructure** | `container.market_data_provider()` | `MarketDataProvider` | Market data (quote, history, search, options) |
 | | `container.cache_manager()` | `CacheManager` | Cache for tool/CLI data |
+
+The **`JobRunner`** port is not exposed as a container method; customize orchestration via **`ResearchOrchestrator`**, executor lists, or a custom **`Container`** (see [Extending](/developer-guide/extending)).
 
 **Imports:** Container from `copinance_os.infra.di`; request/response types from the modules below.
 
@@ -532,8 +623,8 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 
 | Use case | Request | Response | Request fields |
 |----------|---------|----------|----------------|
-| Analyze instrument | `AnalyzeInstrumentRequest` | `RunJobResult` | `symbol` (required), `market_type` (`MarketType.EQUITY` / `OPTIONS`, default `EQUITY`), `timeframe` (optional; defaults by market type), `question`, `mode` (`auto` / `deterministic` / `question_driven`), `expiration_date`, `option_side`, `profile_id`, `include_prompt_in_results` |
-| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, `include_prompt_in_results` |
+| Analyze instrument | `AnalyzeInstrumentRequest` | `RunJobResult` | `symbol` (required), `market_type` (`MarketType.EQUITY` / `OPTIONS`, default `EQUITY`), `timeframe` (optional; defaults by market type), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `expiration_date`, `option_side`, `profile_id`, `include_prompt_in_results`, `stream` |
+| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, `include_prompt_in_results`, `stream` |
 
 **Ports for custom executors:** `AnalyzeInstrumentRunner` and `AnalyzeMarketRunner` — each: `async def run(self, request: ...Request) -> RunJobResult`.
 
@@ -550,7 +641,7 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 
 **Type:** `FinancialLiteracy` from `copinance_os.domain.models.profile`.
 
-### Fundamentals use case — `copinance_os.research.workflows.fundamentals` (market data)
+### Fundamentals use case — `copinance_os.research.workflows.fundamentals`
 
 | Use case | Request | Response | Request fields |
 |----------|---------|----------|----------------|
@@ -561,11 +652,14 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 | Type | Module | Use |
 |------|--------|-----|
 | `Job` | `copinance_os.domain.models.job` | Analysis execution context: `scope`, `market_type`, `instrument_symbol`, `market_index`, `timeframe`, `execution_type`, `profile_id` |
-| `RunJobResult` | `copinance_os.domain.models.job` | `success: bool`, `results: dict \| None`, `error_message: str \| None` |
+| `RunJobResult` | `copinance_os.domain.models.job` | `success`, `results`, `error_message`, **`report`** (`AnalysisReport \| None`), **`report_exclusion_reason`** (`ReportExclusionReason \| None`) |
+| `AnalysisReport` | `copinance_os.domain.models.analysis_report` | `summary`, `key_metrics`, `methodology`, `assumptions`, `limitations` |
+| `ReportExclusionReason` | `copinance_os.domain.models.job` | e.g. `UNKNOWN_EXECUTOR_TYPE` when results exist but no report builder is registered |
 | `JobScope` | `copinance_os.domain.models.job` | `INSTRUMENT`, `MARKET` |
 | `JobTimeframe` | `copinance_os.domain.models.job` | `SHORT_TERM`, `MID_TERM`, `LONG_TERM` |
 | `MarketType` | `copinance_os.domain.models.market` | `EQUITY`, `OPTIONS` |
 | `OptionSide` | `copinance_os.domain.models.market` | `CALL`, `PUT`, `ALL` |
+| `LLMConversationTurn` | `copinance_os.domain.models.llm_conversation` | `role` (`user` / `assistant`), `content`; used for **`conversation_history`** on analyze requests |
 | `MarketDataPoint` | `copinance_os.domain.models.market` | OHLCV + symbol, timestamp |
 | `OptionsChain` | `copinance_os.domain.models.market` | `underlying_symbol`, `expiration_date`, `calls`, `puts`, `underlying_price`, etc. |
 | `Stock` | `copinance_os.domain.models.stock` | Instrument entity (symbol, name, exchange, sector, …) |
@@ -573,7 +667,7 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 ### Override points
 
 - **Custom analyze execution:** Implement `AnalyzeInstrumentRunner` or `AnalyzeMarketRunner` and override `container.analyze_instrument_runner` or `container.analyze_market_runner` (see [Custom executors and runners](#custom-executors-and-runners)).
-- **Custom job orchestration:** Implement `JobRunner` (port in `copinance_os.domain.ports.analysis_execution`) and override `container.job_runner`. Prefer keeping `ResearchOrchestrator` as the façade if you only need policy around `run_job`.
+- **Custom job orchestration:** Implement the **`JobRunner`** port (`copinance_os.domain.ports.analysis_execution`) and wire it when building a **`ResearchOrchestrator`**, or use a custom **`Container`** / `set_container()` so your app owns the wiring. The stock container does not expose `job_runner()` as a getter.
 
 ---
 
@@ -607,7 +701,7 @@ By default, analyze uses **runners** that build a `Job` and call **`ResearchOrch
    # analyze_instrument_use_case() will now use MyAnalyzeInstrumentRunner
    ```
 
-3. **Job-based execution:** If you use jobs (e.g. for queues or batch), you can replace **JobRunner** (e.g. `container.job_runner.override(...)`) so both **`ResearchOrchestrator`** and any direct `job_runner()` consumers use your implementation.
+3. **Job-based execution:** For queues or batch, implement **`JobRunner`** and inject it into a **`ResearchOrchestrator`** you construct yourself, or replace the orchestrator/runners on a custom container.
 
 Request/response types live in the same use case modules (e.g. `research.workflows.market`, `research.workflows.analyze`). Use them for type hints and validation.
 
@@ -646,16 +740,15 @@ The **`.copinance`** directory (e.g. `data/`, `equities.json`) is created by the
 
 For a long-running app you may want file persistence: keep the default (or set `storage_type="file"` and optionally `storage_path`). In-memory storage loses data when the process exits.
 
-
 The library does not impose a database. You can implement the repository and storage ports (see [Developer Guide](/developer-guide/extending)) and wire them into the container if you need PostgreSQL, MongoDB, etc.
 
 ---
 
 ## Custom Orchestration
 
-The default **`JobRunner`** (invoked via **`ResearchOrchestrator.run_job`**) finds the executor for the job’s `execution_type`, builds context (e.g. profile), and runs the executor once. You can:
+The default **`JobRunner`** (used inside **`ResearchOrchestrator.run_job`**) finds the executor for the job’s `execution_type`, builds context (e.g. profile), and runs the executor once. You can:
 
-- **Replace the job runner:** implement the `JobRunner` port (interface: `async def run(job, context) -> RunJobResult`) and provide your own (e.g. queue-based, retries, custom routing).
+- **Replace job orchestration:** implement the **`JobRunner`** port (`async def run(job, context) -> RunJobResult`) and construct a **`ResearchOrchestrator`** (or custom façade) with it—there is no `container.job_runner()` accessor on the stock **`Container`**.
 - **Use analysis executors yourself:** resolve `container.analysis_executors()` and call `validate(job)` / `execute(job, context)` on the executor that validates.
 
 See [Architecture](/developer-guide/architecture) and [Extending](/developer-guide/extending) for ports and extension points.
@@ -664,6 +757,7 @@ See [Architecture](/developer-guide/architecture) and [Extending](/developer-gui
 
 ## Error Handling
 
+- **`RunJobResult.success == True`:** Inspect `result.results` and optional **`result.report`** (`AnalysisReport`) for the structured envelope. If **`result.report` is `None`** but you expected one, check **`result.report_exclusion_reason`** (e.g. unknown executor type without a registered report builder).
 - **`RunJobResult.success == False`:** Check `result.error_message`. The analysis or an underlying service failed.
 - **`ExecutorNotFoundError`:** No executor registered for the job’s execution type. Ensure the container includes the right executors (e.g. LLM config for question-driven analysis).
 - **`DomainError`:** Base type for domain-level errors (e.g. validation, business rule).
@@ -676,7 +770,6 @@ Catch these in your app and map them to your HTTP codes or user messages as need
 
 ```python
 import asyncio
-from datetime import date
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.infra.di import get_container
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
@@ -722,6 +815,7 @@ asyncio.run(main())
 ## Next Steps
 
 - [Configuration](configuration) — LLM and FRED setup, env vars, security.
-- [API Reference](/api-reference/data-providers) — Data provider and other interfaces.
-- [Architecture](/developer-guide/architecture) — Hexagonal layout, ports, and container.
+- [User Guide — CLI](/user-guide/cli) — Full Typer reference, including **`--json`** for machine-readable output.
+- [API Reference](/api-reference/data-providers) — Data provider interfaces and market point coercion helpers.
+- [Architecture](/developer-guide/architecture) — Hexagonal layout, ports, container, and [annotated package tree](/developer-guide/architecture#package-tree-source).
 - [Extending](/developer-guide/extending) — Custom data providers, executors, and tests.

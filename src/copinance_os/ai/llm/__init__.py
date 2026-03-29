@@ -6,9 +6,12 @@ This module contains LLM analyzer implementations that use pluggable LLM provide
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.ai.llm.llm_analyzer import GeminiLLMAnalyzer
 from copinance_os.ai.llm.policy import NUMERIC_GROUNDING_POLICY
+from copinance_os.ai.llm.streaming import LLMTextStreamEvent, TextStreamingMode
 
 __all__ = [
     "GeminiLLMAnalyzer",
     "LLMConfig",
+    "LLMTextStreamEvent",
     "NUMERIC_GROUNDING_POLICY",
+    "TextStreamingMode",
 ]

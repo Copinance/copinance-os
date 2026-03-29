@@ -1,6 +1,7 @@
 """Ollama local LLM provider implementation."""
 
 import json
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -19,7 +20,17 @@ except ImportError:
     HTTPStatusError = None
 
 from copinance_os.ai.llm.providers.base import LLMProvider
+from copinance_os.ai.llm.streaming import LLMTextStreamEvent, TextStreamingMode
+from copinance_os.ai.llm.tool_loop_streaming import (
+    generate_turn_text_with_stream,
+    maybe_emit_tool_round_rollback,
+)
+from copinance_os.core.execution_engine.question_driven_tool_summary import (
+    build_partial_synthesis_message,
+    is_tool_call_json_text,
+)
 from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
+from copinance_os.domain.models.llm_conversation import LLMConversationTurn
 from copinance_os.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)
@@ -60,6 +71,9 @@ class OllamaProvider(LLMProvider):
         model_name: str = "llama2",
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        *,
+        text_streaming_mode: TextStreamingMode = "auto",
+        disable_native_text_stream: bool = False,
     ) -> None:
         """Initialize Ollama provider.
 
@@ -68,11 +82,15 @@ class OllamaProvider(LLMProvider):
             model_name: Ollama model to use (default: "llama2")
             temperature: Default temperature for generation
             max_output_tokens: Default max output tokens
+            text_streaming_mode: Default mode for :meth:`generate_text_stream`
+            disable_native_text_stream: If True, API streaming is disabled (buffered only).
         """
         self._base_url = base_url.rstrip("/")
         self._model_name = model_name
         self._default_temperature = temperature
         self._default_max_output_tokens = max_output_tokens
+        self._text_streaming_mode: TextStreamingMode = text_streaming_mode
+        self._disable_native_text_stream = disable_native_text_stream
         self._client: httpx.AsyncClient | None = None
 
         if HTTPX_AVAILABLE and httpx is not None:
@@ -83,6 +101,47 @@ class OllamaProvider(LLMProvider):
                 logger.warning("Failed to initialize Ollama client", error=str(e))
         else:
             logger.warning("httpx package is not installed, Ollama provider will not work")
+
+    def supports_native_text_stream(self) -> bool:
+        return bool(HTTPX_AVAILABLE and self._client is not None) and (
+            not self._disable_native_text_stream
+        )
+
+    def _build_ollama_payload(
+        self,
+        full_prompt: str,
+        *,
+        stream: bool,
+        temperature: float | None,
+        max_tokens: int | None,
+        extra_options: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Shared request body for /api/generate."""
+        payload: dict[str, Any] = {
+            "model": self._model_name,
+            "prompt": full_prompt,
+            "stream": stream,
+        }
+        if temperature is not None:
+            payload["options"] = {"temperature": temperature}
+        elif self._default_temperature is not None:
+            payload["options"] = {"temperature": self._default_temperature}
+
+        if max_tokens is not None:
+            if "options" not in payload:
+                payload["options"] = {}
+            payload["options"]["num_predict"] = max_tokens
+        elif self._default_max_output_tokens is not None:
+            if "options" not in payload:
+                payload["options"] = {}
+            payload["options"]["num_predict"] = self._default_max_output_tokens
+
+        if extra_options:
+            if "options" not in payload:
+                payload["options"] = {}
+            payload["options"].update(extra_options)
+
+        return payload
 
     async def generate_text(
         self,
@@ -119,34 +178,13 @@ class OllamaProvider(LLMProvider):
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
 
-        # Prepare request payload
-        payload: dict[str, Any] = {
-            "model": self._model_name,
-            "prompt": full_prompt,
-            "stream": False,
-        }
-
-        # Set temperature
-        if temperature is not None:
-            payload["options"] = {"temperature": temperature}
-        elif self._default_temperature is not None:
-            payload["options"] = {"temperature": self._default_temperature}
-
-        # Set max tokens (num_predict in Ollama)
-        if max_tokens is not None:
-            if "options" not in payload:
-                payload["options"] = {}
-            payload["options"]["num_predict"] = max_tokens
-        elif self._default_max_output_tokens is not None:
-            if "options" not in payload:
-                payload["options"] = {}
-            payload["options"]["num_predict"] = self._default_max_output_tokens
-
-        # Add any additional kwargs to options
-        if kwargs:
-            if "options" not in payload:
-                payload["options"] = {}
-            payload["options"].update(kwargs)
+        payload = self._build_ollama_payload(
+            full_prompt,
+            stream=False,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            extra_options=dict(kwargs) if kwargs else None,
+        )
 
         try:
             logger.debug(
@@ -274,6 +312,179 @@ class OllamaProvider(LLMProvider):
         """
         return self._model_name
 
+    async def _iter_native_text_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        temperature: float | None,
+        max_tokens: int | None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[LLMTextStreamEvent, None]:
+        if not HTTPX_AVAILABLE or self._client is None:
+            raise RuntimeError("Ollama client is not initialized")
+
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+
+        extra = dict(kwargs) if kwargs else None
+        payload = self._build_ollama_payload(
+            full_prompt,
+            stream=True,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            extra_options=extra,
+        )
+
+        async with self._client.stream("POST", "/api/generate", json=payload) as response:
+            if response.status_code != 200:
+                try:
+                    err_body = await response.aread()
+                    raise RuntimeError(
+                        f"Ollama streaming failed ({response.status_code}): "
+                        f"{err_body.decode(errors='replace')[:500]}"
+                    )
+                except RuntimeError:
+                    raise
+                except Exception:
+                    response.raise_for_status()
+
+            async for line in response.aiter_lines():
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                fragment = data.get("response")
+                if fragment:
+                    yield LLMTextStreamEvent(
+                        kind="text_delta",
+                        text_delta=str(fragment),
+                        native_streaming=True,
+                    )
+                if data.get("done") is True:
+                    usage = None
+                    if "prompt_eval_count" in data or "eval_count" in data:
+                        usage = {
+                            "input_tokens": int(data.get("prompt_eval_count") or 0),
+                            "output_tokens": int(data.get("eval_count") or 0),
+                            "total_tokens": int(
+                                (data.get("prompt_eval_count") or 0) + (data.get("eval_count") or 0)
+                            ),
+                        }
+                    yield LLMTextStreamEvent(
+                        kind="done",
+                        native_streaming=True,
+                        usage=usage,
+                    )
+                    return
+
+        yield LLMTextStreamEvent(kind="done", native_streaming=True)
+
+    def _ollama_build_chat_messages(
+        self,
+        system_prompt: str | None,
+        prior: list[LLMConversationTurn] | None,
+        user_task: str,
+    ) -> list[dict[str, str]]:
+        """Ollama /api/chat message list: system, prior turns, then current user task."""
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        for t in prior or []:
+            orole = "user" if t.role == "user" else "assistant"
+            messages.append({"role": orole, "content": t.content})
+        messages.append({"role": "user", "content": user_task})
+        return messages
+
+    async def _ollama_chat_turn(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        stream: bool,
+        temperature: float | None,
+        max_tokens: int | None,
+        on_stream_event: Callable[[LLMTextStreamEvent], Awaitable[None]] | None,
+        **kwargs: Any,
+    ) -> str:
+        """One model turn via Ollama POST /api/chat (buffered or streamed)."""
+        if not HTTPX_AVAILABLE or self._client is None:
+            raise RuntimeError("Ollama client is not initialized")
+
+        extra = dict(kwargs) if kwargs else None
+        opts: dict[str, Any] = {}
+        if temperature is not None:
+            opts["temperature"] = temperature
+        elif self._default_temperature is not None:
+            opts["temperature"] = self._default_temperature
+        if max_tokens is not None:
+            opts["num_predict"] = max_tokens
+        elif self._default_max_output_tokens is not None:
+            opts["num_predict"] = self._default_max_output_tokens
+        if extra:
+            opts.update(extra)
+
+        payload: dict[str, Any] = {
+            "model": self._model_name,
+            "messages": messages,
+            "stream": stream,
+        }
+        if opts:
+            payload["options"] = opts
+
+        if not stream or on_stream_event is None:
+            response = await self._client.post("/api/chat", json=payload)
+            if response.status_code != 200:
+                try:
+                    err_body = response.text[:500]
+                    raise RuntimeError(f"Ollama chat failed ({response.status_code}): {err_body}")
+                except RuntimeError:
+                    raise
+                except Exception:
+                    response.raise_for_status()
+            response.raise_for_status()
+            result = response.json()
+            msg = result.get("message") or {}
+            return str(msg.get("content") or "")
+
+        parts: list[str] = []
+        async with self._client.stream("POST", "/api/chat", json=payload) as response:
+            if response.status_code != 200:
+                try:
+                    err_raw: bytes = await response.aread()
+                    err_snip = err_raw.decode(errors="replace")[:500]
+                    raise RuntimeError(
+                        f"Ollama chat stream failed ({response.status_code}): {err_snip}"
+                    )
+                except RuntimeError:
+                    raise
+                except Exception:
+                    response.raise_for_status()
+
+            async for line in response.aiter_lines():
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg = data.get("message") or {}
+                fragment = msg.get("content")
+                if fragment:
+                    parts.append(str(fragment))
+                    await on_stream_event(
+                        LLMTextStreamEvent(
+                            kind="text_delta",
+                            text_delta=str(fragment),
+                            native_streaming=True,
+                        )
+                    )
+                if data.get("done") is True:
+                    break
+
+        return "".join(parts)
+
     async def generate_with_tools(
         self,
         prompt: str,
@@ -282,6 +493,10 @@ class OllamaProvider(LLMProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         max_iterations: int = 5,
+        *,
+        stream: bool = False,
+        on_stream_event: Callable[[LLMTextStreamEvent], Awaitable[None]] | None = None,
+        prior_conversation: list[LLMConversationTurn] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Generate text with optional tool usage using Ollama.
@@ -311,34 +526,39 @@ class OllamaProvider(LLMProvider):
 
         # If no tools, fallback to regular generation
         if tools is None or len(tools) == 0:
-            text = await self.generate_text(
+            text = await generate_turn_text_with_stream(
+                self,
                 prompt=prompt,
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                stream=stream,
+                on_stream_event=on_stream_event,
                 **kwargs,
             )
             return {
                 "text": text,
                 "tool_calls": [],
                 "iterations": 1,
+                "synthesis_status": "complete",
+                "llm_synthesis_error": None,
             }
 
         # Create tool executor
         executor = ToolExecutor(tools)
 
-        # Combine prompts (caller manages prompt content)
-        full_prompt = prompt
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
-
-        # Multi-turn conversation with tool calling
+        # Provider-native multi-turn: Ollama /api/chat messages
         tool_calls_made: list[dict[str, Any]] = []
-        current_prompt = full_prompt
+        messages: list[dict[str, str]] = self._ollama_build_chat_messages(
+            system_prompt,
+            prior_conversation,
+            prompt,
+        )
         response_text = ""
         # Track recent tool calls for loop detection
         recent_tool_calls: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
         max_recent_history = 3  # Check last 3 calls for loops
+        iteration_error: Exception | None = None
 
         for iteration in range(max_iterations):
             try:
@@ -348,12 +568,13 @@ class OllamaProvider(LLMProvider):
                     max_iterations=max_iterations,
                 )
 
-                # Generate response with current prompt (caller manages prompt content)
-                response_text = await self.generate_text(
-                    prompt=current_prompt,
-                    system_prompt=None,  # Caller manages system prompt in current_prompt
+                use_stream = stream and on_stream_event is not None
+                response_text = await self._ollama_chat_turn(
+                    messages,
+                    stream=use_stream,
                     temperature=temperature,
                     max_tokens=max_tokens,
+                    on_stream_event=on_stream_event,
                     **kwargs,
                 )
 
@@ -426,6 +647,12 @@ class OllamaProvider(LLMProvider):
                         function_calls.append({"name": tool_name, "args": tool_params})
                         logger.debug("Found tool call in response", tool=tool_name)
 
+                await maybe_emit_tool_round_rollback(
+                    stream=stream,
+                    on_stream_event=on_stream_event,
+                    had_tool_calls=bool(function_calls),
+                )
+
                 # If no function calls found, we're done
                 if not function_calls:
                     break
@@ -461,7 +688,9 @@ class OllamaProvider(LLMProvider):
                     )
                     break
 
-                # Execute function calls
+                # Execute function calls; append assistant + user(tool feedback) for next chat turn
+                tool_feedback_parts: list[str] = []
+                stop_suffix: str | None = None
                 for func_call in function_calls:
                     tool_name = func_call["name"]
                     tool_args = func_call.get("args", {})
@@ -600,19 +829,12 @@ class OllamaProvider(LLMProvider):
                                 invalid_params=has_invalid_params,
                             )
 
-                    # Append tool result to prompt in generic JSON format
-                    # Caller is responsible for prompt structure and formatting
                     serializable_data = make_json_serializable(result_data)
                     tool_result_json = json.dumps(serializable_data, indent=2)
-                    current_prompt = (
-                        f"{current_prompt}\n\nTool execution result:\n{tool_result_json}"
-                    )
+                    tool_feedback_parts.append(f"Tool execution result:\n{tool_result_json}")
 
-                    # If we got empty results or invalid params, suggest stopping to avoid loops
-                    # But respect tool metadata that indicates retry is allowed
                     should_stop = (is_empty_result or has_invalid_params) and iteration >= 1
                     if should_stop:
-                        # Check if tool metadata allows retry
                         allow_retry = tool_result.metadata and tool_result.metadata.get(
                             "allow_retry", False
                         )
@@ -623,15 +845,22 @@ class OllamaProvider(LLMProvider):
                                 empty_result=is_empty_result,
                                 invalid_params=has_invalid_params,
                             )
-                            stop_message = (
+                            stop_suffix = (
                                 "IMPORTANT: Stop making tool calls now. "
                                 "The tool returned empty results or was called with invalid parameters. "
                                 "Provide your final answer based on any data you have received, "
                                 "or explain that you cannot answer the question with the available tools."
                             )
-                            current_prompt = f"{current_prompt}\n\n{stop_message}"
+
+                if tool_feedback_parts:
+                    messages.append({"role": "assistant", "content": response_text})
+                    user_blob = "\n\n".join(tool_feedback_parts)
+                    if stop_suffix:
+                        user_blob = f"{user_blob}\n\n{stop_suffix}"
+                    messages.append({"role": "user", "content": user_blob})
 
             except RuntimeError as e:
+                iteration_error = e
                 # If it's a RuntimeError from generate_text (e.g., Ollama not available),
                 # provide helpful message and stop iterating
                 error_msg = str(e)
@@ -650,13 +879,45 @@ class OllamaProvider(LLMProvider):
                     )
                 break
             except Exception as e:
+                iteration_error = e
                 logger.error(
                     "Error in tool calling iteration", error=str(e), iteration=iteration + 1
                 )
                 break
 
+        text_out = response_text
+        synthesis_status = "complete"
+        llm_synthesis_error: str | None = None
+        partial_reason: str | None = None
+
+        if tool_calls_made:
+            if iteration_error is not None:
+                synthesis_status = "partial"
+                llm_synthesis_error = str(iteration_error)
+                partial_reason = "LLM request failed after tools ran"
+            elif is_tool_call_json_text(response_text):
+                synthesis_status = "partial"
+                partial_reason = (
+                    "Tool-calling loop ended before a natural-language answer "
+                    "(output still looked like a tool call, or the loop stopped early)."
+                )
+
+        if synthesis_status == "partial" and partial_reason:
+            text_out = build_partial_synthesis_message(
+                reason=partial_reason,
+                error_detail=llm_synthesis_error,
+                tool_calls=tool_calls_made,
+            )
+            logger.warning(
+                "Question-driven synthesis incomplete; substituted deterministic tool summary",
+                synthesis_status=synthesis_status,
+                tool_calls_count=len(tool_calls_made),
+            )
+
         return {
-            "text": response_text,
+            "text": text_out,
             "tool_calls": tool_calls_made,
             "iterations": iteration + 1,
+            "synthesis_status": synthesis_status,
+            "llm_synthesis_error": llm_synthesis_error,
         }

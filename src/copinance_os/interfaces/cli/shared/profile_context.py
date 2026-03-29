@@ -8,7 +8,7 @@ import typer
 from rich.console import Console
 
 from copinance_os.domain.models.profile import FinancialLiteracy
-from copinance_os.infra.di import container
+from copinance_os.interfaces.cli.shared.container_access import get_container
 from copinance_os.research.workflows.profile import (
     CreateProfileRequest,
     GetCurrentProfileRequest,
@@ -30,7 +30,7 @@ async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID |
         return profile_id
 
     # Check current profile
-    current_profile_uc = container.get_current_profile_use_case()
+    current_profile_uc = get_container().get_current_profile_use_case()
     current_response = await current_profile_uc.execute(GetCurrentProfileRequest())
 
     if current_response.profile:
@@ -68,7 +68,7 @@ async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID |
     }
     selected_literacy = literacy_map.get(choice, FinancialLiteracy.INTERMEDIATE)
 
-    create_profile_uc = container.create_profile_use_case()
+    create_profile_uc = get_container().create_profile_use_case()
     create_response = await create_profile_uc.execute(
         CreateProfileRequest(financial_literacy=selected_literacy, display_name=None)
     )

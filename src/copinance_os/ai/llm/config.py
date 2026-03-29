@@ -1,7 +1,7 @@
 """LLM configuration model for integrators to provide LLM settings."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 
 @dataclass
@@ -12,8 +12,8 @@ class LLMConfig:
     (API keys, provider, model, etc.) instead of reading from environment variables.
 
     Attributes:
-        provider: LLM provider name (e.g., "gemini", "ollama", "openai", "anthropic")
-        api_key: API key for the provider (required for cloud providers like Gemini, OpenAI, Anthropic)
+        provider: LLM provider name (e.g., "gemini", "ollama", "openai")
+        api_key: API key for the provider (required for cloud providers like Gemini, OpenAI)
         model: Model name to use (e.g., "gemini-1.5-pro", "gpt-4", "llama2")
         base_url: Base URL for the provider (optional, for custom endpoints or local providers like Ollama)
         temperature: Default temperature for generation (0.0 to 1.0)
@@ -21,6 +21,13 @@ class LLMConfig:
         execution_type_providers: Optional mapping of execution types to provider names
                                   (e.g., {"question_driven_analysis": "gemini"})
         provider_config: Additional provider-specific configuration
+        text_streaming_mode: How `generate_text_stream` chooses native vs buffered I/O:
+            - "auto": use native streaming when supported, otherwise buffered
+              `generate_text` fallback (also used if native fails in auto).
+            - "native": require provider-native streaming; raises if unsupported or fails.
+            - "buffered": always one-shot `generate_text` then emit chunks (works for all models).
+        provider_config may include:
+            disable_native_text_stream (bool): force buffered path even for auto mode.
     """
 
     provider: str
@@ -29,6 +36,7 @@ class LLMConfig:
     base_url: str | None = None
     temperature: float = 0.7
     max_tokens: int | None = None
+    text_streaming_mode: Literal["auto", "native", "buffered"] = "auto"
     execution_type_providers: dict[str, str] = field(default_factory=dict)
     provider_config: dict[str, Any] = field(default_factory=dict)
 

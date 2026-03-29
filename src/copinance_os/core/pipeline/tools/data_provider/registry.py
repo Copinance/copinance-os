@@ -4,10 +4,21 @@ from typing import Any
 
 from copinance_os.core.pipeline.tools.analysis import create_rule_based_regime_tools
 from copinance_os.core.pipeline.tools.data_provider.fundamental_data import (
+    FundamentalDataFindSecFundsTool,
     FundamentalDataGetFinancialStatementsTool,
     FundamentalDataGetFundamentalsTool,
+    FundamentalDataGetSEC13FInstitutionalHoldingsTool,
+    FundamentalDataGetSECCompanyEdgarProfileTool,
+    FundamentalDataGetSECCompanyFactsStatementTool,
+    FundamentalDataGetSECCompareFinancialsTool,
     FundamentalDataGetSECFilingContentTool,
     FundamentalDataGetSECFilingsTool,
+    FundamentalDataGetSecFundEntityTool,
+    FundamentalDataGetSecFundFilingsTool,
+    FundamentalDataGetSecFundLatestReportTool,
+    FundamentalDataGetSecFundPortfolioTool,
+    FundamentalDataGetSECInsiderForm4Tool,
+    FundamentalDataGetSECXbrlStatementTableTool,
 )
 from copinance_os.core.pipeline.tools.data_provider.market_data import (
     MarketDataGetHistoricalDataTool,
@@ -78,15 +89,23 @@ def create_fundamental_data_tools(
     else:
         actual_provider = provider
 
+    # Order matters for LLM prompts: analytical SEC tools before generic filing list/content.
     return [
         FundamentalDataGetFundamentalsTool(actual_provider, cache_manager=cache_manager),
+        FundamentalDataGetSECCompanyEdgarProfileTool(provider, cache_manager=cache_manager),
+        FundamentalDataFindSecFundsTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSecFundEntityTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSecFundFilingsTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSecFundPortfolioTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSecFundLatestReportTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSECCompanyFactsStatementTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSECCompareFinancialsTool(provider, cache_manager=cache_manager),
         FundamentalDataGetFinancialStatementsTool(actual_provider, cache_manager=cache_manager),
-        FundamentalDataGetSECFilingsTool(
-            provider, cache_manager=cache_manager
-        ),  # SEC filings tool supports selectors
-        FundamentalDataGetSECFilingContentTool(
-            provider, cache_manager=cache_manager
-        ),  # SEC filing content tool supports selectors
+        FundamentalDataGetSECXbrlStatementTableTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSECInsiderForm4Tool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSEC13FInstitutionalHoldingsTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSECFilingsTool(provider, cache_manager=cache_manager),
+        FundamentalDataGetSECFilingContentTool(provider, cache_manager=cache_manager),
     ]
 
 
@@ -119,8 +138,27 @@ def create_fundamental_data_tools_with_providers(
 
         return [
             FundamentalDataGetFundamentalsTool(default_provider, cache_manager=cache_manager),
+            FundamentalDataGetSECCompanyEdgarProfileTool(
+                multi_selector, cache_manager=cache_manager
+            ),
+            FundamentalDataFindSecFundsTool(multi_selector, cache_manager=cache_manager),
+            FundamentalDataGetSecFundEntityTool(multi_selector, cache_manager=cache_manager),
+            FundamentalDataGetSecFundFilingsTool(multi_selector, cache_manager=cache_manager),
+            FundamentalDataGetSecFundPortfolioTool(multi_selector, cache_manager=cache_manager),
+            FundamentalDataGetSecFundLatestReportTool(multi_selector, cache_manager=cache_manager),
+            FundamentalDataGetSECCompanyFactsStatementTool(
+                multi_selector, cache_manager=cache_manager
+            ),
+            FundamentalDataGetSECCompareFinancialsTool(multi_selector, cache_manager=cache_manager),
             FundamentalDataGetFinancialStatementsTool(
                 default_provider, cache_manager=cache_manager
+            ),
+            FundamentalDataGetSECXbrlStatementTableTool(
+                multi_selector, cache_manager=cache_manager
+            ),
+            FundamentalDataGetSECInsiderForm4Tool(multi_selector, cache_manager=cache_manager),
+            FundamentalDataGetSEC13FInstitutionalHoldingsTool(
+                multi_selector, cache_manager=cache_manager
             ),
             FundamentalDataGetSECFilingsTool(multi_selector, cache_manager=cache_manager),
             FundamentalDataGetSECFilingContentTool(multi_selector, cache_manager=cache_manager),

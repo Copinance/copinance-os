@@ -27,8 +27,8 @@ Set by `estimate_bsm_greeks_for_options_chain` / `QuantLibBsmGreekEstimator` whe
 ## Configuration and profile
 
 - **Environment / `.env`** (via `pydantic-settings`, prefix `COPINANCEOS_`):
-  - `OPTION_GREEKS_RISK_FREE_RATE` — optional; unset uses built-in default (`0.045`).
-  - `OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT` — optional; unset uses `0` when chain has no `dividend_yield`.
+  - `COPINANCEOS_OPTION_GREEKS_RISK_FREE_RATE` — optional; unset uses built-in default (`0.045`).
+  - `COPINANCEOS_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT` — optional; unset uses `0` when chain has no `dividend_yield`.
 - **`AnalysisProfile.preferences`** (optional overrides when you construct `QuantLibBsmGreekEstimator(profile=...)`):
   - `option_greeks_risk_free_rate`
   - `option_greeks_dividend_yield_default`

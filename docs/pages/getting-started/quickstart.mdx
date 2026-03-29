@@ -2,6 +2,8 @@
 
 Run a few **CLI** commands to see deterministic analysis (fixed pipelines) and optional **question-driven** analysis (LLM + tools). The CLI uses the same container and orchestration stack as the library; nothing here is “LLM-only”—quotes and metrics come from data providers and tools.
 
+You can also run a **standalone research question** at the root (no `analyze` subcommand): `copinance "Your question here"` uses the full tool suite with default macro-style market context—see [CLI — Natural language at the root](/user-guide/cli#natural-language-at-the-root).
+
 ## Your First Analysis
 
 ### 1. Search for an Instrument
@@ -47,12 +49,16 @@ This fetches an options chain snapshot with contract prices, implied volatility,
 ### 5. Analyze with a Question
 
 ```bash
-# Question-driven analysis: AI uses tools to answer (equity or options context)
+# Question-driven analysis: the model uses tools to answer (equity or options context)
 copinance analyze equity AAPL --question "What is the current price and P/E ratio?"
 copinance analyze options AAPL --question "How is the options chain positioned?"
+
+# With SEC/EDGAR configured, you can ask about public filings, filings history, or comparisons
+copinance analyze equity AAPL --question "What recent 10-K and 10-Q filings exist and what are the accession numbers?"
+copinance analyze equity MSFT --question "How does Microsoft’s headline revenue compare to Apple’s over recent periods?"
 ```
 
-The AI will analyze the selected market context using available data tools. Use `--question` for the question and choose `analyze equity`, `analyze options`, or `analyze macro` for the target context.
+The model analyzes the selected context using registered tools (market data, fundamentals, regime/macro, and SEC tools when available). Use `--question` and pick `analyze equity`, `analyze options`, or `analyze macro`. See [CLI — Question-driven examples](/user-guide/cli#question-driven-examples) for more ideas.
 
 ## Working with Profiles
 

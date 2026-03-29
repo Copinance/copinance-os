@@ -94,9 +94,9 @@ Prefixes:
    - Entities, validation, pure strategy protocols
    - No I/O; defines ports (interfaces)
 
-2. **Research Workflows** (`research/workflows/`)
-   - Typed workflows (market, analyze, profile, fundamentals, backtest)
-   - Prefer YAML/JSON for reproducible simple long-only backtests (`backtest_config.py`); orchestration stays in `ResearchOrchestrator`
+2. **Research layer — use cases** (`research/workflows/`)
+   - Typed requests and use cases (market, analyze, profile, fundamentals, backtest); analysis jobs run through **`ResearchOrchestrator`**, **`DefaultJobRunner`**, and **`AnalysisExecutor`** implementations
+   - Prefer YAML/JSON for reproducible simple long-only backtests (`backtest_config.py`)
 
 3. **Data Layer** (`data/`)
    - Providers, cache, repositories, analytics adapters
@@ -112,7 +112,7 @@ Prefixes:
    - Settings (`infra/config/`), logging, DI wiring (`infra/di/`), factories
 
 7. **Interfaces** (`interfaces/cli/`)
-   - Typer CLI; maps user input to workflows and container
+   - CLI entry (`main`, `dispatch`, lazy Typer `root`, `commands/`); maps user input to use cases and the DI container
 
 ### Best Practices
 
@@ -129,7 +129,7 @@ Prefixes:
 When adding features, follow these steps:
 
 1. **Domain**: Define entities and ports if needed
-2. **Research workflows**: Add or extend workflow modules in `research/workflows/`
+2. **Research use cases**: Add or extend modules in `research/workflows/`
 3. **Data / core / ai**: Implement adapters, executors, or LLM wiring as appropriate
 4. **Interfaces**: Add CLI commands if needed
 5. **Tests**: Mirror package layout under `tests/unit/copinance_os/`

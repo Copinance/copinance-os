@@ -7,7 +7,11 @@ import pytest
 
 from copinance_os.domain.models.job import JobTimeframe, RunJobResult
 from copinance_os.domain.models.market import OptionSide
-from copinance_os.interfaces.cli.analyze import analyze_equity, analyze_macro, analyze_options
+from copinance_os.interfaces.cli.commands.analyze import (
+    analyze_equity,
+    analyze_macro,
+    analyze_options,
+)
 from copinance_os.research.workflows.analyze import (
     AnalyzeInstrumentRequest,
     AnalyzeMarketRequest,
@@ -15,16 +19,22 @@ from copinance_os.research.workflows.analyze import (
 )
 
 
+def _typer_ctx() -> MagicMock:
+    ctx = MagicMock()
+    ctx.obj = {}
+    return ctx
+
+
 @pytest.mark.unit
 class TestAnalyzeCLI:
-    @patch("copinance_os.interfaces.cli.analyze.ensure_profile_with_literacy")
-    @patch("copinance_os.interfaces.cli.analyze.get_storage_path_safe")
-    @patch("copinance_os.interfaces.cli.analyze.container.analyze_instrument_use_case")
-    @patch("copinance_os.interfaces.cli.analyze.console")
+    @patch("copinance_os.interfaces.cli.commands.analyze.ensure_profile_with_literacy")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.get_storage_path_safe")
+    @patch("copinance_os.interfaces.cli.commands.analyze.get_container")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.console")
     def test_analyze_equity_calls_use_case_and_displays(
         self,
         mock_console: MagicMock,
-        mock_instrument_use_case: MagicMock,
+        mock_get_container: MagicMock,
         mock_get_storage_path_safe: MagicMock,
         mock_ensure_profile: MagicMock,
         tmp_path: Path,
@@ -35,9 +45,10 @@ class TestAnalyzeCLI:
         mock_uc.execute = AsyncMock(
             return_value=RunJobResult(success=True, results={"summary": "ok"}, error_message=None)
         )
-        mock_instrument_use_case.return_value = mock_uc
+        mock_get_container.return_value.analyze_instrument_use_case.return_value = mock_uc
 
         analyze_equity(
+            _typer_ctx(),
             symbol="AAPL",
             timeframe=JobTimeframe.MID_TERM,
             question=None,
@@ -55,13 +66,13 @@ class TestAnalyzeCLI:
         assert mock_console.print.called
         assert (tmp_path / "results" / "v2").exists()
 
-    @patch("copinance_os.interfaces.cli.analyze.ensure_profile_with_literacy")
-    @patch("copinance_os.interfaces.cli.analyze.container.analyze_instrument_use_case")
-    @patch("copinance_os.interfaces.cli.analyze.console")
+    @patch("copinance_os.interfaces.cli.commands.analyze.ensure_profile_with_literacy")
+    @patch("copinance_os.interfaces.cli.commands.analyze.get_container")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.console")
     def test_analyze_options_agentic_calls_use_case(
         self,
         mock_console: MagicMock,
-        mock_instrument_use_case: MagicMock,
+        mock_get_container: MagicMock,
         mock_ensure_profile: MagicMock,
     ) -> None:
         mock_ensure_profile.return_value = None
@@ -73,9 +84,10 @@ class TestAnalyzeCLI:
                 error_message=None,
             )
         )
-        mock_instrument_use_case.return_value = mock_uc
+        mock_get_container.return_value.analyze_instrument_use_case.return_value = mock_uc
 
         analyze_options(
+            _typer_ctx(),
             underlying_symbol="AAPL",
             expiration_date="2026-06-19",
             option_side=OptionSide.CALL,
@@ -94,14 +106,14 @@ class TestAnalyzeCLI:
         assert request.option_side == OptionSide.CALL
         assert mock_console.print.called
 
-    @patch("copinance_os.interfaces.cli.analyze.ensure_profile_with_literacy")
-    @patch("copinance_os.interfaces.cli.analyze.get_storage_path_safe")
-    @patch("copinance_os.interfaces.cli.analyze.container.analyze_market_use_case")
-    @patch("copinance_os.interfaces.cli.analyze.console")
+    @patch("copinance_os.interfaces.cli.commands.analyze.ensure_profile_with_literacy")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.get_storage_path_safe")
+    @patch("copinance_os.interfaces.cli.commands.analyze.get_container")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.console")
     def test_analyze_macro_calls_use_case_and_displays(
         self,
         mock_console: MagicMock,
-        mock_market_use_case: MagicMock,
+        mock_get_container: MagicMock,
         mock_get_storage_path_safe: MagicMock,
         mock_ensure_profile: MagicMock,
         tmp_path: Path,
@@ -116,9 +128,10 @@ class TestAnalyzeCLI:
                 error_message=None,
             )
         )
-        mock_market_use_case.return_value = mock_uc
+        mock_get_container.return_value.analyze_market_use_case.return_value = mock_uc
 
         analyze_macro(
+            _typer_ctx(),
             market_index="SPY",
             timeframe=JobTimeframe.MID_TERM,
             question=None,

@@ -13,15 +13,15 @@ from rich.table import Table
 from copinance_os.data.loaders.persistence import get_cache_dir
 from copinance_os.domain.models.market import OptionsChain, OptionSide
 from copinance_os.infra.config import get_storage_path_safe
-from copinance_os.infra.di import container
-from copinance_os.interfaces.cli.error_handler import handle_cli_error
-from copinance_os.interfaces.cli.formatting import (
+from copinance_os.interfaces.cli.shared.container_access import get_container
+from copinance_os.interfaces.cli.shared.error_handler import handle_cli_error
+from copinance_os.interfaces.cli.shared.formatting import (
     format_compact_number,
     format_exchange,
     format_price,
     format_volume,
 )
-from copinance_os.interfaces.cli.market_helpers import (
+from copinance_os.interfaces.cli.shared.market_helpers import (
     SUPPORTED_HISTORY_INTERVALS,
     fmt_optional_greek,
     format_fundamentals_value,
@@ -29,7 +29,7 @@ from copinance_os.interfaces.cli.market_helpers import (
     income_trend_table,
     options_chain_to_display,
 )
-from copinance_os.interfaces.cli.utils import async_command
+from copinance_os.interfaces.cli.shared.utils import async_command, print_json_stdout
 from copinance_os.research.workflows.fundamentals import GetStockFundamentalsRequest
 from copinance_os.research.workflows.market import (
     GetHistoricalDataRequest,
@@ -41,13 +41,28 @@ from copinance_os.research.workflows.market import (
 
 market_app = typer.Typer(
     help="Market data: search, quote, history, options (BSM Greeks via QuantLib), fundamentals",
+    invoke_without_command=False,
+    no_args_is_help=True,
 )
 console = Console()
+
+
+@market_app.callback()
+def _market_group(
+    ctx: typer.Context,
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Print command result as JSON to stdout (machine-readable).",
+    ),
+) -> None:
+    ctx.obj = {"json_output": json_output}
 
 
 @market_app.command("search")
 @async_command
 async def search_instruments(
+    ctx: typer.Context,
     query: str = typer.Argument(..., help="Search query (symbol or display name)"),
     limit: int = typer.Option(10, help="Maximum results"),
     search_mode: InstrumentSearchMode = typer.Option(
@@ -57,9 +72,13 @@ async def search_instruments(
     ),
 ) -> None:
     """Search for market instruments by symbol or name."""
-    use_case = container.search_instruments_use_case()
+    use_case = get_container().search_instruments_use_case()
     request = SearchInstrumentsRequest(query=query, limit=limit, search_mode=search_mode)
     response = await use_case.execute(request)
+
+    if ctx.obj and ctx.obj.get("json_output"):
+        print_json_stdout({"command": "search", "response": response.model_dump(mode="json")})
+        return
 
     if not response.instruments:
         console.print(f"No instruments found for '{query}'.", style="yellow")
@@ -80,6 +99,7 @@ async def search_instruments(
 @market_app.command("quote")
 @async_command
 async def get_market_quote(
+    ctx: typer.Context,
     symbol: str = typer.Argument(..., help="Instrument symbol"),
     no_cache: bool = typer.Option(
         False,
@@ -89,7 +109,7 @@ async def get_market_quote(
 ) -> None:
     """Fetch the latest market quote for an instrument."""
     symbol_upper = symbol.upper()
-    cache_manager = container.cache_manager()
+    cache_manager = get_container().cache_manager()
     quote: dict[str, Any] | None = None
 
     if not no_cache:
@@ -102,7 +122,7 @@ async def get_market_quote(
 
     if quote is None:
         try:
-            use_case = container.get_quote_use_case()
+            use_case = get_container().get_quote_use_case()
             response = await use_case.execute(GetQuoteRequest(symbol=symbol_upper))
             quote = response.quote
         except Exception as e:
@@ -117,6 +137,10 @@ async def get_market_quote(
                     metadata={"symbol": symbol_upper},
                     symbol=symbol_upper,
                 )
+
+    if ctx.obj and ctx.obj.get("json_output"):
+        print_json_stdout({"command": "quote", "response": quote})
+        return
 
     table = Table(title=f"Market Quote for {quote.get('symbol', symbol_upper)}")
     table.add_column("Field", style="cyan")
@@ -143,6 +167,7 @@ async def get_market_quote(
 @market_app.command("history")
 @async_command
 async def get_market_history(
+    ctx: typer.Context,
     symbol: str = typer.Argument(..., help="Instrument symbol"),
     start_date: str = typer.Option(..., "--start", help="Start date in YYYY-MM-DD format"),
     end_date: str = typer.Option(..., "--end", help="End date in YYYY-MM-DD format"),
@@ -183,7 +208,7 @@ async def get_market_history(
     start_str = parsed_start_date.strftime("%Y-%m-%d")
     end_str = parsed_end_date.strftime("%Y-%m-%d")
     symbol_upper = symbol.upper()
-    cache_manager = container.cache_manager()
+    cache_manager = get_container().cache_manager()
 
     rows: list[dict[str, Any]] = []
     cache_file_path: str | None = None
@@ -205,7 +230,7 @@ async def get_market_history(
 
     if not rows:
         try:
-            use_case = container.get_historical_data_use_case()
+            use_case = get_container().get_historical_data_use_case()
             response = await use_case.execute(
                 GetHistoricalDataRequest(
                     symbol=symbol_upper,
@@ -237,6 +262,23 @@ async def get_market_history(
 
     cache_dir = get_cache_dir(get_storage_path_safe())
     cache_location = cache_file_path if cache_file_path else str(cache_dir)
+
+    if ctx.obj and ctx.obj.get("json_output"):
+        print_json_stdout(
+            {
+                "command": "history",
+                "symbol": symbol_upper,
+                "start_date": start_str,
+                "end_date": end_str,
+                "interval": interval,
+                "row_count": len(rows),
+                "limit": limit,
+                "cache_location": cache_location,
+                "rows": rows,
+            }
+        )
+        return
+
     console.print(f"[dim]Cache: {cache_location}[/dim]\n")
 
     to_show = rows[:limit] if limit else rows
@@ -268,6 +310,7 @@ async def get_market_history(
 @market_app.command("options")
 @async_command
 async def get_options_chain(
+    ctx: typer.Context,
     underlying_symbol: str = typer.Argument(..., help="Underlying symbol (e.g. AAPL, SPY)"),
     expiration_date: str | None = typer.Option(
         None,
@@ -311,7 +354,7 @@ async def get_options_chain(
     Uses the same cache as question-driven analysis for identical underlying/expiration keys.
     """
     symbol_upper = underlying_symbol.upper()
-    cache_manager = container.cache_manager()
+    cache_manager = get_container().cache_manager()
     options_data: OptionsChain | dict[str, Any] | None = None
 
     if not no_cache:
@@ -328,7 +371,7 @@ async def get_options_chain(
 
     if options_data is None:
         try:
-            use_case = container.get_options_chain_use_case()
+            use_case = get_container().get_options_chain_use_case()
             response = await use_case.execute(
                 GetOptionsChainRequest(
                     underlying_symbol=symbol_upper,
@@ -365,6 +408,26 @@ async def get_options_chain(
         if hasattr(options_data, "underlying_symbol")
         else options_data.get("underlying_symbol", symbol_upper)
     )
+
+    if ctx.obj and ctx.obj.get("json_output"):
+        chain_payload: Any
+        if hasattr(options_data, "model_dump"):
+            chain_payload = options_data.model_dump(mode="json")
+        else:
+            chain_payload = dict(options_data) if isinstance(options_data, dict) else options_data
+        print_json_stdout(
+            {
+                "command": "options",
+                "underlying": sym,
+                "expiration_display": exp_str,
+                "underlying_price": underlying_price,
+                "option_side": option_side.value,
+                "contracts": contracts,
+                "chain": chain_payload,
+            }
+        )
+        return
+
     console.print(
         f"[bold]Options chain for {sym}[/bold] "
         f"(expiration: {exp_str}, underlying: {underlying_price})"
@@ -432,6 +495,7 @@ async def get_options_chain(
 @market_app.command("fundamentals")
 @async_command
 async def get_market_fundamentals(
+    ctx: typer.Context,
     symbol: str = typer.Argument(..., help="Equity symbol"),
     periods: int = typer.Option(
         5,
@@ -456,7 +520,7 @@ async def get_market_fundamentals(
     balance sheet, cash flow, and key ratios.
     """
     symbol_upper = symbol.upper()
-    cache_manager = container.cache_manager()
+    cache_manager = get_container().cache_manager()
     fundamentals_data: dict[str, Any] | None = None
 
     if not no_cache:
@@ -474,7 +538,7 @@ async def get_market_fundamentals(
 
     if fundamentals_data is None:
         try:
-            use_case = container.get_stock_fundamentals_use_case()
+            use_case = get_container().get_stock_fundamentals_use_case()
             response = await use_case.execute(
                 GetStockFundamentalsRequest(
                     symbol=symbol_upper,
@@ -501,6 +565,17 @@ async def get_market_fundamentals(
                     periods=periods,
                     period_type=period_type,
                 )
+
+    if ctx.obj and ctx.obj.get("json_output"):
+        print_json_stdout(
+            {
+                "command": "fundamentals",
+                "response": fundamentals_data,
+                "periods": periods,
+                "period_type": period_type,
+            }
+        )
+        return
 
     console.print(f"[bold]Fundamentals for {fundamentals_data.get('symbol', symbol_upper)}[/bold]")
     num_income = len(fundamentals_data.get("income_statements") or [])

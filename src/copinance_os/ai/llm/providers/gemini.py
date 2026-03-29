@@ -3,6 +3,7 @@
 import asyncio
 import json
 import re
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from decimal import Decimal
 from typing import Any, cast
 
@@ -17,7 +18,17 @@ except ImportError:
     genai = None  # type: ignore[assignment]
 
 from copinance_os.ai.llm.providers.base import LLMProvider
+from copinance_os.ai.llm.streaming import LLMTextStreamEvent, TextStreamingMode
+from copinance_os.ai.llm.tool_loop_streaming import (
+    generate_turn_text_with_stream,
+    maybe_emit_tool_round_rollback,
+)
+from copinance_os.core.execution_engine.question_driven_tool_summary import (
+    build_partial_synthesis_message,
+    is_tool_call_json_text,
+)
 from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
+from copinance_os.domain.models.llm_conversation import LLMConversationTurn
 from copinance_os.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)
@@ -54,6 +65,9 @@ class GeminiProvider(LLMProvider):
         model_name: str = "gemini-1.5-pro",
         temperature: float = 0.7,
         max_output_tokens: int | None = None,
+        *,
+        text_streaming_mode: TextStreamingMode = "auto",
+        disable_native_text_stream: bool = False,
     ) -> None:
         """Initialize Gemini provider.
 
@@ -64,11 +78,15 @@ class GeminiProvider(LLMProvider):
                        All support function calling for question-driven analysis
             temperature: Default temperature for generation
             max_output_tokens: Default max output tokens
+            text_streaming_mode: Default mode for :meth:`generate_text_stream`
+            disable_native_text_stream: If True, API streaming is disabled (buffered only).
         """
         self._api_key = api_key
         self._model_name = model_name
         self._default_temperature = temperature
         self._default_max_output_tokens = max_output_tokens
+        self._text_streaming_mode: TextStreamingMode = text_streaming_mode
+        self._disable_native_text_stream = disable_native_text_stream
         self._client: Any = None
 
         if GEMINI_AVAILABLE and api_key:
@@ -179,6 +197,109 @@ class GeminiProvider(LLMProvider):
         """
         return self._model_name
 
+    def supports_native_text_stream(self) -> bool:
+        return (
+            bool(GEMINI_AVAILABLE and self._api_key and self._client is not None)
+            and not self._disable_native_text_stream
+        )
+
+    @staticmethod
+    def _delta_from_cumulative_fragment(piece: str, acc_ref: list[str]) -> str:
+        """Turn a (possibly cumulative) stream fragment into an incremental delta."""
+        if not piece:
+            return ""
+        acc = acc_ref[0]
+        if piece.startswith(acc):
+            delta = piece[len(acc) :]
+            acc_ref[0] = piece
+            return delta
+        acc_ref[0] = acc + piece
+        return piece
+
+    def _sync_generate_content_stream(
+        self, contents: str | list[Any], config: dict[str, Any]
+    ) -> Any:
+        """Synchronous streaming iterator from the Gemini client (run in a worker thread)."""
+        if not GEMINI_AVAILABLE or genai is None:
+            raise RuntimeError("google-genai package is not installed")
+        if config:
+            try:
+                gen_config = genai.types.GenerateContentConfig(**config)
+                return self._client.models.generate_content_stream(
+                    model=self._model_name,
+                    contents=contents,
+                    config=gen_config,
+                )
+            except (AttributeError, TypeError):
+                return self._client.models.generate_content_stream(
+                    model=self._model_name,
+                    contents=contents,
+                    config=config,
+                )
+        return self._client.models.generate_content_stream(
+            model=self._model_name,
+            contents=contents,
+        )
+
+    async def _iter_native_text_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        temperature: float | None,
+        max_tokens: int | None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[LLMTextStreamEvent, None]:
+        if not GEMINI_AVAILABLE:
+            raise RuntimeError("google-genai package is not installed")
+        if not self._api_key or self._client is None:
+            raise RuntimeError("Gemini client is not initialized")
+
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+
+        config = self._build_generation_config(temperature, max_tokens, **kwargs)
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue(maxsize=512)
+        acc_ref = [""]
+
+        def worker() -> None:
+            try:
+                stream = self._sync_generate_content_stream(full_prompt, config)
+                last_usage: dict[str, int] | None = None
+                for chunk in stream:
+                    last_usage = self._extract_usage(chunk)
+                    piece = self._extract_response_text(chunk)
+                    delta = self._delta_from_cumulative_fragment(piece, acc_ref)
+                    if delta:
+                        asyncio.run_coroutine_threadsafe(queue.put(("d", delta)), loop).result()
+                usage_out = last_usage if last_usage and any(last_usage.values()) else None
+                asyncio.run_coroutine_threadsafe(queue.put(("done", usage_out)), loop).result()
+            except Exception as e:
+                asyncio.run_coroutine_threadsafe(queue.put(("err", e)), loop).result()
+
+        task = asyncio.create_task(asyncio.to_thread(worker))
+        try:
+            while True:
+                kind, payload = await queue.get()
+                if kind == "d" and payload:
+                    yield LLMTextStreamEvent(
+                        kind="text_delta",
+                        text_delta=payload,
+                        native_streaming=True,
+                    )
+                elif kind == "done":
+                    yield LLMTextStreamEvent(
+                        kind="done",
+                        native_streaming=True,
+                        usage=payload,
+                    )
+                    break
+                elif kind == "err":
+                    raise payload
+        finally:
+            await task
+
     def _extract_response_text(self, response: Any) -> str:
         """Extract text from Gemini API response.
 
@@ -281,15 +402,13 @@ class GeminiProvider(LLMProvider):
         config.update(kwargs)
         return config
 
-    def _call_gemini_api(self, prompt: str, config: dict[str, Any] | None = None) -> Any:
-        """Call Gemini API with the given prompt and config.
-
-        Args:
-            prompt: The prompt to send
-            config: Optional generation config
+    def _call_gemini_api(
+        self, contents: str | list[Any], config: dict[str, Any] | None = None
+    ) -> Any:
+        """Call Gemini with a string or multi-turn ``contents`` list.
 
         Returns:
-            Gemini API response
+            Awaitable (Future) compatible with ``await`` from async callers.
         """
         loop = asyncio.get_event_loop()
 
@@ -299,23 +418,98 @@ class GeminiProvider(LLMProvider):
                     gen_config = genai.types.GenerateContentConfig(**config)
                     return self._client.models.generate_content(
                         model=self._model_name,
-                        contents=prompt,
+                        contents=contents,
                         config=gen_config,
                     )
                 except (AttributeError, TypeError):
-                    # Fallback to dict config
                     return self._client.models.generate_content(
                         model=self._model_name,
-                        contents=prompt,
+                        contents=contents,
                         config=config,
                     )
-            else:
-                return self._client.models.generate_content(
-                    model=self._model_name,
-                    contents=prompt,
-                )
+            return self._client.models.generate_content(
+                model=self._model_name,
+                contents=contents,
+            )
 
         return loop.run_in_executor(None, _generate)
+
+    @staticmethod
+    def _gemini_build_contents(
+        prior: list[LLMConversationTurn] | None, user_prompt: str
+    ) -> list[Any]:
+        """Map prior turns + current user task to Gemini ``Content`` list (user / model roles)."""
+        if not GEMINI_AVAILABLE or genai is None:
+            raise RuntimeError("google-genai package is not installed")
+        contents: list[Any] = []
+        for t in prior or []:
+            g_role = "user" if t.role == "user" else "model"
+            contents.append(
+                genai.types.Content(
+                    role=g_role,
+                    parts=[genai.types.Part.from_text(text=t.content)],
+                )
+            )
+        contents.append(
+            genai.types.Content(
+                role="user",
+                parts=[genai.types.Part.from_text(text=user_prompt)],
+            )
+        )
+        return contents
+
+    async def _gemini_stream_tool_turn(
+        self,
+        contents: list[Any],
+        config: dict[str, Any],
+        on_stream_event: Callable[[LLMTextStreamEvent], Awaitable[None]],
+    ) -> str:
+        """Single tool-loop generation with native streaming over ``contents``."""
+        if not GEMINI_AVAILABLE:
+            raise RuntimeError("google-genai package is not installed")
+        if not self._api_key or self._client is None:
+            raise RuntimeError("Gemini client is not initialized")
+
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue(maxsize=512)
+        acc_ref = [""]
+
+        def worker() -> None:
+            try:
+                stream = self._sync_generate_content_stream(contents, config)
+                last_usage: dict[str, int] | None = None
+                for chunk in stream:
+                    last_usage = self._extract_usage(chunk)
+                    piece = self._extract_response_text(chunk)
+                    delta = self._delta_from_cumulative_fragment(piece, acc_ref)
+                    if delta:
+                        asyncio.run_coroutine_threadsafe(queue.put(("d", delta)), loop).result()
+                usage_out = last_usage if last_usage and any(last_usage.values()) else None
+                asyncio.run_coroutine_threadsafe(queue.put(("done", usage_out)), loop).result()
+            except Exception as e:
+                asyncio.run_coroutine_threadsafe(queue.put(("err", e)), loop).result()
+
+        task = asyncio.create_task(asyncio.to_thread(worker))
+        parts: list[str] = []
+        try:
+            while True:
+                kind, payload = await queue.get()
+                if kind == "d" and payload:
+                    parts.append(payload)
+                    await on_stream_event(
+                        LLMTextStreamEvent(
+                            kind="text_delta",
+                            text_delta=payload,
+                            native_streaming=True,
+                        )
+                    )
+                elif kind == "done":
+                    break
+                elif kind == "err":
+                    raise payload
+        finally:
+            await task
+        return "".join(parts)
 
     @staticmethod
     def _make_json_serializable(obj: Any) -> Any:
@@ -444,6 +638,10 @@ class GeminiProvider(LLMProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         max_iterations: int = 5,
+        *,
+        stream: bool = False,
+        on_stream_event: Callable[[LLMTextStreamEvent], Awaitable[None]] | None = None,
+        prior_conversation: list[LLMConversationTurn] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Generate text with optional tool usage using Gemini function calling.
@@ -472,38 +670,41 @@ class GeminiProvider(LLMProvider):
 
         # If no tools, fallback to regular generation
         if tools is None or len(tools) == 0:
-            text = await self.generate_text(
+            text = await generate_turn_text_with_stream(
+                self,
                 prompt=prompt,
                 system_prompt=system_prompt,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                stream=stream,
+                on_stream_event=on_stream_event,
                 **kwargs,
             )
             return {
                 "text": text,
                 "tool_calls": [],
                 "iterations": 1,
+                "synthesis_status": "complete",
+                "llm_synthesis_error": None,
             }
 
         # Create tool executor
         executor = ToolExecutor(tools)
 
-        # Combine prompts (caller manages prompt content)
-        full_prompt = prompt
+        # Native multi-turn: prior user/model turns + current user task; system via config
+        base_cfg = self._build_generation_config(temperature, max_tokens, **kwargs)
+        config = dict(base_cfg)
         if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
+            config["systemInstruction"] = system_prompt
 
-        # Prepare config
-        config = self._build_generation_config(temperature, max_tokens, **kwargs)
-
-        # Multi-turn conversation with tool calling
         tool_calls_made: list[dict[str, Any]] = []
-        current_prompt = full_prompt
+        contents: list[Any] = self._gemini_build_contents(prior_conversation, prompt)
         response_text = ""
         usage_total: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
         # Track recent tool calls for loop detection
         recent_tool_calls: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
         max_recent_history = 3  # Check last 3 calls for loops
+        iteration_error: Exception | None = None
 
         for iteration in range(max_iterations):
             try:
@@ -513,15 +714,26 @@ class GeminiProvider(LLMProvider):
                     max_iterations=max_iterations,
                 )
 
-                # Generate response with current prompt (caller manages prompt content)
-                response = await self._call_gemini_api(current_prompt, config)
-                response_text = self._extract_response_text(response)
-                u = self._extract_usage(response)
-                for k in usage_total:
-                    usage_total[k] += u.get(k, 0)
+                # Generate with Gemini multi-turn contents (prior turns + in-loop model/user)
+                if stream and on_stream_event:
+                    response_text = await self._gemini_stream_tool_turn(
+                        contents, config, on_stream_event
+                    )
+                else:
+                    response = await self._call_gemini_api(contents, config)
+                    response_text = self._extract_response_text(response)
+                    u = self._extract_usage(response)
+                    for k in usage_total:
+                        usage_total[k] += u.get(k, 0)
 
                 # Parse tool calls from response
                 function_calls = self._parse_tool_calls_from_response(response_text, executor)
+
+                await maybe_emit_tool_round_rollback(
+                    stream=stream,
+                    on_stream_event=on_stream_event,
+                    had_tool_calls=bool(function_calls),
+                )
 
                 # If no function calls found, we're done
                 if not function_calls:
@@ -558,7 +770,9 @@ class GeminiProvider(LLMProvider):
                     )
                     break
 
-                # Execute function calls
+                # Execute function calls; then append model + user(tool feedback) for Gemini turns
+                tool_feedback_parts: list[str] = []
+                stop_suffix: str | None = None
                 for func_call in function_calls:
                     tool_name = func_call["name"]
                     tool_args = func_call.get("args", {})
@@ -706,13 +920,10 @@ class GeminiProvider(LLMProvider):
                                 invalid_params=has_invalid_params,
                             )
 
-                    # Append tool result to prompt in generic JSON format
-                    # Caller is responsible for prompt structure and formatting
+                    # Collect tool result JSON for the following user turn
                     serializable_data = self._make_json_serializable(result_data)
                     tool_result_json = json.dumps(serializable_data, indent=2)
-                    current_prompt = (
-                        f"{current_prompt}\n\nTool execution result:\n{tool_result_json}"
-                    )
+                    tool_feedback_parts.append(f"Tool execution result:\n{tool_result_json}")
 
                     # If we got empty results or invalid params, suggest stopping to avoid loops
                     # But respect tool metadata that indicates retry is allowed
@@ -729,15 +940,32 @@ class GeminiProvider(LLMProvider):
                                 empty_result=is_empty_result,
                                 invalid_params=has_invalid_params,
                             )
-                            stop_message = (
+                            stop_suffix = (
                                 "IMPORTANT: Stop making tool calls now. "
                                 "The tool returned empty results or was called with invalid parameters. "
                                 "Provide your final answer based on any data you have received, "
                                 "or explain that you cannot answer the question with the available tools."
                             )
-                            current_prompt = f"{current_prompt}\n\n{stop_message}"
+
+                if tool_feedback_parts and GEMINI_AVAILABLE and genai is not None:
+                    contents.append(
+                        genai.types.Content(
+                            role="model",
+                            parts=[genai.types.Part.from_text(text=response_text)],
+                        )
+                    )
+                    user_blob = "\n\n".join(tool_feedback_parts)
+                    if stop_suffix:
+                        user_blob = f"{user_blob}\n\n{stop_suffix}"
+                    contents.append(
+                        genai.types.Content(
+                            role="user",
+                            parts=[genai.types.Part.from_text(text=user_blob)],
+                        )
+                    )
 
             except Exception as e:
+                iteration_error = e
                 logger.error(
                     "Error in tool calling iteration",
                     error=str(e),
@@ -747,24 +975,60 @@ class GeminiProvider(LLMProvider):
                 if iteration == 0:
                     # First iteration failed, fallback to regular generation
                     logger.warning("Tool calling failed, falling back to regular generation")
-                    text = await self.generate_text(
+                    text = await generate_turn_text_with_stream(
+                        self,
                         prompt=prompt,
                         system_prompt=system_prompt,
                         temperature=temperature,
                         max_tokens=max_tokens,
+                        stream=stream,
+                        on_stream_event=on_stream_event,
                         **kwargs,
                     )
                     return {
                         "text": text,
                         "tool_calls": [],
                         "iterations": 1,
+                        "synthesis_status": "complete",
+                        "llm_synthesis_error": None,
                     }
                 break
 
+        text_out = response_text
+        synthesis_status = "complete"
+        llm_synthesis_error: str | None = None
+        partial_reason: str | None = None
+
+        if tool_calls_made:
+            if iteration_error is not None:
+                synthesis_status = "partial"
+                llm_synthesis_error = str(iteration_error)
+                partial_reason = "LLM request failed after tools ran"
+            elif is_tool_call_json_text(response_text):
+                synthesis_status = "partial"
+                partial_reason = (
+                    "Tool-calling loop ended before a natural-language answer "
+                    "(output still looked like a tool call, or the loop stopped early)."
+                )
+
+        if synthesis_status == "partial" and partial_reason:
+            text_out = build_partial_synthesis_message(
+                reason=partial_reason,
+                error_detail=llm_synthesis_error,
+                tool_calls=tool_calls_made,
+            )
+            logger.warning(
+                "Question-driven synthesis incomplete; substituted deterministic tool summary",
+                synthesis_status=synthesis_status,
+                tool_calls_count=len(tool_calls_made),
+            )
+
         result: dict[str, Any] = {
-            "text": response_text,
+            "text": text_out,
             "tool_calls": tool_calls_made,
             "iterations": iteration + 1,
+            "synthesis_status": synthesis_status,
+            "llm_synthesis_error": llm_synthesis_error,
         }
         if any(usage_total.values()):
             result["llm_usage"] = dict(usage_total)

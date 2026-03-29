@@ -9,7 +9,14 @@ from copinance_os.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
-from copinance_os.domain.models.job import Job, JobScope, JobStatus, JobTimeframe, RunJobResult
+from copinance_os.domain.models.job import (
+    Job,
+    JobScope,
+    JobStatus,
+    JobTimeframe,
+    ReportExclusionReason,
+    RunJobResult,
+)
 from copinance_os.domain.models.macro import MacroDataPoint
 from copinance_os.domain.models.market import (
     MarketDataPoint,
@@ -54,6 +61,7 @@ __all__ = [
     "JobStatus",
     "JobTimeframe",
     "RunJobResult",
+    "ReportExclusionReason",
     "AnalysisProfile",
     "FinancialLiteracy",
     "Stock",

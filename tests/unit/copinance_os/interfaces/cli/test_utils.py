@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from copinance_os.interfaces.cli.utils import async_command
+from copinance_os.interfaces.cli.shared.utils import async_command
 
 
 @pytest.mark.unit

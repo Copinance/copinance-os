@@ -1,12 +1,13 @@
 # CLI Reference
 
-Complete guide to the Copinance OS **Typer** CLI (`copinance_os.interfaces.cli`). Commands resolve services from the **DI container** and run analysis through the same **research workflows** and **`ResearchOrchestrator`** path as library integrations.
+Complete guide to the Copinance OS CLI (`copinance_os.interfaces.cli`). The console entry **`main`** parses **`argv`**: known subcommands go to a **lazy Typer** app (`analyze`, `cache`, `market`, `profile`, `version`); anything else (after optional **`--json`**, **`--stream`**, or **`--include-prompt`**) is treated as a **natural-language research question** and runs question-driven **market** analysis with the full tool suite (same underlying path as `analyze macro --question`, default macro context). Otherwise, commands resolve services from the **DI container** and run jobs through the same **`DefaultJobRunner`** / **`ResearchOrchestrator`** stack as library integrations.
 
 ## Command Overview
 
 | Command | Description |
 |--------|-------------|
-| `analyze` | Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. |
+| *(no subcommand)* | If the first argument is not a known subcommand, the rest is a **research question** (see [Natural language at the root](#natural-language-at-the-root)). |
+| `analyze` | Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. Group flags **`--json`** and **`--stream`** apply before the subcommand (`equity`, `options`, `macro`). |
 | `cache` | Cache management commands (clear, refresh, info). |
 | `market` | Market data: search, quote, history, options (BSM Greeks via QuantLib), fundamentals. |
 | `profile` | Analysis profile management commands. |
@@ -26,7 +27,63 @@ copinance <command>
 python -m copinance_os.interfaces.cli <command>
 ```
 
-**Performance:** `copinance --help` and `copinance version` load quickly because heavy subcommands (analyze, cache, market, profile) are loaded only when you run them. See [Architecture — Container and performance](/developer-guide/architecture#container-and-performance) for the design.
+**Performance:** `copinance --help`, `copinance help`, and `copinance version` load quickly because heavy subcommands (analyze, cache, market, profile) are loaded only when you run them. See [Architecture — Container and performance](/developer-guide/architecture#container-and-performance) for the design.
+
+## Natural language at the root
+
+When the first token is **not** `analyze`, `cache`, `market`, `profile`, or `version`, the CLI treats the line as a **single question** (tools + LLM), with optional flags **before** the question:
+
+```bash
+# Question-driven market analysis (default macro-style context: SPY, broad indicator set)
+copinance "How is Tesla doing financially?"
+copinance --stream "What is the VIX?"
+copinance --json "What is the VIX?"
+copinance --include-prompt "Compare credit spreads to last year"
+copinance --json --include-prompt "Summarize labor and inflation"
+```
+
+- **`--json`**: print **`RunJobResult`** JSON to stdout (same shape as `copinance analyze --json macro --question "…"`). **Disables** **`--stream`**.
+- **`--stream`**: print LLM tokens to stdout during the run (question-driven only). Ignored with **`--json`**.
+- **`--include-prompt`**: include rendered prompts in saved results (when not using `--json`, behavior matches analyze question-driven runs).
+
+Like **`analyze`**, root **`copinance "…"`** is **single-turn**: one natural-language question per invocation. **Multi-turn** conversation (prior Q&A in the same thread) is **library-only**—use **`AnalyzeMarketRequest`** with **`conversation_history`** in Python (same underlying path as this CLI entry); see [Library — Multi-turn question-driven analysis](/getting-started/library#multi-turn-question-driven-analysis).
+
+For symbol-scoped or instrument flows, use **`copinance analyze equity|options|macro`** instead.
+
+## Machine-readable output (`--json`)
+
+Use **`--json` on the command group** (before the subcommand) to print **JSON to stdout** instead of Rich tables—suitable for scripts, CI, and piping.
+
+| Group | Behavior |
+|-------|----------|
+| **`analyze`** | Prints a **`RunJobResult`** payload: `success`, `results`, `error_message`, `report` (structured **AnalysisReport** when the executor provides one—including **question-driven** runs), and `report_exclusion_reason` when results exist but no report builder is registered for that executor type. |
+| **`market`** | Prints an object with a **`command`** field (`search`, `quote`, `history`, `options`, `fundamentals`) and command-specific keys such as **`response`**, **`rows`**, **`chain`**, **`contracts`**. |
+| **Root** (no subcommand) | Same **`RunJobResult`** JSON as **`analyze`** when you use **`copinance --json "…"`** (see [Natural language at the root](#natural-language-at-the-root)). |
+
+**Placement:** for **`analyze`** and **`market`**, put **`--json`** on the group before the subcommand. For the **root** question form, put **`--json`** (and optionally **`--include-prompt`**) before the question string.
+
+```bash
+copinance analyze --json equity AAPL --timeframe mid_term
+copinance analyze --json macro --question "Risk-on or risk-off?"
+copinance --json "Summarize labor and inflation"
+copinance market --json quote AAPL
+copinance market --json search "Apple" --limit 5
+copinance market --json history AAPL --start 2026-01-01 --end 2026-03-14 --interval 1d
+copinance market --json options SPY
+copinance market --json fundamentals AAPL --periods 5
+```
+
+Rich human output and saving results under `.copinance/results/v2/` still apply to **`analyze`** when `--json` is not used.
+
+## Streaming question-driven output (`--stream`)
+
+Use **`--stream` on the `analyze` group** (before `equity`, `options`, or `macro`) or **at the root** before a natural-language question to print **LLM tokens to stdout** as they are generated during question-driven tool loops. **`--json` turns streaming off.** After the run, Rich still prints the same **Analysis** panel (markdown) so you always have a readable block for copy-paste, plus run metadata and the saved file path. Library-oriented streaming options (`LLMConfig`, providers) are described in [Using as a Library — LLM text streaming](/getting-started/library#llm-text-streaming-library--llmprovider).
+
+```bash
+copinance analyze --stream equity AAPL --question "What is the beta?"
+copinance analyze --stream macro --question "Risk-on or risk-off?"
+copinance --stream "Summarize credit conditions"
+```
 
 ## Version
 
@@ -36,6 +93,8 @@ copinance version
 ```
 
 ## Market Commands
+
+The `market` group accepts **`--json`** (see [Machine-readable output](#machine-readable-output-json)).
 
 ### Search Instruments
 
@@ -202,12 +261,16 @@ copinance profile delete <profile-id> --force
 
 ## Analyze Commands
 
+The `analyze` group accepts **`--json`** (see [Machine-readable output](#machine-readable-output-json)) and **`--stream`** (see [Streaming question-driven output](#streaming-question-driven-output---stream)); place them **before** the subcommand (`equity`, `options`, `macro`).
+
 Run one-off analysis. Results are saved under `.copinance/results/v2/`; profiles, cache, and state live under versioned subdirectories inside `.copinance`.
 
 Analyze is progressive:
 - Without `--question`, it runs deterministic analysis.
 - With `--question`, it runs question-driven analysis and lets the model call the relevant tools.
 - Use `--mode auto|deterministic|question_driven` when you want to force the execution style.
+
+**Multi-turn (library only):** The CLI always sends **one** natural-language question per invocation on **`analyze`** and on **root** **`copinance "…"`** (or **none** for deterministic **`analyze`** without `--question`). To continue a thread with prior user/assistant turns, use **`AnalyzeInstrumentRequest` / `AnalyzeMarketRequest`** with **`conversation_history`** in Python — see [Library — Multi-turn question-driven analysis](/getting-started/library#multi-turn-question-driven-analysis). The CLI does not accept prior-turn transcripts.
 
 ### Analyze an Equity
 
@@ -219,9 +282,31 @@ copinance analyze equity AAPL --timeframe mid_term
 
 # Run question-driven analysis with a custom question and optional profile
 copinance analyze equity AAPL --question "What are the key risks?" --timeframe long_term --profile-id <id>
+
+# Stream LLM tokens during question-driven analysis (group flag before subcommand)
+copinance analyze --stream equity AAPL --question "What are the key risks?"
 ```
 
+### Question-driven examples
+
+With **`--question`** on equity analysis, the model chooses **tools** (quotes, history, fundamentals, regime/macro signals, and—when your environment is configured for **SEC/EDGAR**—public filing data). Numbers and tables come from tools; the answer explains and synthesizes.
+
+Illustrative questions you can ask (wording may vary):
+
+- **Market + fundamentals:** *“How has MSFT traded over the last quarter versus its headline revenue trend?”*
+- **Filings:** *“What 10-K and 10-Q filings did Apple file recently, and what are the accession numbers?”*
+- **Filing text:** *“Summarize risk factors from Apple’s latest annual filing.”* (requires CIK/accession from a filings step or your knowledge.)
+- **Long-run financial history:** *“Show multi-year revenue context for Apple.”*
+- **Cross-company comparison:** *“Compare recent revenue and net income for Apple and Microsoft.”*
+- **Segments / detail in statements:** *“What does the latest 10-K show for revenue breakdown dimensions?”*
+- **Insiders:** *“What insider Form 4 activity has been reported for Tesla recently?”*
+- **Institutions (13F):** *“What were the largest equity positions in [known filer]’s latest quarterly 13F?”* (works for a **filer** you name—e.g. a fund or manager—not as a global screen of every holder of a stock.)
+- **Entity check:** *“Confirm CIK and industry classification for AAPL before we dig into filings.”*
+
+Use **`--mode question_driven`** to force tool-using mode even if you omit `--question` in edge cases, and **`--include-prompt`** to save rendered prompts with results. SEC-heavy questions need **EDGAR identity** configured (see [Configuration — SEC EDGAR](/getting-started/configuration)).
+
 **Options:**
+- **`--json`** / **`--stream`** (group, before `equity`): machine JSON vs. streaming tokens for question-driven runs (see sections above).
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
 - `--question` / `-q`: Optional natural-language question
 - `--mode <mode>`: `auto`, `deterministic`, or `question_driven`
@@ -244,6 +329,7 @@ copinance analyze options AAPL --question "What does skew say about sentiment?" 
 ```
 
 **Options:**
+- **`--json`** / **`--stream`** (group, before `options`): same as equity group.
 - `--expiration <date>`: Optional expiration date (YYYY-MM-DD)
 - `--side <side>`: `call`, `put`, or `all`
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
@@ -280,11 +366,18 @@ copinance analyze macro --market-index DIA --lookback-days 60
 # Question-driven: AI uses macro and market tools to answer
 copinance analyze macro --question "Is this a risk-on or risk-off regime?"
 
+# Question-driven: combine regime signals with a macro framing question
+copinance analyze macro --question "Do breadth and VIX support a defensive posture?"
+
+# Question-driven with streaming LLM output
+copinance analyze --stream macro --question "Is this risk-on or risk-off?"
+
 # Only VIX and breadth, no sector rotation; SPY as reference
 copinance analyze macro --no-include-sector-rotation
 ```
 
 **Options:**
+- **`--json`** / **`--stream`** (group, before `macro`): same as other analyze subcommands.
 - `--market-index` / `-m`: Reference index for trend/volatility and sector comparison (`SPY`, `QQQ`, `DIA`, `IWM`). Breadth and rotation always use the 11 S&P sector ETFs and VIX.
 - `--timeframe`: `short_term`, `mid_term`, or `long_term` (default: `mid_term`)
 - `--question` / `-q`: Optional natural-language question (enables question-driven mode in auto)

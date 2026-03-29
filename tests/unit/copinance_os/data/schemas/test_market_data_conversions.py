@@ -7,6 +7,7 @@ import pytest
 
 from copinance_os.data.schemas.market_data_conversions import (
     coerce_sorted_market_data_points,
+    coerce_sorted_market_data_points_detailed,
     price_series_from_market_data_points,
 )
 from copinance_os.data.schemas.price_series import PriceSeries
@@ -24,6 +25,35 @@ def _point(ts: datetime, close: float) -> MarketDataPoint:
         low_price=d,
         volume=1_000_000,
     )
+
+
+@pytest.mark.unit
+def test_coerce_detailed_counts_skips() -> None:
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
+    bad_dict = {"symbol": "SPY", "timestamp": "not-a-date"}
+    raw = [
+        _point(t0, 100.0),
+        bad_dict,
+        "not-a-point",
+    ]
+    detailed = coerce_sorted_market_data_points_detailed(raw, strict=False)
+    assert detailed.accepted_as_model == 1
+    assert detailed.skipped_invalid_dict == 1
+    assert detailed.skipped_unsupported_type == 1
+    assert len(detailed.points) == 1
+
+
+@pytest.mark.unit
+def test_coerce_strict_invalid_dict() -> None:
+    bad_dict = {"symbol": "SPY"}
+    with pytest.raises(ValueError, match="Invalid market data point"):
+        coerce_sorted_market_data_points_detailed([bad_dict], strict=True)
+
+
+@pytest.mark.unit
+def test_coerce_strict_unsupported_type() -> None:
+    with pytest.raises(TypeError, match="Unsupported market data point"):
+        coerce_sorted_market_data_points_detailed([42], strict=True)
 
 
 @pytest.mark.unit

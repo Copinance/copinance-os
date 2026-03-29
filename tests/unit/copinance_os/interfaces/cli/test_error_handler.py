@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from copinance_os.domain.exceptions import DomainError
-from copinance_os.interfaces.cli.error_handler import (
+from copinance_os.interfaces.cli.shared.error_handler import (
     _handle_application_error,
     _handle_domain_error,
     _handle_unexpected_error,
@@ -36,7 +36,7 @@ class SampleApplicationError(ApplicationError):
 class TestErrorHandler:
     """Test CLI error handling functions."""
 
-    @patch("copinance_os.interfaces.cli.error_handler.console")
+    @patch("copinance_os.interfaces.cli.shared.error_handler.console")
     def test_handle_domain_error(self, mock_console: MagicMock) -> None:
         """Test handling domain exceptions."""
         error = SampleDomainError("Invalid symbol", details={"symbol": "INVALID"})
@@ -49,7 +49,7 @@ class TestErrorHandler:
         assert call_args.title == "Domain Error"
         assert call_args.border_style == "red"
 
-    @patch("copinance_os.interfaces.cli.error_handler.console")
+    @patch("copinance_os.interfaces.cli.shared.error_handler.console")
     def test_handle_application_error(self, mock_console: MagicMock) -> None:
         """Test handling application exceptions."""
         cause = ValueError("Underlying error")
@@ -63,7 +63,7 @@ class TestErrorHandler:
         assert call_args.title == "Application Error"
         assert call_args.border_style == "yellow"
 
-    @patch("copinance_os.interfaces.cli.error_handler.console")
+    @patch("copinance_os.interfaces.cli.shared.error_handler.console")
     def test_handle_unexpected_error(self, mock_console: MagicMock) -> None:
         """Test handling unexpected errors."""
         error = RuntimeError("Unexpected runtime error")
@@ -76,7 +76,7 @@ class TestErrorHandler:
         assert call_args.title == "Unexpected Error"
         assert call_args.border_style == "red"
 
-    @patch("copinance_os.interfaces.cli.error_handler._handle_domain_error")
+    @patch("copinance_os.interfaces.cli.shared.error_handler._handle_domain_error")
     def test_handle_cli_error_domain_exception(self, mock_handle_domain: MagicMock) -> None:
         """Test handle_cli_error with domain exception."""
         error = SampleDomainError("Domain error")
@@ -86,7 +86,7 @@ class TestErrorHandler:
 
         mock_handle_domain.assert_called_once_with(error, context)
 
-    @patch("copinance_os.interfaces.cli.error_handler._handle_application_error")
+    @patch("copinance_os.interfaces.cli.shared.error_handler._handle_application_error")
     def test_handle_cli_error_application_exception(self, mock_handle_app: MagicMock) -> None:
         """Test handle_cli_error with application exception."""
         error = SampleApplicationError("Application error")
@@ -96,7 +96,7 @@ class TestErrorHandler:
 
         mock_handle_app.assert_called_once_with(error, context)
 
-    @patch("copinance_os.interfaces.cli.error_handler._handle_unexpected_error")
+    @patch("copinance_os.interfaces.cli.shared.error_handler._handle_unexpected_error")
     def test_handle_cli_error_unexpected_exception(self, mock_handle_unexpected: MagicMock) -> None:
         """Test handle_cli_error with unexpected exception."""
         error = ValueError("Unexpected error")
@@ -106,7 +106,7 @@ class TestErrorHandler:
 
         mock_handle_unexpected.assert_called_once_with(error, {})
 
-    @patch("copinance_os.interfaces.cli.error_handler._handle_unexpected_error")
+    @patch("copinance_os.interfaces.cli.shared.error_handler._handle_unexpected_error")
     def test_handle_cli_error_without_context(self, mock_handle_unexpected: MagicMock) -> None:
         """Test handle_cli_error without context."""
         error = RuntimeError("Error without context")

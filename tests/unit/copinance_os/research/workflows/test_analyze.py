@@ -10,6 +10,7 @@ from copinance_os.core.orchestrator.runners import (
     DefaultAnalyzeMarketRunner,
 )
 from copinance_os.domain.models.job import JobScope, JobTimeframe, RunJobResult
+from copinance_os.domain.models.llm_conversation import LLMConversationTurn
 from copinance_os.domain.models.market import MarketType, OptionSide
 from copinance_os.domain.ports.analysis_execution import JobRunner
 from copinance_os.research.workflows.analyze import (
@@ -66,6 +67,7 @@ class TestDefaultAnalyzeInstrumentRunner:
         assert job.execution_type == INSTRUMENT_DETERMINISTIC_TYPE
         assert job.timeframe == JobTimeframe.MID_TERM
         assert context["question"] is None
+        assert context["stream"] is False
 
     @pytest.mark.asyncio
     async def test_run_builds_agentic_options_job(self) -> None:
@@ -98,6 +100,51 @@ class TestDefaultAnalyzeInstrumentRunner:
         assert context["question"] == "Is skew bearish?"
         assert context["expiration_date"] == "2026-06-19"
         assert context["option_side"] == "call"
+        assert context["stream"] is False
+
+    @pytest.mark.asyncio
+    async def test_run_passes_stream_in_context(self) -> None:
+        mock_job_runner = AsyncMock(spec=JobRunner)
+        mock_job_runner.run = AsyncMock(
+            return_value=RunJobResult(success=True, results={}, error_message=None)
+        )
+        runner = DefaultAnalyzeInstrumentRunner(
+            research_orchestrator=ResearchOrchestrator(mock_job_runner)
+        )
+        await runner.run(
+            AnalyzeInstrumentRequest(
+                symbol="AAPL",
+                question="Test?",
+                mode=AnalyzeMode.QUESTION_DRIVEN,
+                stream=True,
+            )
+        )
+        context = mock_job_runner.run.call_args[0][1]
+        assert context["stream"] is True
+
+
+@pytest.mark.unit
+def test_instrument_request_rejects_conversation_in_deterministic_mode() -> None:
+    with pytest.raises(ValueError, match="conversation_history"):
+        AnalyzeInstrumentRequest(
+            symbol="AAPL",
+            mode=AnalyzeMode.DETERMINISTIC,
+            conversation_history=[
+                LLMConversationTurn(role="user", content="a"),
+                LLMConversationTurn(role="assistant", content="b"),
+            ],
+        )
+
+
+@pytest.mark.unit
+def test_instrument_request_rejects_invalid_conversation_pairs() -> None:
+    with pytest.raises(ValueError, match="even length"):
+        AnalyzeInstrumentRequest(
+            symbol="AAPL",
+            question="q",
+            mode=AnalyzeMode.QUESTION_DRIVEN,
+            conversation_history=[LLMConversationTurn(role="user", content="only user")],
+        )
 
 
 @pytest.mark.unit
@@ -141,6 +188,7 @@ class TestDefaultAnalyzeMarketRunner:
         assert context["market_index"] == "QQQ"
         assert context["lookback_days"] == 90
         assert context["include_vix"] is False
+        assert context["stream"] is False
 
     @pytest.mark.asyncio
     async def test_run_builds_question_driven_market_job(self) -> None:
@@ -166,3 +214,4 @@ class TestDefaultAnalyzeMarketRunner:
         assert job.market_index == "SPY"
         assert job.execution_type == MARKET_QUESTION_DRIVEN_TYPE
         assert context["question"] == "Is this risk on or risk off?"
+        assert context["stream"] is False

@@ -13,21 +13,29 @@ Market regime detection and macroeconomic indicators (trend, volatility, cycles,
 
 ## Data provider tools
 
-Tools that wrap provider methods (quotes, history, search, options, fundamentals). Available to the AI in question-driven runs.
+Tools that wrap provider methods: **market data** (quotes, history, search, options) and **fundamentals** (equity snapshots, financial statement grids, and optional **SEC/EDGAR** listing, filing content, entity profile, multi-period facts, cross-ticker metrics, statement tables, Form 4 insiders, and 13F institutional portfolios when configured). Available to the model in question-driven runs.
 
-- [Data Provider Tools](data-providers) — Market and fundamental tool reference
+- [Data Provider Tools](data-providers) — Full list and descriptions
 
 ## Using tools
 
 ### In question-driven analysis
 
-Tools are registered automatically when you use question-driven analyze:
+Tools are registered automatically when you run **analyze** with a **question** (or force **`--mode question_driven`**), or when you use the **root** form **`copinance "…"`** (generic market question). The model picks tools; numeric outputs come from providers and tools, not from free-form generation.
 
 ```bash
+# Price, history, fundamentals, regime tools as needed
 copinance analyze equity AAPL --question "What is the current market trend?"
+
+# Same tool registry from the root entry (default macro-style context)
+copinance "What is the current market trend?"
+
+# SEC-oriented questions when EDGAR is configured (see Configuration)
+copinance analyze equity MSFT --question "Compare revenue and net income for Microsoft and Apple."
+copinance analyze equity BRK.B --question "What 10-K filings appeared recently and what are the accession numbers?"
 ```
 
-The model selects tools; outputs are grounded in provider and tool results.
+See [CLI Reference — Question-driven examples](/user-guide/cli#question-driven-examples) for more example prompts and [Data Provider Tools](data-providers) for tool names.
 
 ### Programmatic usage
 

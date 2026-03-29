@@ -9,6 +9,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
 
 from copinance_os.domain.models.job import JobScope, JobTimeframe, RunJobResult
+from copinance_os.domain.models.llm_conversation import (
+    LLMConversationTurn,
+    validate_conversation_history_pairs,
+)
 from copinance_os.domain.models.market import MarketType, OptionSide
 from copinance_os.research.workflows.base import UseCase
 
@@ -90,6 +94,18 @@ class AnalyzeInstrumentRequest(BaseModel):
         False,
         description="Whether to include rendered prompts in question-driven results",
     )
+    stream: bool = Field(
+        False,
+        description="Stream LLM tokens to stdout during question-driven runs (library/CLI)",
+    )
+    conversation_history: list[LLMConversationTurn] = Field(
+        default_factory=list,
+        description=(
+            "Prior user/assistant turns for multi-turn question-driven analysis. "
+            "Must be alternating user, assistant, … and end with assistant; "
+            "the new user message is `question`."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_request(self) -> AnalyzeInstrumentRequest:
@@ -108,6 +124,10 @@ class AnalyzeInstrumentRequest(BaseModel):
             raise ValueError("question is required when mode=question_driven")
         if self.mode == AnalyzeMode.DETERMINISTIC and normalized_question:
             raise ValueError("question cannot be provided when mode=deterministic")
+        if self.mode == AnalyzeMode.DETERMINISTIC and self.conversation_history:
+            raise ValueError("conversation_history is only supported for question-driven analysis")
+        if resolved_mode == AnalyzeMode.QUESTION_DRIVEN:
+            validate_conversation_history_pairs(self.conversation_history)
 
         if self.question is not None:
             self.question = normalized_question or None
@@ -168,6 +188,18 @@ class AnalyzeMarketRequest(BaseModel):
         False,
         description="Whether to include rendered prompts in question-driven results",
     )
+    stream: bool = Field(
+        False,
+        description="Stream LLM tokens to stdout during question-driven runs (library/CLI)",
+    )
+    conversation_history: list[LLMConversationTurn] = Field(
+        default_factory=list,
+        description=(
+            "Prior user/assistant turns for multi-turn question-driven analysis. "
+            "Must be alternating user, assistant, … and end with assistant; "
+            "the new user message is `question`."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_request(self) -> AnalyzeMarketRequest:
@@ -177,6 +209,10 @@ class AnalyzeMarketRequest(BaseModel):
             raise ValueError("question is required when mode=question_driven")
         if self.mode == AnalyzeMode.DETERMINISTIC and normalized_question:
             raise ValueError("question cannot be provided when mode=deterministic")
+        if self.mode == AnalyzeMode.DETERMINISTIC and self.conversation_history:
+            raise ValueError("conversation_history is only supported for question-driven analysis")
+        if resolved_mode == AnalyzeMode.QUESTION_DRIVEN:
+            validate_conversation_history_pairs(self.conversation_history)
 
         if not self.market_index or not self.market_index.strip():
             raise ValueError("market_index is required")

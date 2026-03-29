@@ -18,12 +18,16 @@ from copinance_os.domain.exceptions import (
     ExecutorNotFoundError,
     RetryableExecutionError,
 )
-from copinance_os.domain.models.job import Job, RunJobResult
+from copinance_os.domain.models.job import Job, ReportExclusionReason, RunJobResult
 from copinance_os.domain.ports.analysis_execution import AnalysisExecutor, JobRunner
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 from copinance_os.domain.services.run_job_analysis_report import build_run_job_analysis_report
 
 logger = structlog.get_logger(__name__)
+
+_REPORT_ENVELOPE_EXECUTION_TYPES = frozenset(
+    {"instrument_analysis", "market_analysis", "question_driven_analysis"}
+)
 
 _DEFAULT_RETRYABLE: tuple[type[BaseException], ...] = (
     RetryableExecutionError,
@@ -76,6 +80,11 @@ class DefaultJobRunner(JobRunner):
             try:
                 results = await executor.execute(job, ctx)
                 report = build_run_job_analysis_report(results) if results else None
+                report_exclusion: ReportExclusionReason | None = None
+                if results and report is None:
+                    et = results.get("execution_type")
+                    if et and et not in _REPORT_ENVELOPE_EXECUTION_TYPES:
+                        report_exclusion = ReportExclusionReason.UNKNOWN_EXECUTOR_TYPE
                 logger.info(
                     "job_run_success",
                     execution_type=job.execution_type,
@@ -86,6 +95,7 @@ class DefaultJobRunner(JobRunner):
                     results=results,
                     error_message=None,
                     report=report,
+                    report_exclusion_reason=report_exclusion,
                 )
             except DomainError as e:
                 if attempt < self._max_execute_retries and isinstance(

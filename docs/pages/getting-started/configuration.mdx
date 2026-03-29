@@ -18,6 +18,8 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 
 ## LLM Provider Setup
 
+**Implemented backends:** **`gemini`** and **`ollama`** only. Other provider names in the LLM factory are rejected until implemented (see [Using as a Library — LLMConfig](library#llmconfig-required-for-question-driven-analysis)).
+
 ### Gemini (Cloud)
 
 1. Get an API key from [Google AI Studio](https://aistudio.google.com).
@@ -30,14 +32,16 @@ COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro   # default
 COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash # faster
 ```
 
+**Text streaming (CLI):** For question-driven runs, pass **`--stream`** on the **`analyze`** group (before the subcommand) or **`--stream`** on generic research (`copinance --stream "…"`). **`--json`** disables streaming. Output prints to stdout as tokens arrive; run metadata and saved JSON still appear after. See [Using as a Library — LLM text streaming](library#llm-text-streaming-library--llmprovider) for **`LLMConfig`** and programmatic use.
+
 ### Ollama (Local)
 
-1. Install from [ollama.ai](https://ollama.ai) and run `ollama pull llama2`.
+1. Install from [ollama.ai](https://ollama.ai) and run `ollama pull` for a model you have locally (e.g. `llama3.2` or `llama3.1`).
 2. Set in `.env`:
 ```bash
 COPINANCEOS_LLM_PROVIDER=ollama
 COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
-COPINANCEOS_OLLAMA_MODEL=llama2
+COPINANCEOS_OLLAMA_MODEL=llama3.2
 ```
 3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
 
@@ -108,7 +112,7 @@ COPINANCEOS_STORAGE_PATH=~/.copinance
 ```bash
 COPINANCEOS_LLM_PROVIDER=ollama
 COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
-COPINANCEOS_OLLAMA_MODEL=llama2
+COPINANCEOS_OLLAMA_MODEL=llama3.2
 COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinance
 ```

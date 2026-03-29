@@ -148,6 +148,15 @@ container.llm_analyzer.override(
 
 **Note:** If you're using LLM features, make sure to provide `LLMConfig` when creating the container. See [Configuration](/getting-started/configuration#library-integration) for details.
 
+### LLM backends: text streaming
+
+Built-in **`GeminiProvider`** and **`OllamaProvider`** subclass **`LLMProvider`** and implement **`_iter_native_text_stream`** for API-native chunking. **`supports_native_text_stream()`** respects **`disable_native_text_stream`**. When adding a new vendor adapter, either:
+
+- Implement **`_iter_native_text_stream`** and return **`True`** from **`supports_native_text_stream()`** when the remote API supports streaming, or
+- Rely on the base **`generate_text_stream`** logic: **`auto`** / **`buffered`** will call **`generate_text`** only.
+
+Events are **`LLMTextStreamEvent`** (Pydantic) with **`kind`**, **`text_delta`**, **`native_streaming`**, and optional **`usage`**. See [Library — LLM text streaming](/getting-started/library#llm-text-streaming-library--llmprovider).
+
 ## Adding a Custom Executor
 
 ### 1. Extend BaseAnalysisExecutor
@@ -161,10 +170,11 @@ class MyCustomExecutor(BaseAnalysisExecutor):
     """Custom analysis executor."""
 
     def get_executor_id(self) -> str:
-        return "custom"
+        # Becomes results["execution_type"] in the payload; register a matching job.execution_type in your JobRunner.
+        return "custom_analysis"
 
     async def validate(self, job: Job) -> bool:
-        return job.execution_type == "custom"
+        return job.execution_type == "custom_analysis"
 
     async def _execute_analysis(
         self, job: Job, context: dict[str, Any]
@@ -175,7 +185,7 @@ class MyCustomExecutor(BaseAnalysisExecutor):
 
 ### 2. Register in Container
 
-Add your executor to the analysis executors factory or override in the container. Jobs are run via the `JobRunner` port (default implementation finds an executor and runs it); you can override `container.job_runner` with your own implementation for custom orchestration (e.g. queues, retries).
+Add your executor in **`infra/factories/analysis_executor.py`** (or build a custom list) and wire it through dependency injection, or override **`container.analysis_executors`** on a **`Container`** you own. Jobs are run via the **`JobRunner`** port (default: finds an executor and runs it). For custom global orchestration (queues, retries), implement **`JobRunner`** and pass it to **`ResearchOrchestrator(job_runner=...)`**—the default **`Container`** does not expose **`job_runner()`** as a method.
 
 ## Custom prompt templates
 

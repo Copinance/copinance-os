@@ -12,6 +12,7 @@ from copinance_os.ai.llm.resources import (
     PromptManager,
 )
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
+from copinance_os.core.execution_engine.llm_stream_stdout import stdout_llm_stream_handler
 from copinance_os.core.pipeline.tools import (
     create_fundamental_data_tools,
     create_fundamental_data_tools_with_providers,
@@ -24,6 +25,7 @@ from copinance_os.core.pipeline.tools.analysis.market_regime.indicators import (
 )
 from copinance_os.core.pipeline.tools.context_tools import GetCurrentDateTool
 from copinance_os.domain.models.job import Job, JobScope
+from copinance_os.domain.models.llm_conversation import parse_conversation_history
 from copinance_os.domain.models.market import MarketType
 from copinance_os.domain.ports.analyzers import LLMAnalyzer
 from copinance_os.domain.ports.data_providers import (
@@ -86,6 +88,10 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             job: The job to execute
             context: Execution context and parameters. Can include:
                 - "question": Specific question to answer (optional)
+                - "conversation_history": Prior turns as
+                  ``[{"role":"user"|"assistant","content": str}, ...]`` (optional).
+                  Must be alternating user/assistant and end with assistant; the new
+                  user message is ``question``.
                 - "financial_literacy": User's financial literacy level (optional)
 
         Returns:
@@ -93,6 +99,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
                 - analysis: LLM's analysis text
                 - tool_calls: Tools that were used
                 - iterations: Number of LLM iterations
+                - conversation_turns: Full user/assistant transcript after success (for follow-up jobs)
         """
         is_market_wide = job.scope == JobScope.MARKET
         market_type = job.market_type or MarketType.EQUITY
@@ -224,6 +231,21 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             logger.warning("Question-driven analysis executed without question", symbol=symbol)
             return results
 
+        try:
+            prior_turns = parse_conversation_history(context.get("conversation_history"))
+        except ValueError as e:
+            results["status"] = "failed"
+            results["error"] = "Invalid conversation_history"
+            results["message"] = str(e)
+            logger.warning("Invalid conversation history", error=str(e))
+            return results
+
+        conversation_history_digest = (
+            json.dumps([t.model_dump() for t in prior_turns], ensure_ascii=False)
+            if prior_turns
+            else ""
+        )
+
         # Enhance question to include symbol/index context when helpful.
         enhanced_question = question
         if is_market_wide:
@@ -266,6 +288,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             "tool_examples": tool_examples,
             "financial_literacy": financial_literacy,
             "current_date": current_date,
+            "conversation_history_digest": conversation_history_digest,
         }
         system_prompt = ""
         user_prompt = ""
@@ -299,6 +322,11 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             provider=llm_provider.get_provider_name(),
         )
 
+        stream = bool(context.get("stream"))
+        on_stream = context.get("on_llm_stream")
+        if stream and on_stream is None:
+            on_stream = stdout_llm_stream_handler
+
         # Execute LLM with tools
         llm_result = await llm_provider.generate_with_tools(
             prompt=user_prompt,
@@ -306,21 +334,44 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             system_prompt=system_prompt,
             temperature=0.7,
             max_iterations=5,
+            stream=stream,
+            on_stream_event=on_stream if stream else None,
+            prior_conversation=prior_turns if prior_turns else None,
         )
 
         # Extract results
         results["analysis"] = llm_result.get("text", "")
+        if stream:
+            results["analysis_streamed"] = True
         results["tool_calls"] = llm_result.get("tool_calls", [])
         results["iterations"] = llm_result.get("iterations", 1)
         results["llm_provider"] = llm_provider.get_provider_name()
         results["llm_model"] = llm_provider.get_model_name()
         results["tools_used"] = [tc.get("tool") for tc in results["tool_calls"]]
         results["numeric_grounding_policy"] = NUMERIC_GROUNDING_POLICY
+        synthesis_status = llm_result.get("synthesis_status")
+        if synthesis_status:
+            results["synthesis_status"] = synthesis_status
+        if llm_result.get("llm_synthesis_error"):
+            results["llm_synthesis_error"] = llm_result["llm_synthesis_error"]
+        if synthesis_status == "partial":
+            results["message"] = (
+                "Analysis completed with a deterministic data summary "
+                "(the model did not return a final narrative; see analysis text)."
+            )
         if llm_result.get("llm_usage"):
             results["llm_usage"] = llm_result["llm_usage"]
         if context.get("include_prompt"):
             results["system_prompt"] = system_prompt
             results["user_prompt"] = user_prompt
+
+        analysis_text = (results.get("analysis") or "").strip()
+        if analysis_text:
+            results["conversation_turns"] = [
+                *[t.model_dump() for t in prior_turns],
+                {"role": "user", "content": enhanced_question},
+                {"role": "assistant", "content": results.get("analysis") or ""},
+            ]
 
         logger.info(
             "Question-driven analysis completed",
@@ -423,7 +474,20 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
                     f'  {{"tool": "{schema.name}", "args": {json.dumps(example_args)}}}'
                 )
 
-        tools_description = "\n".join(tool_descriptions)
+        sec_routing = ""
+        if any(t.get_name().startswith("get_sec_") for t in tools):
+            sec_routing = (
+                "SEC / EDGAR — pick the smallest tool that answers the question (do not default to listing filings):\n"
+                "  • Multi-year or multi-period trends for ONE company → get_sec_company_facts_statement\n"
+                "  • Compare headline metrics across TWO OR MORE tickers → get_sec_compare_financials_metrics\n"
+                "  • Statement tables for ONE ticker (standardized recent bundle) → get_financial_statements\n"
+                "  • Segment / dimensional rows or filing-native statement detail → get_sec_xbrl_statement_table\n"
+                "  • Resolve CIK / SIC / entity identity → get_sec_company_edgar_profile\n"
+                "  • ONLY filing index rows (dates, form, accession, URL) → get_sec_filings — not for revenue, EPS, or ratios\n"
+                "  • Raw filing text/HTML after CIK + accession are known → get_sec_filing_content\n\n"
+            )
+
+        tools_description = sec_routing + "\n".join(tool_descriptions)
         examples_text = "\n".join(tool_examples) if tool_examples else ""
 
         return tools_description, examples_text

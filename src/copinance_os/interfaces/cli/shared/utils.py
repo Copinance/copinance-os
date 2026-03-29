@@ -15,8 +15,19 @@ import structlog
 from pydantic import BaseModel
 
 from copinance_os.data.loaders.persistence import PERSISTENCE_SCHEMA_VERSION, get_results_dir
+from copinance_os.domain.models.job import RunJobResult
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def print_run_job_result_json(result: RunJobResult) -> None:
+    """Print ``RunJobResult`` as JSON to stdout (scripting / CI)."""
+    print(json.dumps(result.model_dump(mode="json"), indent=2))
+
+
+def print_json_stdout(data: Any) -> None:
+    """Print a JSON-serializable payload to stdout (``default=str`` for edge types)."""
+    print(json.dumps(data, indent=2, default=str))
 
 
 def save_analysis_results(results: dict[str, Any], storage_path: str = ".copinance") -> Path | None:

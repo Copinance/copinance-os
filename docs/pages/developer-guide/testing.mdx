@@ -25,9 +25,14 @@ tests/
 
 ## Running Tests
 
+`pyproject.toml` enables **coverage** in the default `pytest` invocation (`addopts`). Use **`pytest --no-cov`** for a faster loop when you do not need a coverage report.
+
 ```bash
-# All tests
+# All tests (includes coverage per project defaults)
 pytest
+
+# Skip coverage
+pytest --no-cov
 
 # Unit tests only
 pytest -m unit
@@ -35,7 +40,7 @@ pytest -m unit
 # Integration tests only
 pytest -m integration
 
-# With coverage
+# Explicit coverage HTML (also on by default unless --no-cov)
 pytest --cov=copinance_os --cov-report=html
 ```
 
@@ -55,7 +60,6 @@ def test_job_creation():
         scope=JobScope.INSTRUMENT,
         market_type=MarketType.EQUITY,
         instrument_symbol="AAPL",
-        market_index=None,
         timeframe=JobTimeframe.MID_TERM,
         execution_type="deterministic_instrument_analysis",
     )

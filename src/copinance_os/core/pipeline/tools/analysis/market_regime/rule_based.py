@@ -76,6 +76,22 @@ from copinance_os.domain.ports.tools import Tool, ToolSchema
 
 logger = structlog.get_logger(__name__)
 
+# OpenAI function-calling requires JSON Schema arrays to declare ``items``.
+_HISTORICAL_DATA_PARAM = {
+    "type": "array",
+    "description": (
+        "Optional pre-fetched historical daily bars. If omitted, the tool fetches data. "
+        "Each element must include at least close_price (number); volume is optional."
+    ),
+    "items": {
+        "type": "object",
+        "properties": {
+            "close_price": {"type": "number"},
+            "volume": {"type": "number"},
+        },
+    },
+}
+
 
 def _calculate_volatility(prices: list[float], window: int = 20) -> list[float | None]:
     """Rolling sample volatility of log-returns, annualized (domain implementation)."""
@@ -217,10 +233,7 @@ class MarketRegimeDetectTrendTool(Tool):
                         "description": "Long-term moving average period (days)",
                         "default": 200,
                     },
-                    "historical_data": {
-                        "type": "array",
-                        "description": "Optional pre-fetched historical data. If provided, tool will use this instead of fetching.",
-                    },
+                    "historical_data": dict(_HISTORICAL_DATA_PARAM),
                 },
                 "required": ["symbol"],
             },
@@ -514,10 +527,7 @@ class MarketRegimeDetectVolatilityTool(Tool):
                         "description": "Window size for volatility calculation (days)",
                         "default": 20,
                     },
-                    "historical_data": {
-                        "type": "array",
-                        "description": "Optional pre-fetched historical data. If provided, tool will use this instead of fetching.",
-                    },
+                    "historical_data": dict(_HISTORICAL_DATA_PARAM),
                 },
                 "required": ["symbol"],
             },
@@ -707,10 +717,7 @@ class MarketRegimeDetectCyclesTool(Tool):
                         "description": "Number of days to analyze for cycle detection",
                         "default": 252,
                     },
-                    "historical_data": {
-                        "type": "array",
-                        "description": "Optional pre-fetched historical data. If provided, tool will use this instead of fetching.",
-                    },
+                    "historical_data": dict(_HISTORICAL_DATA_PARAM),
                 },
                 "required": ["symbol"],
             },

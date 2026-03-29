@@ -1,5 +1,6 @@
 """Unit tests for Ollama LLM provider."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -402,3 +403,89 @@ class TestOllamaProvider:
             result = await provider.is_available()
 
             assert result is False
+
+    async def test_generate_text_stream_native_emits_ollama_chunks(self) -> None:
+        """Streaming uses /api/generate with stream=true and NDJSON lines."""
+        lines = [
+            json.dumps({"response": "Hi ", "done": False}),
+            json.dumps({"response": "there", "done": False}),
+            json.dumps(
+                {
+                    "response": "",
+                    "done": True,
+                    "prompt_eval_count": 3,
+                    "eval_count": 5,
+                }
+            ),
+        ]
+
+        async def mock_aiter_lines():
+            for line in lines:
+                yield line
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.aiter_lines = mock_aiter_lines
+
+        class _StreamCM:
+            async def __aenter__(self) -> MagicMock:
+                return mock_response
+
+            async def __aexit__(self, *args: object) -> None:
+                return None
+
+        with (
+            patch("copinance_os.ai.llm.providers.ollama.HTTPX_AVAILABLE", True),
+            patch("copinance_os.ai.llm.providers.ollama.httpx") as mock_httpx,
+        ):
+            mock_client = MagicMock()
+            mock_client.stream = MagicMock(return_value=_StreamCM())
+            mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
+
+            provider = OllamaProvider()
+            assert provider._client is mock_client
+
+            deltas: list[str] = []
+            kinds: list[str] = []
+            usage = None
+            async for ev in provider.generate_text_stream("ping", stream_mode="native"):
+                kinds.append(ev.kind)
+                if ev.kind == "text_delta":
+                    deltas.append(ev.text_delta)
+                if ev.kind == "done":
+                    usage = ev.usage
+
+            assert deltas == ["Hi ", "there"]
+            assert kinds[-1] == "done"
+            assert usage == {
+                "input_tokens": 3,
+                "output_tokens": 5,
+                "total_tokens": 8,
+            }
+            mock_client.stream.assert_called_once()
+            call_kw = mock_client.stream.call_args[1]
+            assert call_kw["json"]["stream"] is True
+
+    async def test_disable_native_forces_buffered_stream(self) -> None:
+        """provider_config can disable native streaming (buffered only)."""
+        with (
+            patch("copinance_os.ai.llm.providers.ollama.HTTPX_AVAILABLE", True),
+            patch("copinance_os.ai.llm.providers.ollama.httpx") as mock_httpx,
+        ):
+            mock_client = MagicMock()
+            mock_response = MagicMock()
+            mock_response.json = MagicMock(return_value={"response": "ok"})
+            mock_response.raise_for_status = MagicMock()
+            mock_response.status_code = 200
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_httpx.AsyncClient = MagicMock(return_value=mock_client)
+
+            provider = OllamaProvider(disable_native_text_stream=True)
+            assert provider.supports_native_text_stream() is False
+
+            events = []
+            async for ev in provider.generate_text_stream("x", stream_mode="auto"):
+                events.append(ev)
+
+            assert any(e.kind == "text_delta" and e.text_delta == "ok" for e in events)
+            assert all(not e.native_streaming for e in events if e.kind != "error")
