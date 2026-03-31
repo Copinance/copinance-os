@@ -262,9 +262,3 @@ This project is licensed under the Apache License 2.0. See the LICENSE file for 
 
 GitHub Issues: [Report bugs or request features](https://github.com/copinance/copinance-os/issues)
 
-
-## VHS
-
-```bash
-
-```
