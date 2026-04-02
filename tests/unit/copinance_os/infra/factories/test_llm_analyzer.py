@@ -4,17 +4,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from copinance_os.ai.llm.analyzer_factory import LLMAnalyzerFactory
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.domain.ports.analyzers import LLMAnalyzer
-from copinance_os.infra.factories.llm_analyzer import LLMAnalyzerFactory
 
 
 @pytest.mark.unit
 class TestLLMAnalyzerFactory:
     """Test LLMAnalyzerFactory."""
 
-    @patch("copinance_os.infra.factories.llm_analyzer.LLMProviderFactory")
-    @patch("copinance_os.infra.factories.llm_analyzer.LLMAnalyzerImpl")
+    @patch("copinance_os.ai.llm.analyzer_factory.LLMProviderFactory")
+    @patch("copinance_os.ai.llm.analyzer_factory.LLMAnalyzerImpl")
     def test_create_with_provider_name(
         self,
         mock_llm_impl: MagicMock,
@@ -34,8 +34,8 @@ class TestLLMAnalyzerFactory:
         mock_factory.create_provider.assert_called_once_with("gemini", llm_config)
         mock_llm_impl.assert_called_once_with(mock_provider)
 
-    @patch("copinance_os.infra.factories.llm_analyzer.LLMProviderFactory")
-    @patch("copinance_os.infra.factories.llm_analyzer.LLMAnalyzerImpl")
+    @patch("copinance_os.ai.llm.analyzer_factory.LLMProviderFactory")
+    @patch("copinance_os.ai.llm.analyzer_factory.LLMAnalyzerImpl")
     def test_create_without_provider_name(
         self,
         mock_llm_impl: MagicMock,
@@ -55,8 +55,8 @@ class TestLLMAnalyzerFactory:
         mock_factory.create_provider.assert_called_once_with("ollama", llm_config)
         mock_llm_impl.assert_called_once_with(mock_provider)
 
-    @patch("copinance_os.infra.factories.llm_analyzer.LLMProviderFactory")
-    @patch("copinance_os.infra.factories.llm_analyzer.LLMAnalyzerImpl")
+    @patch("copinance_os.ai.llm.analyzer_factory.LLMProviderFactory")
+    @patch("copinance_os.ai.llm.analyzer_factory.LLMAnalyzerImpl")
     def test_create_for_execution_type(
         self,
         mock_llm_impl: MagicMock,

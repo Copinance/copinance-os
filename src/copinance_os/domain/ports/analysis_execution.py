@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+# Forward reference resolved at import time — analysis models live in domain
+from copinance_os.domain.models.analysis import AnalyzeInstrumentRequest, AnalyzeMarketRequest
 from copinance_os.domain.models.job import Job, RunJobResult
 
 
@@ -50,4 +52,22 @@ class AnalysisExecutor(ABC):
     @abstractmethod
     def get_executor_id(self) -> str:
         """Return the executor identifier used for routing (e.g. deterministic_instrument_analysis)."""
+        pass
+
+
+class AnalyzeInstrumentRunner(ABC):
+    """Port for progressive instrument analysis execution."""
+
+    @abstractmethod
+    async def run(self, request: AnalyzeInstrumentRequest) -> RunJobResult:
+        """Run the instrument analysis."""
+        pass
+
+
+class AnalyzeMarketRunner(ABC):
+    """Port for progressive market analysis execution."""
+
+    @abstractmethod
+    async def run(self, request: AnalyzeMarketRequest) -> RunJobResult:
+        """Run the market analysis."""
         pass

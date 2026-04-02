@@ -1,6 +1,6 @@
 """Unit tests for market regime detection registry functions."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -97,6 +97,10 @@ class TestRegistryFunctions:
     def test_create_regime_tools_by_type_invalid(
         self, mock_market_data_provider: MarketDataProvider
     ) -> None:
-        """Test creating tools by type with invalid method."""
-        with pytest.raises(ValueError, match="Unknown method"):
-            create_regime_tools_by_type(mock_market_data_provider, "invalid_method")
+        """Test creating tools by type with invalid method returns empty list and logs warning."""
+        with patch(
+            "copinance_os.core.pipeline.tools.analysis.market_regime.registry.logger"
+        ) as mock_logger:
+            result = create_regime_tools_by_type(mock_market_data_provider, "invalid_method")  # type: ignore[arg-type]
+            assert result == []
+            mock_logger.warning.assert_called_once()

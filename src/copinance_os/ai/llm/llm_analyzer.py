@@ -38,7 +38,7 @@ class GeminiLLMAnalyzer(LLMAnalyzerImpl):
 
         analyzer = GeminiLLMAnalyzer(api_key="your-key")
 
-        from copinance_os.infra.factories import LLMAnalyzerFactory
+        from copinance_os.ai.llm.analyzer_factory import LLMAnalyzerFactory
 
         analyzer = LLMAnalyzerFactory.create("gemini")
         ```

@@ -352,6 +352,46 @@ def _truncate_company_facts_dict(data: dict[str, Any], max_items: int) -> dict[s
     return out
 
 
+def _fill_company_facts_items_from_flat_if_needed(stmt: Any, raw: dict[str, Any]) -> None:
+    """If to_dict() yields no rows but facts exist, use to_flat_list() (tabular period columns)."""
+    items = raw.get("items")
+    meta = raw.get("metadata")
+    total = int(meta.get("total_items") or 0) if isinstance(meta, dict) else 0
+    if not isinstance(items, list) or len(items) > 0 or total <= 0:
+        return
+    flat_fn = getattr(stmt, "to_flat_list", None)
+    if not callable(flat_fn):
+        return
+    try:
+        rows = flat_fn()
+    except Exception:
+        logger.warning("company_facts to_flat_list failed", exc_info=True)
+        return
+    period_cols = raw.get("periods")
+    if not isinstance(period_cols, list):
+        period_cols = []
+    rebuilt: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        vals = {str(c): row.get(c) for c in period_cols}
+        if not any(v is not None for v in vals.values()):
+            continue
+        rebuilt.append(
+            {
+                "concept": row.get("concept"),
+                "label": row.get("label"),
+                "depth": row.get("depth"),
+                "values": vals,
+            }
+        )
+        if len(rebuilt) >= _MAX_COMPANY_FACT_LINE_ITEMS:
+            break
+    if rebuilt:
+        raw["items"] = rebuilt
+        raw["items_layout"] = "flat_period_columns"
+
+
 def _company_facts_statement_sync(
     *,
     co: Any,
@@ -426,9 +466,13 @@ def _company_facts_statement_sync(
             "error": "Statement object has no to_dict(); try as_dataframe path in a future revision.",
             "provider": provider_name,
         }
-    raw = to_dict(include_empty=False)
+    # include_empty=True: statement roots are often abstract headers with no period
+    # values; include_empty=False drops those nodes before recursing, which can yield
+    # items=[] while metadata.total_items is still > 0 (children never serialized).
+    raw = to_dict(include_empty=True)
     if not isinstance(raw, dict):
         raw = {"payload": raw}
+    _fill_company_facts_items_from_flat_if_needed(stmt, raw)
     data = _truncate_company_facts_dict(raw, _MAX_COMPANY_FACT_LINE_ITEMS)
     data.setdefault("symbol", symbol.upper())
     data["statement_kind"] = sk
@@ -1386,6 +1430,8 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
             "periods": periods,
             "period": period.lower(),
             "line_label": (line_label or "").strip(),
+            # Bump when serialization changes so stale empty-item caches are not reused.
+            "facts_items_payload": "v2_include_empty_and_flat_fallback",
         }
         return cast(
             dict[str, Any],

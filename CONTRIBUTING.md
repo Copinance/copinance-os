@@ -109,7 +109,7 @@ Prefixes:
    - LLM providers and analyzers (explanation/summarization; not numerical truth)
 
 6. **Infra** (`infra/`)
-   - Settings (`infra/config/`), logging, DI wiring (`infra/di/`), factories
+   - Settings (`infra/config/`), logging, DI composition root (`infra/di/`). Executable wiring factories are **`AnalysisExecutorFactory`** (`core/execution_engine/factory.py`) and **`LLMAnalyzerFactory`** (`ai/llm/analyzer_factory.py`), not a separate `infra/factories` tree.
 
 7. **Interfaces** (`interfaces/cli/`)
    - CLI entry (`main`, `dispatch`, lazy Typer `root`, `commands/`); maps user input to use cases and the DI container
@@ -158,14 +158,14 @@ When adding features, follow these steps:
 
 ## Adding New Analysis Executors
 
-The library uses **analysis executors** (implementing the `AnalysisExecutor` port) to run deterministic or question-driven analysis. Use `execution_type_from_scope_and_mode(scope, mode)` when building jobs from requests.
+The library uses **analysis executors** (implementing the `AnalysisExecutor` port) to run deterministic or question-driven analysis. Use `execution_type_from_scope_and_mode(scope, mode)` from `copinance_os.domain.models.analysis` when building jobs from requests.
 
 To add a new executor:
 
 1. Create a class implementing `AnalysisExecutor` interface
 2. Implement `execute()`, `validate()`, and `get_executor_id()`
 3. Add tests for the executor
-4. Register in dependency injection (`infra/di/use_cases.py` and `infra/factories/analysis_executor.py` as needed)
+4. Register it with DI: extend **`AnalysisExecutorFactory.create_all`** (`copinance_os.core.execution_engine.factory`) and ensure `infra/di/use_cases.py` still exposes your executor list—or override **`container.analysis_executors`** in a custom container (see [Extending](https://copinance.github.io/copinance-os/developer-guide/extending))
 
 Example:
 
@@ -192,7 +192,7 @@ Tools are self-describing functions that wrap data providers or other functional
 1. Create a class implementing the `Tool` interface from `domain/ports/tools.py`
 2. Implement `get_name()`, `get_description()`, `get_schema()`, and `execute()`
 3. Add tests for the tool
-4. Register the tool in a `ToolRegistry` or use factory functions
+4. Wire the tool through a bundle factory and `PluginSpec` in `core.pipeline.tools.discovery` (or add a `tool_bundle_factory` in `core.pipeline.tools.bundles` for scan), or register manually on `ToolRegistry` for experiments
 
 ### For Data Provider Tools
 

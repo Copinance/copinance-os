@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "Documentation site for Copinance OS powered by Nextra (Next.js Pages Router)",
+  "overrides": {
+    "lodash-es": "4.18.1"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

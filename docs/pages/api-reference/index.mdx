@@ -17,8 +17,18 @@ Implementation guide: [Extending](/developer-guide/extending).
 
 ## LLM providers
 
-- **`LLMProvider`** (`copinance_os.ai.llm.providers.base`) — **`generate_text`**, **`generate_with_tools`**, **`generate_text_stream`** (async iteration of **`LLMTextStreamEvent`**). Factories: **`LLMProviderFactory`**, config: **`LLMConfig`** (`text_streaming_mode`, **`provider_config["disable_native_text_stream"]`**). **Gemini** and **Ollama** support native streaming in **`auto`** mode with buffered fallback.
+- **`LLMProvider`** (`copinance_os.ai.llm.providers.base`) — **`generate_text`**, **`generate_with_tools`**, **`generate_text_stream`** (async iteration of **`LLMTextStreamEvent`**). **`LLMProviderFactory`** (`ai.llm.providers.factory`) builds **`gemini`**, **`openai`**, and **`ollama`** adapters from **`LLMConfig`**. **`LLMAnalyzerFactory`** (`ai.llm.analyzer_factory`) wraps a provider as the **`LLMAnalyzer`** port for question-driven wiring.
 - Details: [Using as a Library — LLM text streaming](/getting-started/library#llm-text-streaming-library--llmprovider).
+
+## Tools and bundles
+
+- **Discovery** — `copinance_os.core.pipeline.tools.discovery`: **`collect_question_driven_tools`**, **`build_data_provider_tool_registry`**, **`load_tools_from_plugin_specs`**, **`scan_tool_bundle_factories`** (`TOOL_BUNDLE_ENTRY_GROUP`, optional package scan).
+- **Context** — **`ToolBundleContext`** (`domain.models.tool_bundle_context`); bundle protocol — **`ToolBundleFactory`** (`domain.ports.tool_bundles`).
+- Overview: [Tools](/tools).
+
+## Analysis executors
+
+- **`AnalysisExecutorFactory`** — `copinance_os.core.execution_engine.factory`; used by DI to assemble the default **`list[AnalysisExecutor]`**. Override **`container.analysis_executors`** or extend the factory list for custom executor types.
 
 ## Other extension points
 

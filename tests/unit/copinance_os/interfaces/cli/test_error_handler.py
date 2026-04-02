@@ -36,9 +36,10 @@ class SampleApplicationError(ApplicationError):
 class TestErrorHandler:
     """Test CLI error handling functions."""
 
-    @patch("copinance_os.interfaces.cli.shared.error_handler.console")
-    def test_handle_domain_error(self, mock_console: MagicMock) -> None:
+    @patch("copinance_os.interfaces.cli.shared.error_handler.Console")
+    def test_handle_domain_error(self, mock_console_class: MagicMock) -> None:
         """Test handling domain exceptions."""
+        mock_console = mock_console_class.return_value
         error = SampleDomainError("Invalid symbol", details={"symbol": "INVALID"})
         context = {"command": "get_quote"}
 
@@ -49,9 +50,10 @@ class TestErrorHandler:
         assert call_args.title == "Domain Error"
         assert call_args.border_style == "red"
 
-    @patch("copinance_os.interfaces.cli.shared.error_handler.console")
-    def test_handle_application_error(self, mock_console: MagicMock) -> None:
+    @patch("copinance_os.interfaces.cli.shared.error_handler.Console")
+    def test_handle_application_error(self, mock_console_class: MagicMock) -> None:
         """Test handling application exceptions."""
+        mock_console = mock_console_class.return_value
         cause = ValueError("Underlying error")
         error = SampleApplicationError("Application error occurred", cause=cause)
         context = {"command": "analyze equity"}
@@ -63,9 +65,10 @@ class TestErrorHandler:
         assert call_args.title == "Application Error"
         assert call_args.border_style == "yellow"
 
-    @patch("copinance_os.interfaces.cli.shared.error_handler.console")
-    def test_handle_unexpected_error(self, mock_console: MagicMock) -> None:
+    @patch("copinance_os.interfaces.cli.shared.error_handler.Console")
+    def test_handle_unexpected_error(self, mock_console_class: MagicMock) -> None:
         """Test handling unexpected errors."""
+        mock_console = mock_console_class.return_value
         error = RuntimeError("Unexpected runtime error")
         context = {"command": "unknown"}
 

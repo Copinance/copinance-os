@@ -1,30 +1,38 @@
-"""Factory for creating analysis executors."""
+"""Factory for creating analysis executor instances."""
 
 import structlog
 
+from copinance_os.ai.llm.analyzer_factory import LLMAnalyzerFactory
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.ai.llm.providers.factory import LLMProviderFactory
 from copinance_os.ai.llm.resources import PromptManager
-from copinance_os.core.execution_engine import (
-    InstrumentAnalysisExecutor,
-    MarketAnalysisExecutor,
+from copinance_os.core.execution_engine.instrument_analysis import InstrumentAnalysisExecutor
+from copinance_os.core.execution_engine.market_analysis import MarketAnalysisExecutor
+from copinance_os.core.execution_engine.question_driven_analysis import (
     QuestionDrivenAnalysisExecutor,
 )
 from copinance_os.data.cache import CacheManager
+from copinance_os.domain.models.fundamentals import (
+    GetStockFundamentalsRequest,
+    GetStockFundamentalsResponse,
+)
+from copinance_os.domain.models.market_requests import (
+    GetHistoricalDataRequest,
+    GetHistoricalDataResponse,
+    GetInstrumentRequest,
+    GetInstrumentResponse,
+    GetOptionsChainRequest,
+    GetOptionsChainResponse,
+    GetQuoteRequest,
+    GetQuoteResponse,
+)
 from copinance_os.domain.ports.analysis_execution import AnalysisExecutor
 from copinance_os.domain.ports.data_providers import (
     FundamentalDataProvider,
     MacroeconomicDataProvider,
     MarketDataProvider,
 )
-from copinance_os.infra.factories.llm_analyzer import LLMAnalyzerFactory
-from copinance_os.research.workflows.fundamentals import GetStockFundamentalsUseCase
-from copinance_os.research.workflows.market import (
-    GetHistoricalDataUseCase,
-    GetInstrumentUseCase,
-    GetOptionsChainUseCase,
-    GetQuoteUseCase,
-)
+from copinance_os.domain.ports.use_cases import UseCase
 
 logger = structlog.get_logger(__name__)
 
@@ -34,13 +42,13 @@ class AnalysisExecutorFactory:
 
     @staticmethod
     def create_all(
-        get_instrument_use_case: GetInstrumentUseCase,
-        get_quote_use_case: GetQuoteUseCase,
-        get_historical_data_use_case: GetHistoricalDataUseCase,
-        get_options_chain_use_case: GetOptionsChainUseCase,
+        get_instrument_use_case: UseCase[GetInstrumentRequest, GetInstrumentResponse],
+        get_quote_use_case: UseCase[GetQuoteRequest, GetQuoteResponse],
+        get_historical_data_use_case: UseCase[GetHistoricalDataRequest, GetHistoricalDataResponse],
+        get_options_chain_use_case: UseCase[GetOptionsChainRequest, GetOptionsChainResponse],
         market_data_provider: MarketDataProvider,
         macro_data_provider: MacroeconomicDataProvider,
-        fundamentals_use_case: GetStockFundamentalsUseCase,
+        fundamentals_use_case: UseCase[GetStockFundamentalsRequest, GetStockFundamentalsResponse],
         fundamental_data_provider: FundamentalDataProvider,
         sec_filings_provider: FundamentalDataProvider,
         cache_manager: CacheManager | None,

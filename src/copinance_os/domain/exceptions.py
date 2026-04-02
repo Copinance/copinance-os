@@ -181,6 +181,13 @@ class DataProviderUnavailableError(DataProviderError):
         super().__init__(provider_name, "is_available", "Provider is not available", details)
 
 
+class ConfigurationError(DomainError):
+    """Raised when the application is misconfigured at startup."""
+
+    def __init__(self, message: str, details: dict[str, str] | None = None) -> None:
+        super().__init__(message, details)
+
+
 class RetryableExecutionError(DomainError):
     """Raised for transient failures where repeating the same request may succeed.
 

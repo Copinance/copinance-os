@@ -18,7 +18,7 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 
 ## LLM Provider Setup
 
-**Implemented backends:** **`gemini`** and **`ollama`** only. Other provider names in the LLM factory are rejected until implemented (see [Using as a Library — LLMConfig](library#llmconfig-required-for-question-driven-analysis)).
+**Implemented backends:** **`gemini`**, **`openai`** (Chat Completions), and **`ollama`**. The factory rejects unknown provider names (see [Using as a Library — LLMConfig](library#llmconfig-required-for-question-driven-analysis)).
 
 ### Gemini (Cloud)
 
@@ -33,6 +33,19 @@ COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash # faster
 ```
 
 **Text streaming (CLI):** For question-driven runs, pass **`--stream`** on the **`analyze`** group (before the subcommand) or **`--stream`** on generic research (`copinance --stream "…"`). **`--json`** disables streaming. Output prints to stdout as tokens arrive; run metadata and saved JSON still appear after. See [Using as a Library — LLM text streaming](library#llm-text-streaming-library--llmprovider) for **`LLMConfig`** and programmatic use.
+
+### OpenAI (Cloud)
+
+1. Get an API key from [OpenAI](https://platform.openai.com/) (or use a base URL for an OpenAI-compatible HTTP API).
+2. Set in `.env`:
+```bash
+COPINANCEOS_LLM_PROVIDER=openai
+COPINANCEOS_OPENAI_API_KEY=sk-...
+COPINANCEOS_OPENAI_MODEL=gpt-4o-mini
+# Optional — custom / enterprise endpoint:
+# COPINANCEOS_OPENAI_BASE_URL=https://api.openai.com/v1
+```
+3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
 
 ### Ollama (Local)
 
@@ -108,6 +121,15 @@ COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinance
 ```
 
+**OpenAI:**
+```bash
+COPINANCEOS_LLM_PROVIDER=openai
+COPINANCEOS_OPENAI_API_KEY=sk-...
+COPINANCEOS_OPENAI_MODEL=gpt-4o-mini
+COPINANCEOS_STORAGE_TYPE=file
+COPINANCEOS_STORAGE_PATH=~/.copinance
+```
+
 **Ollama:**
 ```bash
 COPINANCEOS_LLM_PROVIDER=ollama
@@ -130,6 +152,7 @@ Never commit `.env`. Add to `.gitignore`:
 - **"LLM analyzer not configured"**: Check `.env` location and variable names; restart terminal.
 - **"Gemini not available"**: `pip install google-genai`
 - **"Gemini API key is not configured"**: No quotes around the key; exact name `COPINANCEOS_GEMINI_API_KEY`.
+- **OpenAI errors / "openai package is not installed"**: Ensure project deps are installed (`pip install -e .`); the `openai` library is declared in `pyproject.toml`. Check `COPINANCEOS_OPENAI_API_KEY` when using env-based CLI config.
 
 ## Library Integration
 

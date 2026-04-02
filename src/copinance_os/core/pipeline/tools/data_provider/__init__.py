@@ -27,12 +27,6 @@ from copinance_os.core.pipeline.tools.data_provider.market_data import (
     MarketDataGetQuoteTool,
     MarketDataSearchInstrumentsTool,
 )
-from copinance_os.core.pipeline.tools.data_provider.registry import (
-    DataProviderToolRegistry,
-    create_fundamental_data_tools,
-    create_fundamental_data_tools_with_providers,
-    create_market_data_tools,
-)
 
 __all__ = [
     # Market data tools
@@ -56,10 +50,4 @@ __all__ = [
     "FundamentalDataGetSecFundFilingsTool",
     "FundamentalDataGetSecFundPortfolioTool",
     "FundamentalDataGetSecFundLatestReportTool",
-    # Factory functions
-    "create_market_data_tools",
-    "create_fundamental_data_tools",
-    "create_fundamental_data_tools_with_providers",
-    # Registry
-    "DataProviderToolRegistry",
 ]

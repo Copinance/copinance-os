@@ -30,15 +30,16 @@ class TestAnalyzeCLI:
     @patch("copinance_os.interfaces.cli.commands.analyze.ensure_profile_with_literacy")
     @patch("copinance_os.interfaces.cli.shared.run_job_output.get_storage_path_safe")
     @patch("copinance_os.interfaces.cli.commands.analyze.get_container")
-    @patch("copinance_os.interfaces.cli.shared.run_job_output.console")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.Console")
     def test_analyze_equity_calls_use_case_and_displays(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
         mock_get_storage_path_safe: MagicMock,
         mock_ensure_profile: MagicMock,
         tmp_path: Path,
     ) -> None:
+        mock_console = mock_console_class.return_value
         mock_ensure_profile.return_value = None
         mock_get_storage_path_safe.return_value = str(tmp_path)
         mock_uc = MagicMock()
@@ -55,12 +56,14 @@ class TestAnalyzeCLI:
             mode=AnalyzeMode.AUTO,
             profile_id=None,
             include_prompt_in_results=False,
+            no_cache=False,
         )
 
         mock_uc.execute.assert_called_once()
         request = mock_uc.execute.call_args[0][0]
         assert isinstance(request, AnalyzeInstrumentRequest)
         assert request.symbol == "AAPL"
+        assert request.no_cache is False
         assert request.timeframe == JobTimeframe.MID_TERM
         assert request.question is None
         assert mock_console.print.called
@@ -68,13 +71,14 @@ class TestAnalyzeCLI:
 
     @patch("copinance_os.interfaces.cli.commands.analyze.ensure_profile_with_literacy")
     @patch("copinance_os.interfaces.cli.commands.analyze.get_container")
-    @patch("copinance_os.interfaces.cli.shared.run_job_output.console")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.Console")
     def test_analyze_options_agentic_calls_use_case(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
         mock_ensure_profile: MagicMock,
     ) -> None:
+        mock_console = mock_console_class.return_value
         mock_ensure_profile.return_value = None
         mock_uc = MagicMock()
         mock_uc.execute = AsyncMock(
@@ -96,12 +100,14 @@ class TestAnalyzeCLI:
             mode=AnalyzeMode.AUTO,
             profile_id=None,
             include_prompt_in_results=False,
+            no_cache=False,
         )
 
         request = mock_uc.execute.call_args[0][0]
         assert isinstance(request, AnalyzeInstrumentRequest)
         assert request.symbol == "AAPL"
         assert request.question == "Is skew bearish?"
+        assert request.no_cache is False
         assert request.expiration_date == "2026-06-19"
         assert request.option_side == OptionSide.CALL
         assert mock_console.print.called
@@ -109,15 +115,16 @@ class TestAnalyzeCLI:
     @patch("copinance_os.interfaces.cli.commands.analyze.ensure_profile_with_literacy")
     @patch("copinance_os.interfaces.cli.shared.run_job_output.get_storage_path_safe")
     @patch("copinance_os.interfaces.cli.commands.analyze.get_container")
-    @patch("copinance_os.interfaces.cli.shared.run_job_output.console")
+    @patch("copinance_os.interfaces.cli.shared.run_job_output.Console")
     def test_analyze_macro_calls_use_case_and_displays(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
         mock_get_storage_path_safe: MagicMock,
         mock_ensure_profile: MagicMock,
         tmp_path: Path,
     ) -> None:
+        mock_console = mock_console_class.return_value
         mock_ensure_profile.return_value = None
         mock_get_storage_path_safe.return_value = str(tmp_path)
         mock_uc = MagicMock()
@@ -151,6 +158,7 @@ class TestAnalyzeCLI:
             include_advanced=True,
             profile_id=None,
             include_prompt_in_results=False,
+            no_cache=False,
         )
 
         mock_uc.execute.assert_called_once()
@@ -158,5 +166,6 @@ class TestAnalyzeCLI:
         assert isinstance(request, AnalyzeMarketRequest)
         assert request.market_index == "SPY"
         assert request.lookback_days == 90
+        assert request.no_cache is False
         assert mock_console.print.called
         assert (tmp_path / "results" / "v2").exists()

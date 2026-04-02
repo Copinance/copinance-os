@@ -220,7 +220,7 @@ class MarketRegimeIndicatorsTool(Tool):
             # Calculate date range
             # Add extra buffer to ensure we have enough data for 200-day MA calculation
             # 252 trading days + 60 buffer = ~312 calendar days to account for weekends/holidays
-            end_date = datetime.now()
+            end_date = datetime.now(UTC)
             start_date = end_date - timedelta(
                 days=lookback_days + 60
             )  # Increased buffer for weekends/holidays and to ensure 200+ trading days

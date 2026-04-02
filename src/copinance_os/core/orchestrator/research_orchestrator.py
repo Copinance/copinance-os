@@ -9,11 +9,14 @@ from __future__ import annotations
 from typing import Any
 
 from copinance_os.core.execution_engine.backtest import execute_simple_long_only_backtest
-from copinance_os.domain.backtest import SimpleBacktestConfig, SimpleBacktestResult
+from copinance_os.domain.backtest import (
+    SimpleBacktestConfig,
+    SimpleBacktestResult,
+    SimpleLongOnlyWorkflowRequest,
+)
 from copinance_os.domain.models.job import Job, RunJobResult
 from copinance_os.domain.ports.analysis_execution import JobRunner
 from copinance_os.domain.strategies.signal import StrategySignal
-from copinance_os.research.workflows.backtest import SimpleLongOnlyWorkflowRequest
 
 
 class ResearchOrchestrator:

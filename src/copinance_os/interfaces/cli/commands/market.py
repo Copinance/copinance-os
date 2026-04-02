@@ -44,7 +44,6 @@ market_app = typer.Typer(
     invoke_without_command=False,
     no_args_is_help=True,
 )
-console = Console()
 
 
 @market_app.callback()
@@ -72,6 +71,7 @@ async def search_instruments(
     ),
 ) -> None:
     """Search for market instruments by symbol or name."""
+    console = Console()
     use_case = get_container().search_instruments_use_case()
     request = SearchInstrumentsRequest(query=query, limit=limit, search_mode=search_mode)
     response = await use_case.execute(request)
@@ -108,6 +108,7 @@ async def get_market_quote(
     ),
 ) -> None:
     """Fetch the latest market quote for an instrument."""
+    console = Console()
     symbol_upper = symbol.upper()
     cache_manager = get_container().cache_manager()
     quote: dict[str, Any] | None = None
@@ -189,6 +190,7 @@ async def get_market_history(
     Uses the same cache as in question-driven analysis; repeated requests for the same
     symbol/range/interval are served from cache until expiry or cache clear.
     """
+    console = Console()
     if interval not in SUPPORTED_HISTORY_INTERVALS:
         handle_cli_error(
             ValueError(
@@ -353,6 +355,7 @@ async def get_options_chain(
 
     Uses the same cache as question-driven analysis for identical underlying/expiration keys.
     """
+    console = Console()
     symbol_upper = underlying_symbol.upper()
     cache_manager = get_container().cache_manager()
     options_data: OptionsChain | dict[str, Any] | None = None
@@ -519,6 +522,7 @@ async def get_market_fundamentals(
     Uses the same cache as in question-driven analysis. Data includes income statement,
     balance sheet, cash flow, and key ratios.
     """
+    console = Console()
     symbol_upper = symbol.upper()
     cache_manager = get_container().cache_manager()
     fundamentals_data: dict[str, Any] | None = None

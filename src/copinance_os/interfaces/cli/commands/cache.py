@@ -17,7 +17,6 @@ from copinance_os.infra.config import get_storage_path_safe
 from copinance_os.interfaces.cli.shared.container_access import get_container
 
 cache_app = typer.Typer(help="Cache management commands", no_args_is_help=True)
-console = Console()
 
 
 def _clear_stored_instruments() -> bool:
@@ -44,6 +43,7 @@ def clear_cache(
     """
 
     async def _clear() -> None:
+        console = Console()
         cache_manager = get_container().cache_manager()
         deleted_count = await cache_manager.clear(tool_name)
         cleared_instruments = _clear_stored_instruments()
@@ -78,6 +78,7 @@ def refresh_cache(
     """
 
     async def _refresh() -> None:
+        console = Console()
         cache_manager = get_container().cache_manager()
 
         params: dict[str, Any] = {}
@@ -112,6 +113,7 @@ def cache_info() -> None:
     """Show cache information."""
 
     async def _info() -> None:
+        console = Console()
         cache_manager = get_container().cache_manager()
         backend = cache_manager.get_backend()
 

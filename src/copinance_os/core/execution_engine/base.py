@@ -1,5 +1,6 @@
 """Base analysis executor with common execution patterns."""
 
+import asyncio
 from abc import abstractmethod
 from datetime import UTC, datetime
 from typing import Any
@@ -8,6 +9,7 @@ import structlog
 
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.ports.analysis_execution import AnalysisExecutor
+from copinance_os.infra.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -57,8 +59,10 @@ class BaseAnalysisExecutor(AnalysisExecutor):
             timeframe=timeframe,
         )
 
+        timeout_seconds = get_settings().default_analysis_timeout
         try:
-            analysis_results = await self._execute_analysis(job, context)
+            async with asyncio.timeout(timeout_seconds):
+                analysis_results = await self._execute_analysis(job, context)
 
             if hasattr(analysis_results, "model_dump"):
                 results.update(analysis_results.model_dump())
@@ -84,6 +88,16 @@ class BaseAnalysisExecutor(AnalysisExecutor):
                 timeframe=timeframe,
             )
 
+        except TimeoutError:
+            logger.error(
+                "Analysis execution timed out",
+                execution_type=execution_type,
+                symbol=target_symbol,
+                timeout_seconds=timeout_seconds,
+            )
+            results["status"] = "failed"
+            results["error"] = f"Analysis timed out after {timeout_seconds}s"
+            results["message"] = f"Analysis execution timed out after {timeout_seconds}s"
         except Exception as e:
             logger.error(
                 "Analysis execution failed",

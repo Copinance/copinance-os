@@ -19,7 +19,6 @@ from copinance_os.research.workflows.profile import (
 )
 
 profile_app = typer.Typer(help="Analysis profile management commands", no_args_is_help=True)
-console = Console()
 
 
 @profile_app.command("create")
@@ -32,7 +31,9 @@ def create_profile(
     """Create a new analysis profile."""
 
     async def _create() -> None:
-        use_case = get_container().create_profile_use_case()
+        console = Console()
+        container = get_container()
+        use_case = container.create_profile_use_case()
         request = CreateProfileRequest(
             financial_literacy=literacy,
             display_name=name,
@@ -57,7 +58,9 @@ def list_profiles(
     """List all analysis profiles."""
 
     async def _list() -> None:
-        use_case = get_container().list_profiles_use_case()
+        console = Console()
+        container = get_container()
+        use_case = container.list_profiles_use_case()
         request = ListProfilesRequest(limit=limit)
         response = await use_case.execute(request)
 
@@ -66,7 +69,7 @@ def list_profiles(
             return
 
         # Get current profile ID
-        current_use_case = get_container().get_current_profile_use_case()
+        current_use_case = container.get_current_profile_use_case()
         current_response = await current_use_case.execute(GetCurrentProfileRequest())
         current_id = current_response.profile.id if current_response.profile else None
 
@@ -100,7 +103,9 @@ def get_profile(
     """Get profile details."""
 
     async def _get() -> None:
-        use_case = get_container().get_profile_use_case()
+        console = Console()
+        container = get_container()
+        use_case = container.get_profile_use_case()
         request = GetProfileRequest(profile_id=profile_id)
         response = await use_case.execute(request)
 
@@ -127,7 +132,9 @@ def get_current_profile() -> None:
     """Get the current profile."""
 
     async def _get_current() -> None:
-        use_case = get_container().get_current_profile_use_case()
+        console = Console()
+        container = get_container()
+        use_case = container.get_current_profile_use_case()
         request = GetCurrentProfileRequest()
         response = await use_case.execute(request)
 
@@ -159,7 +166,9 @@ def set_current_profile(
     """Set or clear the current profile."""
 
     async def _set_current() -> None:
-        use_case = get_container().set_current_profile_use_case()
+        console = Console()
+        container = get_container()
+        use_case = container.set_current_profile_use_case()
         request = SetCurrentProfileRequest(profile_id=profile_id)
 
         try:
@@ -185,8 +194,10 @@ def delete_profile(
     """Delete an analysis profile."""
 
     async def _delete() -> None:
+        console = Console()
+        container = get_container()
         # Get profile first to show details
-        get_use_case = get_container().get_profile_use_case()
+        get_use_case = container.get_profile_use_case()
         get_request = GetProfileRequest(profile_id=profile_id)
         get_response = await get_use_case.execute(get_request)
 
@@ -197,7 +208,7 @@ def delete_profile(
         profile = get_response.profile
 
         # Check if it's the current profile
-        current_use_case = get_container().get_current_profile_use_case()
+        current_use_case = container.get_current_profile_use_case()
         current_response = await current_use_case.execute(GetCurrentProfileRequest())
         is_current = (
             current_response.profile is not None and current_response.profile.id == profile_id
@@ -219,7 +230,7 @@ def delete_profile(
                 return
 
         # Delete the profile
-        use_case = get_container().delete_profile_use_case()
+        use_case = container.delete_profile_use_case()
         request = DeleteProfileRequest(profile_id=profile_id)
 
         try:

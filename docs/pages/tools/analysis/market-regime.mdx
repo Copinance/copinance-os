@@ -525,21 +525,32 @@ indicators_tool = MarketRegimeIndicatorsTool(provider)
 indicators_result = await indicators_tool.execute(market_index="SPY")
 ```
 
-### Tool Registry
+### Tool registry and discovery
 
-Tools can also be registered in a tool registry for centralized management:
+**Recommended:** use **`build_data_provider_tool_registry`** so market data, rule-based regime, and fundamental tools share one registry (matches bundle specs in `core.pipeline.tools.discovery.specs`):
+
+```python
+from copinance_os.core.pipeline.tools import build_data_provider_tool_registry
+
+registry = build_data_provider_tool_registry(
+    market_data_provider=provider,
+    fundamental_data_provider=fundamentals_provider,  # optional
+)
+trend_tool = registry.get("detect_market_trend")
+```
+
+**Regime-only** (manual registration):
 
 ```python
 from copinance_os.core.pipeline.tools import ToolRegistry
 from copinance_os.core.pipeline.tools.analysis import create_rule_based_regime_tools
 
 registry = ToolRegistry()
-tools = create_rule_based_regime_tools(provider)
-registry.register_many(tools)
-
-# Get a tool by name
+registry.register_many(create_rule_based_regime_tools(provider))
 trend_tool = registry.get("detect_market_trend")
 ```
+
+See [Tools Overview](../index#programmatic-usage) for `collect_question_driven_tools`, `ToolBundleContext`, and plugin entry points.
 
 ## Academic References
 

@@ -12,23 +12,24 @@ from copinance_os.data.schemas.market_data_conversions import (
     coerce_sorted_market_data_points,
     price_series_from_market_data_points,
 )
+from copinance_os.domain.models.analysis import INSTRUMENT_DETERMINISTIC_TYPE
+from copinance_os.domain.models.fundamentals import (
+    GetStockFundamentalsRequest,
+    GetStockFundamentalsResponse,
+)
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType, OptionsChain, OptionSide
-from copinance_os.research.workflows.analyze import INSTRUMENT_DETERMINISTIC_TYPE
-from copinance_os.research.workflows.fundamentals import (
-    GetStockFundamentalsRequest,
-    GetStockFundamentalsUseCase,
-)
-from copinance_os.research.workflows.market import (
+from copinance_os.domain.models.market_requests import (
     GetHistoricalDataRequest,
-    GetHistoricalDataUseCase,
+    GetHistoricalDataResponse,
     GetInstrumentRequest,
-    GetInstrumentUseCase,
+    GetInstrumentResponse,
     GetOptionsChainRequest,
-    GetOptionsChainUseCase,
+    GetOptionsChainResponse,
     GetQuoteRequest,
-    GetQuoteUseCase,
+    GetQuoteResponse,
 )
+from copinance_os.domain.ports.use_cases import UseCase
 
 logger = structlog.get_logger(__name__)
 
@@ -38,11 +39,17 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
 
     def __init__(
         self,
-        get_instrument_use_case: GetInstrumentUseCase | None = None,
-        get_quote_use_case: GetQuoteUseCase | None = None,
-        get_historical_data_use_case: GetHistoricalDataUseCase | None = None,
-        get_options_chain_use_case: GetOptionsChainUseCase | None = None,
-        fundamentals_use_case: GetStockFundamentalsUseCase | None = None,
+        get_instrument_use_case: UseCase[GetInstrumentRequest, GetInstrumentResponse] | None = None,
+        get_quote_use_case: UseCase[GetQuoteRequest, GetQuoteResponse] | None = None,
+        get_historical_data_use_case: (
+            UseCase[GetHistoricalDataRequest, GetHistoricalDataResponse] | None
+        ) = None,
+        get_options_chain_use_case: (
+            UseCase[GetOptionsChainRequest, GetOptionsChainResponse] | None
+        ) = None,
+        fundamentals_use_case: (
+            UseCase[GetStockFundamentalsRequest, GetStockFundamentalsResponse] | None
+        ) = None,
         cache_manager: CacheManager | None = None,
     ) -> None:
         self._get_instrument_use_case = get_instrument_use_case
@@ -58,20 +65,22 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
 
         symbol = job.instrument_symbol.upper()
         market_type = job.market_type or MarketType.EQUITY
+        use_cache = not bool(context.get("no_cache"))
 
         if market_type == MarketType.OPTIONS:
-            return await self._execute_options_analysis(symbol, job.timeframe, context)
-        return await self._execute_equity_analysis(symbol, job.timeframe)
+            return await self._execute_options_analysis(symbol, job.timeframe, context, use_cache)
+        return await self._execute_equity_analysis(symbol, job.timeframe, use_cache)
 
     async def _execute_equity_analysis(
         self,
         symbol: str,
         timeframe: JobTimeframe,
+        use_cache: bool,
     ) -> dict[str, Any]:
         instrument = await self._get_instrument_info(symbol)
-        quote = await self._get_market_quote(symbol)
-        historical_data = await self._get_historical_data(symbol, timeframe)
-        fundamentals = await self._get_fundamentals(symbol, timeframe)
+        quote = await self._get_market_quote(symbol, use_cache=use_cache)
+        historical_data = await self._get_historical_data(symbol, timeframe, use_cache=use_cache)
+        fundamentals = await self._get_fundamentals(symbol, timeframe, use_cache=use_cache)
         analysis = await self._calculate_equity_analysis(
             symbol,
             quote,
@@ -102,6 +111,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         symbol: str,
         timeframe: JobTimeframe,
         context: dict[str, Any],
+        use_cache: bool,
     ) -> dict[str, Any]:
         if not self._get_options_chain_use_case:
             raise ValueError("GetOptionsChainUseCase not available for options analysis")
@@ -110,9 +120,9 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         requested_side = context.get("option_side", OptionSide.ALL.value)
         side = OptionSide(requested_side)
 
-        quote = await self._get_market_quote(symbol)
+        quote = await self._get_market_quote(symbol, use_cache=use_cache)
         options_chain: OptionsChain | None = None
-        if self._cache_manager:
+        if self._cache_manager and use_cache:
             try:
                 entry = await self._cache_manager.get(
                     "get_options_chain",
@@ -141,7 +151,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 )
             )
             options_chain = options_response.chain
-            if self._cache_manager:
+            if self._cache_manager and use_cache:
                 with contextlib.suppress(Exception):
                     await self._cache_manager.set(
                         "get_options_chain",
@@ -308,13 +318,13 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             "timestamp": quote.get("timestamp"),
         }
 
-    async def _get_market_quote(self, symbol: str) -> dict[str, Any]:
+    async def _get_market_quote(self, symbol: str, *, use_cache: bool = True) -> dict[str, Any]:
         if not self._get_quote_use_case:
             logger.warning("GetQuoteUseCase not available, skipping quote")
             return {"symbol": symbol, "note": "Quote not available"}
 
         symbol_upper = symbol.upper()
-        if self._cache_manager:
+        if self._cache_manager and use_cache:
             try:
                 entry = await self._cache_manager.get("get_market_quote", symbol=symbol_upper)
                 if entry and entry.data:
@@ -332,7 +342,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         try:
             response = await self._get_quote_use_case.execute(GetQuoteRequest(symbol=symbol_upper))
             quote = response.quote
-            if self._cache_manager and quote:
+            if self._cache_manager and use_cache and quote:
                 with contextlib.suppress(Exception):
                     await self._cache_manager.set(
                         "get_market_quote",
@@ -397,7 +407,9 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             "price_series": price_series_payload,
         }
 
-    async def _get_historical_data(self, symbol: str, timeframe: JobTimeframe) -> dict[str, Any]:
+    async def _get_historical_data(
+        self, symbol: str, timeframe: JobTimeframe, *, use_cache: bool = True
+    ) -> dict[str, Any]:
         if not self._get_historical_data_use_case:
             logger.warning("GetHistoricalDataUseCase not available, skipping historical data")
             return {"symbol": symbol, "note": "Historical data not available"}
@@ -418,7 +430,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             start_str = start_date.strftime("%Y-%m-%d")
             end_str = end_date.strftime("%Y-%m-%d")
 
-            if self._cache_manager:
+            if self._cache_manager and use_cache:
                 try:
                     entry = await self._cache_manager.get(
                         "get_historical_market_data",
@@ -453,7 +465,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             )
             historical = response.data
 
-            if self._cache_manager and historical:
+            if self._cache_manager and use_cache and historical:
                 try:
                     serialized = [
                         p.model_dump(mode="json") if hasattr(p, "model_dump") else p
@@ -526,7 +538,9 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             out["ratios"] = ratios_dict
         return out
 
-    async def _get_fundamentals(self, symbol: str, timeframe: JobTimeframe) -> dict[str, Any]:
+    async def _get_fundamentals(
+        self, symbol: str, timeframe: JobTimeframe, *, use_cache: bool = True
+    ) -> dict[str, Any]:
         if not self._fundamentals_use_case:
             logger.warning("FundamentalsUseCase not available, skipping fundamentals")
             return {"symbol": symbol, "note": "Fundamentals not available"}
@@ -543,7 +557,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 periods = 5
                 period_type = "annual"
 
-            if self._cache_manager:
+            if self._cache_manager and use_cache:
                 try:
                     entry = await self._cache_manager.get(
                         "get_equity_fundamentals",
@@ -577,7 +591,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 fundamentals.model_dump(mode="json")
             )
 
-            if self._cache_manager:
+            if self._cache_manager and use_cache:
                 with contextlib.suppress(Exception):
                     await self._cache_manager.set(
                         "get_equity_fundamentals",

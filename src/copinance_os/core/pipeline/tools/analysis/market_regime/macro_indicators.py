@@ -7,7 +7,7 @@ falls back to yfinance proxies via MarketDataProvider when needed.
 from __future__ import annotations
 
 import contextlib
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 import structlog
@@ -183,7 +183,7 @@ class MacroRegimeIndicatorsTool(Tool):
             include_global = bool(validated.get("include_global", True))
             include_advanced = bool(validated.get("include_advanced", True))
 
-            end_date = datetime.now()
+            end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=lookback_days + 30)
 
             data: dict[str, Any] = {

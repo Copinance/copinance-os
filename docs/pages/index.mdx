@@ -103,7 +103,7 @@ You can run a **full analysis job** (the whole story for a symbol or the market)
 
 ### Tools: the model uses your calculators
 
-In question-driven mode, **tools** are the bridge: they expose **the same data and logic** the deterministic paths use. That way the model cannot “invent” a number that the system would not also compute when asked directly.
+In question-driven mode, **tools** are the bridge: they expose **the same data and logic** the deterministic paths use. That way the model cannot “invent” a number that the system would not also compute when asked directly. Tool sets are composed from **`PluginSpec` bundles**, optional setuptools entry points, and an optional package scan—see [Tools overview](tools) and [Architecture](developer-guide/architecture).
 
 ### Where data lives and how it is reused
 

@@ -12,8 +12,6 @@ from rich.panel import Panel
 from copinance_os.domain.exceptions import DomainError
 from copinance_os.research.workflows.exceptions import ApplicationError
 
-console = Console()
-
 
 def handle_cli_error(error: Exception, context: dict[str, Any] | None = None) -> None:
     """Handle errors in CLI commands and display user-friendly messages.
@@ -50,6 +48,7 @@ def handle_cli_error(error: Exception, context: dict[str, Any] | None = None) ->
 
 def _handle_domain_error(error: DomainError, context: dict[str, Any]) -> None:
     """Handle domain exceptions with user-friendly messages."""
+    console = Console()
     # Extract error information
     message = error.message if hasattr(error, "message") else str(error)
     details = error.details if hasattr(error, "details") else {}
@@ -72,6 +71,7 @@ def _handle_domain_error(error: DomainError, context: dict[str, Any]) -> None:
 
 def _handle_application_error(error: ApplicationError, context: dict[str, Any]) -> None:
     """Handle application exceptions with user-friendly messages."""
+    console = Console()
     message = error.message if hasattr(error, "message") else str(error)
     cause = error.cause if hasattr(error, "cause") else None
 
@@ -89,6 +89,7 @@ def _handle_application_error(error: ApplicationError, context: dict[str, Any]) 
 
 def _handle_unexpected_error(error: Exception, context: dict[str, Any]) -> None:
     """Handle unexpected errors with user-friendly messages."""
+    console = Console()
     error_type = type(error).__name__
     error_message = str(error)
 

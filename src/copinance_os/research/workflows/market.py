@@ -1,6 +1,5 @@
 """Market use cases: search, instrument, quote, historical data, options chain."""
 
-from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
@@ -8,12 +7,40 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, Field
 
-from copinance_os.domain.models.market import MarketDataPoint, OptionsChain
+from copinance_os.domain.models.market_requests import (
+    GetHistoricalDataRequest,
+    GetHistoricalDataResponse,
+    GetInstrumentRequest,
+    GetInstrumentResponse,
+    GetOptionsChainRequest,
+    GetOptionsChainResponse,
+    GetQuoteRequest,
+    GetQuoteResponse,
+)
 from copinance_os.domain.models.stock import Stock
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.repositories import StockRepository
 from copinance_os.domain.validation import StockSymbolValidator
 from copinance_os.research.workflows.base import UseCase
+
+# Re-export request/response types for consumers that import from this module
+__all__ = [
+    "SearchInstrumentsRequest",
+    "SearchInstrumentsResponse",
+    "SearchInstrumentsUseCase",
+    "GetInstrumentRequest",
+    "GetInstrumentResponse",
+    "GetInstrumentUseCase",
+    "GetQuoteRequest",
+    "GetQuoteResponse",
+    "GetQuoteUseCase",
+    "GetHistoricalDataRequest",
+    "GetHistoricalDataResponse",
+    "GetHistoricalDataUseCase",
+    "GetOptionsChainRequest",
+    "GetOptionsChainResponse",
+    "GetOptionsChainUseCase",
+]
 
 logger = structlog.get_logger(__name__)
 
@@ -189,18 +216,6 @@ class SearchInstrumentsUseCase(UseCase[SearchInstrumentsRequest, SearchInstrumen
 # ---- Get instrument (cached) ----
 
 
-class GetInstrumentRequest(BaseModel):
-    """Request to get equity instrument information by symbol."""
-
-    symbol: str = Field(..., description="Instrument symbol")
-
-
-class GetInstrumentResponse(BaseModel):
-    """Response from getting instrument information."""
-
-    instrument: Stock | None = Field(..., description="Instrument if found")
-
-
 class GetInstrumentUseCase(UseCase[GetInstrumentRequest, GetInstrumentResponse]):
     """Get cached equity instrument by symbol."""
 
@@ -213,19 +228,6 @@ class GetInstrumentUseCase(UseCase[GetInstrumentRequest, GetInstrumentResponse])
 
 
 # ---- Get quote ----
-
-
-class GetQuoteRequest(BaseModel):
-    """Request to get current market quote for a symbol."""
-
-    symbol: str = Field(..., description="Instrument symbol")
-
-
-class GetQuoteResponse(BaseModel):
-    """Response with current quote data."""
-
-    quote: dict[str, Any] = Field(default_factory=dict, description="Quote payload from provider")
-    symbol: str = Field(..., description="Instrument symbol")
 
 
 class GetQuoteUseCase(UseCase[GetQuoteRequest, GetQuoteResponse]):
@@ -246,25 +248,6 @@ class GetQuoteUseCase(UseCase[GetQuoteRequest, GetQuoteResponse]):
 # ---- Get historical data ----
 
 
-class GetHistoricalDataRequest(BaseModel):
-    """Request to get historical OHLCV data for a symbol."""
-
-    symbol: str = Field(..., description="Instrument symbol")
-    start_date: datetime = Field(..., description="Start date (inclusive)")
-    end_date: datetime = Field(..., description="End date (inclusive)")
-    interval: str = Field(default="1d", description="Bar interval (e.g. 1d, 1h, 5m)")
-
-
-class GetHistoricalDataResponse(BaseModel):
-    """Response with historical market data points."""
-
-    data: list[MarketDataPoint] = Field(
-        default_factory=list,
-        description="Historical OHLCV data points",
-    )
-    symbol: str = Field(..., description="Instrument symbol")
-
-
 class GetHistoricalDataUseCase(UseCase[GetHistoricalDataRequest, GetHistoricalDataResponse]):
     """Get historical market data for a symbol from the market data provider."""
 
@@ -283,23 +266,6 @@ class GetHistoricalDataUseCase(UseCase[GetHistoricalDataRequest, GetHistoricalDa
 
 
 # ---- Get options chain ----
-
-
-class GetOptionsChainRequest(BaseModel):
-    """Request to get options chain for an underlying symbol."""
-
-    underlying_symbol: str = Field(..., description="Underlying instrument symbol")
-    expiration_date: str | None = Field(
-        None,
-        description="Optional expiration date (YYYY-MM-DD); provider default if omitted",
-    )
-
-
-class GetOptionsChainResponse(BaseModel):
-    """Response with options chain."""
-
-    chain: OptionsChain = Field(..., description="Options chain for the underlying")
-    underlying_symbol: str = Field(..., description="Underlying instrument symbol")
 
 
 class GetOptionsChainUseCase(UseCase[GetOptionsChainRequest, GetOptionsChainResponse]):

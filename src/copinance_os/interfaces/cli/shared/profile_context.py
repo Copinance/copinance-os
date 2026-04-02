@@ -14,8 +14,6 @@ from copinance_os.research.workflows.profile import (
     GetCurrentProfileRequest,
 )
 
-console = Console()
-
 
 async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID | None:
     """Ensure user has a profile with a literacy level for personalized analysis.
@@ -26,11 +24,13 @@ async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID |
     Returns:
         A profile ID if available, otherwise None.
     """
+    console = Console()
     if profile_id is not None:
         return profile_id
 
+    container = get_container()
     # Check current profile
-    current_profile_uc = get_container().get_current_profile_use_case()
+    current_profile_uc = container.get_current_profile_use_case()
     current_response = await current_profile_uc.execute(GetCurrentProfileRequest())
 
     if current_response.profile:
@@ -68,7 +68,7 @@ async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID |
     }
     selected_literacy = literacy_map.get(choice, FinancialLiteracy.INTERMEDIATE)
 
-    create_profile_uc = get_container().create_profile_use_case()
+    create_profile_uc = container.create_profile_use_case()
     create_response = await create_profile_uc.execute(
         CreateProfileRequest(financial_literacy=selected_literacy, display_name=None)
     )

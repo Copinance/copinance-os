@@ -251,6 +251,8 @@ result = await macro_tool.execute(
 )
 ```
 
+In **question-driven** runs, the same macro tool is included when **`collect_question_driven_tools`** builds the list from a **`ToolBundleContext`** that has both **`macro_data_provider`** and **`market_data_provider`** set (as the default container wiring does when FRED and market data are configured).
+
 ## Data Sources & Quality
 
 ### Primary Data Sources

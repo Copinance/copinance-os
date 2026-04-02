@@ -29,9 +29,13 @@ class TestProfileCLI:
     """Test profile-related CLI commands."""
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
-    def test_create_profile(self, mock_console: MagicMock, mock_get_container: MagicMock) -> None:
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
+    def test_create_profile(
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
+    ) -> None:
         """Test create profile command."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
         # Setup mocks
         profile_id = uuid4()
         mock_profile = AnalysisProfile(
@@ -60,13 +64,15 @@ class TestProfileCLI:
         assert any(str(profile_id) in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_list_profiles_with_results(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
         """Test list profiles command with results."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id1 = uuid4()
@@ -108,13 +114,15 @@ class TestProfileCLI:
         assert not any("No profiles found" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_list_profiles_no_results(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
         """Test list profiles command with no results."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         mock_list_response = ListProfilesResponse(profiles=[])
@@ -137,11 +145,13 @@ class TestProfileCLI:
         assert any("No profiles found" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_get_profile_found(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test get profile command when profile is found."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -169,11 +179,13 @@ class TestProfileCLI:
         assert any("Profile Details" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_get_profile_not_found(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test get profile command when profile is not found."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -189,11 +201,13 @@ class TestProfileCLI:
         assert any("Profile not found" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_get_current_profile_set(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test get current profile command when current profile is set."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -218,11 +232,13 @@ class TestProfileCLI:
         assert any("Current Profile" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_get_current_profile_not_set(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test get current profile command when no current profile is set."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         mock_response = GetCurrentProfileResponse(profile=None)
@@ -237,11 +253,13 @@ class TestProfileCLI:
         assert any("No current profile set" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_set_current_profile(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test set current profile command."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -267,11 +285,13 @@ class TestProfileCLI:
         assert any("Current profile set" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_set_current_profile_clear(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test set current profile command to clear current profile."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         mock_response = SetCurrentProfileResponse(profile=None)
@@ -291,11 +311,13 @@ class TestProfileCLI:
         assert any("Current profile cleared" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_set_current_profile_error(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test set current profile command with error."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -311,14 +333,16 @@ class TestProfileCLI:
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
     @patch("copinance_os.interfaces.cli.commands.profile.typer.confirm")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_delete_profile_with_confirmation(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_confirm: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
         """Test delete profile command with confirmation."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -359,13 +383,15 @@ class TestProfileCLI:
         assert any("Profile deleted successfully" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_delete_profile_force(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
         """Test delete profile command with force flag."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()
@@ -402,11 +428,13 @@ class TestProfileCLI:
         assert any("Profile deleted successfully" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.profile.get_container")
-    @patch("copinance_os.interfaces.cli.commands.profile.console")
+    @patch("copinance_os.interfaces.cli.commands.profile.Console")
     def test_delete_profile_not_found(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
         """Test delete profile command when profile is not found."""
+        mock_console = MagicMock()
+        mock_console_class.return_value = mock_console
 
         # Setup mocks
         profile_id = uuid4()

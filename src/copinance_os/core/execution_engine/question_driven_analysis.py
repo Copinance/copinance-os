@@ -13,20 +13,16 @@ from copinance_os.ai.llm.resources import (
 )
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
 from copinance_os.core.execution_engine.llm_stream_stdout import stdout_llm_stream_handler
-from copinance_os.core.pipeline.tools import (
-    create_fundamental_data_tools,
-    create_fundamental_data_tools_with_providers,
-    create_macro_regime_indicators_tool,
-    create_market_data_tools,
-    create_rule_based_regime_tools,
-)
-from copinance_os.core.pipeline.tools.analysis.market_regime.indicators import (
-    create_market_regime_indicators_tool,
-)
 from copinance_os.core.pipeline.tools.context_tools import GetCurrentDateTool
+from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
+from copinance_os.domain.models.analysis import (
+    INSTRUMENT_QUESTION_DRIVEN_TYPE,
+    MARKET_QUESTION_DRIVEN_TYPE,
+)
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.models.llm_conversation import parse_conversation_history
 from copinance_os.domain.models.market import MarketType
+from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
 from copinance_os.domain.ports.analyzers import LLMAnalyzer
 from copinance_os.domain.ports.data_providers import (
     FundamentalDataProvider,
@@ -34,10 +30,6 @@ from copinance_os.domain.ports.data_providers import (
     MarketDataProvider,
 )
 from copinance_os.domain.ports.tools import Tool
-from copinance_os.research.workflows.analyze import (
-    INSTRUMENT_QUESTION_DRIVEN_TYPE,
-    MARKET_QUESTION_DRIVEN_TYPE,
-)
 
 logger = structlog.get_logger(__name__)
 
@@ -115,6 +107,9 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
                 "instrument_symbol is required for question-driven analysis when scope=instrument"
             )
 
+        no_cache = bool(context.get("no_cache"))
+        effective_tool_cache = None if no_cache else self._cache_manager
+
         results: dict[str, Any] = {}
 
         # Check if LLM analyzer is available
@@ -141,75 +136,34 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             return results
 
         # Create tools: always include current-date tool so LLM can get today's date
-        tools: list = [GetCurrentDateTool()]
+        bundle_ctx = ToolBundleContext(
+            market_data_provider=self._market_data_provider,
+            macro_data_provider=self._macro_data_provider,
+            fundamental_data_provider=self._fundamental_data_provider,
+            sec_filings_provider=self._sec_filings_provider,
+            cache_manager=effective_tool_cache,
+        )
         logger.debug(
-            "Creating tools",
-            has_cache_manager=self._cache_manager is not None,
+            "Creating tools via bundle discovery",
+            has_cache_manager=effective_tool_cache is not None,
             has_sec_filings_provider=self._sec_filings_provider is not None,
         )
-        if self._market_data_provider:
-            market_tools = create_market_data_tools(
-                self._market_data_provider, cache_manager=self._cache_manager
+        extra_tools = collect_question_driven_tools(bundle_ctx)
+        if self._fundamental_data_provider and self._sec_filings_provider:
+            logger.info(
+                "Question-driven tools loaded (fundamentals + SEC split)",
+                count=len(extra_tools),
+                default_provider=self._fundamental_data_provider.get_provider_name(),
+                sec_filings_provider=self._sec_filings_provider.get_provider_name(),
+                cache_enabled=effective_tool_cache is not None,
             )
-            tools.extend(market_tools)
+        else:
             logger.debug(
-                "Added market data tools",
-                count=len(market_tools),
-                cache_enabled=self._cache_manager is not None,
+                "Question-driven tools loaded",
+                count=len(extra_tools),
+                cache_enabled=effective_tool_cache is not None,
             )
-
-            # Add market regime detection tools
-            regime_tools = create_rule_based_regime_tools(self._market_data_provider)
-            tools.extend(regime_tools)
-
-            # Add market regime indicators tool
-            indicators_tool = create_market_regime_indicators_tool(
-                self._market_data_provider,
-                cache_manager=self._cache_manager,
-            )
-            tools.append(indicators_tool)
-
-            # Add macro regime indicators tool (rates/credit/commodities) if configured
-            if self._macro_data_provider:
-                macro_tool = create_macro_regime_indicators_tool(
-                    self._macro_data_provider,
-                    self._market_data_provider,
-                    cache_manager=self._cache_manager,
-                )
-                tools.append(macro_tool)
-
-            logger.debug(
-                "Added market regime detection tools and indicators",
-                regime_tools_count=len(regime_tools),
-                indicators_tool=True,
-                macro_tool=bool(self._macro_data_provider),
-            )
-
-        if self._fundamental_data_provider:
-            # Use provider selection if SEC filings provider is specified
-            if self._sec_filings_provider:
-                fundamental_tools = create_fundamental_data_tools_with_providers(
-                    default_provider=self._fundamental_data_provider,
-                    sec_filings_provider=self._sec_filings_provider,
-                    cache_manager=self._cache_manager,
-                )
-                logger.info(
-                    "Added fundamental data tools with provider selection",
-                    count=len(fundamental_tools),
-                    default_provider=self._fundamental_data_provider.get_provider_name(),
-                    sec_filings_provider=self._sec_filings_provider.get_provider_name(),
-                    cache_enabled=self._cache_manager is not None,
-                )
-            else:
-                fundamental_tools = create_fundamental_data_tools(
-                    self._fundamental_data_provider, cache_manager=self._cache_manager
-                )
-                logger.debug(
-                    "Added fundamental data tools",
-                    count=len(fundamental_tools),
-                    cache_enabled=self._cache_manager is not None,
-                )
-            tools.extend(fundamental_tools)
+        tools: list = [GetCurrentDateTool(), *extra_tools]
 
         if not tools:
             results["status"] = "failed"
@@ -292,7 +246,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
         }
         system_prompt = ""
         user_prompt = ""
-        if self._cache_manager:
+        if self._cache_manager and not no_cache:
             entry = await self._cache_manager.get(QUESTION_ANALYSIS_PROMPT_CACHE_NAME, **cache_kw)
             if entry and isinstance(entry.data, dict):
                 system_prompt = entry.data.get("system_prompt", "") or ""
@@ -308,7 +262,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
                 financial_literacy=financial_literacy,
                 current_date=current_date,
             )
-            if self._cache_manager:
+            if self._cache_manager and not no_cache:
                 await self._cache_manager.set(
                     QUESTION_ANALYSIS_PROMPT_CACHE_NAME,
                     {"system_prompt": system_prompt, "user_prompt": user_prompt},

@@ -82,14 +82,11 @@ class TestYFinanceMarketProvider:
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
             patch("copinance_os.data.providers.yfinance.yf") as mock_yf,
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(return_value={"test": "data"})),
         ):
             mock_ticker = MagicMock()
             mock_ticker.info = {"test": "data"}
             mock_yf.Ticker.return_value = mock_ticker
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(return_value={"test": "data"})
-            mock_get_loop.return_value = mock_loop
 
             provider = YFinanceMarketProvider()
             result = await provider.is_available()
@@ -101,13 +98,9 @@ class TestYFinanceMarketProvider:
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
             patch("copinance_os.data.providers.yfinance.yf"),
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=Exception("Test error"))),
         ):
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("Test error"))
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             result = await provider.is_available()
             assert result is False
@@ -116,35 +109,25 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_get_quote_success(self) -> None:
         """Test getting a quote successfully."""
-        with patch("asyncio.get_event_loop") as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_ticker.info = {
-                "currentPrice": 150.0,
-                "previousClose": 149.0,
-                "open": 150.5,
-                "dayHigh": 151.0,
-                "dayLow": 149.5,
-                "volume": 1000000,
-                "marketCap": 2500000000,
-                "currency": "USD",
-                "exchange": "NASDAQ",
-            }
+        mock_ticker = MagicMock()
+        mock_ticker.info = {
+            "currentPrice": 150.0,
+            "previousClose": 149.0,
+            "open": 150.5,
+            "dayHigh": 151.0,
+            "dayLow": 149.5,
+            "volume": 1000000,
+            "marketCap": 2500000000,
+            "currency": "USD",
+            "exchange": "NASDAQ",
+        }
+        mock_hist = MagicMock()
+        mock_hist.empty = True
 
-            # Mock empty history DataFrame
-            mock_hist = MagicMock()
-            mock_hist.empty = True
-
-            def ticker_side_effect(*args, **kwargs):
-                if args[0] is None:
-                    return mock_ticker
-                return mock_ticker
-
-            mock_loop.run_in_executor = AsyncMock(
-                side_effect=[mock_ticker, mock_ticker.info, mock_hist]
-            )
-            mock_get_loop.return_value = mock_loop
-
+        with patch(
+            "asyncio.to_thread",
+            new=AsyncMock(side_effect=[mock_ticker, mock_ticker.info, mock_hist]),
+        ):
             provider = YFinanceMarketProvider()
             quote = await provider.get_quote("AAPL")
 
@@ -163,34 +146,29 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_get_quote_with_history(self) -> None:
         """Test getting a quote with history data."""
-        with patch("asyncio.get_event_loop") as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_ticker.info = {
-                "currentPrice": 150.0,
-                "previousClose": 149.0,
-                "open": 150.5,
-                "dayHigh": 151.0,
-                "dayLow": 149.5,
-                "volume": 1000000,
-            }
+        mock_ticker = MagicMock()
+        mock_ticker.info = {
+            "currentPrice": 150.0,
+            "previousClose": 149.0,
+            "open": 150.5,
+            "dayHigh": 151.0,
+            "dayLow": 149.5,
+            "volume": 1000000,
+        }
+        mock_hist = MagicMock()
+        mock_hist.empty = False
+        mock_row = MagicMock()
+        mock_row.__getitem__.return_value = 152.0
+        mock_hist.iloc = MagicMock()
+        mock_hist.iloc.__getitem__.return_value = mock_row
+        mock_row.__getitem__ = MagicMock(
+            side_effect=lambda key: 2000000 if key == "Volume" else 152.0
+        )
 
-            # Mock history DataFrame with data
-            mock_hist = MagicMock()
-            mock_hist.empty = False
-            mock_row = MagicMock()
-            mock_row.__getitem__.return_value = 152.0  # Close price
-            mock_hist.iloc = MagicMock()
-            mock_hist.iloc.__getitem__.return_value = mock_row
-            mock_row.__getitem__ = MagicMock(
-                side_effect=lambda key: 2000000 if key == "Volume" else 152.0
-            )
-
-            mock_loop.run_in_executor = AsyncMock(
-                side_effect=[mock_ticker, mock_ticker.info, mock_hist]
-            )
-            mock_get_loop.return_value = mock_loop
-
+        with patch(
+            "asyncio.to_thread",
+            new=AsyncMock(side_effect=[mock_ticker, mock_ticker.info, mock_hist]),
+        ):
             provider = YFinanceMarketProvider()
             quote = await provider.get_quote("AAPL")
 
@@ -201,13 +179,9 @@ class TestYFinanceMarketProvider:
     async def test_get_quote_handles_exception(self) -> None:
         """Test get_quote handles exceptions."""
         with (
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=Exception("API error"))),
         ):
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("API error"))
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             with pytest.raises(ValueError, match="Failed to fetch quote"):
                 await provider.get_quote("AAPL")
@@ -216,38 +190,28 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_get_historical_data_success(self) -> None:
         """Test getting historical data successfully."""
+        mock_ticker = MagicMock()
+        mock_df = MagicMock()
+        mock_df.empty = False
+        mock_timestamp = datetime(2024, 1, 1, tzinfo=UTC)
+        mock_timestamp_obj = MagicMock()
+        mock_timestamp_obj.to_pydatetime.return_value = mock_timestamp
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(
+            side_effect=lambda key: {
+                "Open": 100.0,
+                "Close": 101.0,
+                "High": 102.0,
+                "Low": 99.0,
+                "Volume": 1000000,
+            }.get(key, 0)
+        )
+        mock_df.iterrows.return_value = [(mock_timestamp_obj, mock_row)]
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_df])),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-
-            # Create mock DataFrame
-            mock_df = MagicMock()
-            mock_df.empty = False
-            mock_timestamp = datetime(2024, 1, 1, tzinfo=UTC)
-            # Create a mock timestamp object that has to_pydatetime
-            mock_timestamp_obj = MagicMock()
-            mock_timestamp_obj.to_pydatetime.return_value = mock_timestamp
-            mock_timestamp_obj.hasattr = MagicMock(return_value=True)
-
-            mock_row = MagicMock()
-            mock_row.__getitem__ = MagicMock(
-                side_effect=lambda key: {
-                    "Open": 100.0,
-                    "Close": 101.0,
-                    "High": 102.0,
-                    "Low": 99.0,
-                    "Volume": 1000000,
-                }.get(key, 0)
-            )
-
-            mock_df.iterrows.return_value = [(mock_timestamp_obj, mock_row)]
-
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_df])
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             start_date = datetime(2024, 1, 1)
             end_date = datetime(2024, 1, 31)
@@ -262,19 +226,15 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_get_historical_data_empty(self) -> None:
         """Test getting historical data when empty."""
+        mock_ticker = MagicMock()
+        mock_df = MagicMock()
+        mock_df.empty = True
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_df])),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_df = MagicMock()
-            mock_df.empty = True
-
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_df])
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             start_date = datetime(2024, 1, 1)
             end_date = datetime(2024, 1, 31)
@@ -298,13 +258,9 @@ class TestYFinanceMarketProvider:
         """Test get_historical_data handles exceptions."""
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=Exception("API error"))),
         ):
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("API error"))
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             start_date = datetime(2024, 1, 1)
             end_date = datetime(2024, 1, 31)
@@ -315,38 +271,28 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_get_intraday_data_success(self) -> None:
         """Test getting intraday data successfully."""
+        mock_ticker = MagicMock()
+        mock_df = MagicMock()
+        mock_df.empty = False
+        mock_timestamp = datetime(2024, 1, 1, tzinfo=UTC)
+        mock_timestamp_obj = MagicMock()
+        mock_timestamp_obj.to_pydatetime.return_value = mock_timestamp
+        mock_row = MagicMock()
+        mock_row.__getitem__ = MagicMock(
+            side_effect=lambda key: {
+                "Open": 100.0,
+                "Close": 101.0,
+                "High": 102.0,
+                "Low": 99.0,
+                "Volume": 1000000,
+            }.get(key, 0)
+        )
+        mock_df.iterrows.return_value = [(mock_timestamp_obj, mock_row)]
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_df])),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-
-            # Create mock DataFrame
-            mock_df = MagicMock()
-            mock_df.empty = False
-            mock_timestamp = datetime(2024, 1, 1, tzinfo=UTC)
-            # Create a mock timestamp object that has to_pydatetime
-            mock_timestamp_obj = MagicMock()
-            mock_timestamp_obj.to_pydatetime.return_value = mock_timestamp
-            mock_timestamp_obj.hasattr = MagicMock(return_value=True)
-
-            mock_row = MagicMock()
-            mock_row.__getitem__ = MagicMock(
-                side_effect=lambda key: {
-                    "Open": 100.0,
-                    "Close": 101.0,
-                    "High": 102.0,
-                    "Low": 99.0,
-                    "Volume": 1000000,
-                }.get(key, 0)
-            )
-
-            mock_df.iterrows.return_value = [(mock_timestamp_obj, mock_row)]
-
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_df])
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             result = await provider.get_intraday_data("AAPL", interval="1min")
 
@@ -366,30 +312,26 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_search_stocks_success(self) -> None:
         """Test searching stocks successfully."""
+        mock_search = MagicMock()
+        mock_search.quotes = [
+            {
+                "symbol": "AAPL",
+                "longname": "Apple Inc.",
+                "exchange": "NASDAQ",
+                "quoteType": "EQUITY",
+            },
+            {
+                "symbol": "MSFT",
+                "shortname": "Microsoft",
+                "exchange": "NASDAQ",
+                "quoteType": "ETF",
+            },
+        ]
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(return_value=mock_search)),
         ):
-            mock_loop = MagicMock()
-            mock_search = MagicMock()
-            mock_search.quotes = [
-                {
-                    "symbol": "AAPL",
-                    "longname": "Apple Inc.",
-                    "exchange": "NASDAQ",
-                    "quoteType": "EQUITY",
-                },
-                {
-                    "symbol": "MSFT",
-                    "shortname": "Microsoft",
-                    "exchange": "NASDAQ",
-                    "quoteType": "ETF",
-                },
-            ]
-
-            mock_loop.run_in_executor = AsyncMock(return_value=mock_search)
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             result = await provider.search_instruments("Apple", limit=10)
 
@@ -401,18 +343,14 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_search_instruments_no_results(self) -> None:
         """Test searching instruments with no results."""
+        mock_search = MagicMock()
+        mock_search.quotes = []
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(return_value=mock_search)),
         ):
-            mock_loop = MagicMock()
-            mock_search = MagicMock()
-            mock_search.quotes = []
-
-            mock_loop.run_in_executor = AsyncMock(return_value=mock_search)
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             result = await provider.search_instruments("NONEXISTENT", limit=10)
 
@@ -422,30 +360,26 @@ class TestYFinanceMarketProvider:
     @pytest.mark.asyncio
     async def test_search_instruments_filters_by_quote_type(self) -> None:
         """Test that search_instruments filters out non-equity types."""
+        mock_search = MagicMock()
+        mock_search.quotes = [
+            {
+                "symbol": "AAPL",
+                "longname": "Apple Inc.",
+                "exchange": "NASDAQ",
+                "quoteType": "EQUITY",
+            },
+            {
+                "symbol": "BOND",
+                "longname": "Bond",
+                "exchange": "NYSE",
+                "quoteType": "BOND",
+            },
+        ]
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(return_value=mock_search)),
         ):
-            mock_loop = MagicMock()
-            mock_search = MagicMock()
-            mock_search.quotes = [
-                {
-                    "symbol": "AAPL",
-                    "longname": "Apple Inc.",
-                    "exchange": "NASDAQ",
-                    "quoteType": "EQUITY",
-                },
-                {
-                    "symbol": "BOND",
-                    "longname": "Bond",
-                    "exchange": "NYSE",
-                    "quoteType": "BOND",
-                },
-            ]
-
-            mock_loop.run_in_executor = AsyncMock(return_value=mock_search)
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             result = await provider.search_instruments("test", limit=10)
 
@@ -457,13 +391,9 @@ class TestYFinanceMarketProvider:
         """Test search_instruments handles exceptions gracefully."""
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=Exception("API error"))),
         ):
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("API error"))
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceMarketProvider()
             result = await provider.search_instruments("test", limit=10)
 
@@ -508,14 +438,11 @@ class TestYFinanceFundamentalProvider:
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
             patch("copinance_os.data.providers.yfinance.yf") as mock_yf,
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(return_value={"test": "data"})),
         ):
             mock_ticker = MagicMock()
             mock_ticker.info = {"test": "data"}
             mock_yf.Ticker.return_value = mock_ticker
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(return_value={"test": "data"})
-            mock_get_loop.return_value = mock_loop
 
             provider = YFinanceFundamentalProvider()
             result = await provider.is_available()
@@ -524,20 +451,16 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_financial_statements_success(self) -> None:
         """Test getting financial statements successfully."""
+        mock_ticker = MagicMock()
+        mock_df = MagicMock()
+        mock_df.empty = False
+        mock_df.to_dict.return_value = {"2023-12-31": {"Revenue": 1000000.0}}
+        mock_ticker.financials = mock_df
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_df])),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_df = MagicMock()
-            mock_df.empty = False
-            mock_df.to_dict.return_value = {"2023-12-31": {"Revenue": 1000000.0}}
-
-            mock_ticker.financials = mock_df
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_df])
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             result = await provider.get_financial_statements("AAPL", "income_statement", "annual")
 
@@ -549,20 +472,16 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_financial_statements_empty(self) -> None:
         """Test getting financial statements when empty."""
+        mock_ticker = MagicMock()
+        mock_df = MagicMock()
+        mock_df.empty = True
+        mock_ticker.financials = mock_df
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_df])),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_df = MagicMock()
-            mock_df.empty = True
-
-            mock_ticker.financials = mock_df
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_df])
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             result = await provider.get_financial_statements("AAPL", "income_statement", "annual")
 
@@ -573,15 +492,12 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_financial_statements_invalid_type(self) -> None:
         """Test getting financial statements with invalid type."""
+        mock_ticker = MagicMock()
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch("asyncio.to_thread", new=AsyncMock(return_value=mock_ticker)),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(return_value=mock_ticker)
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             with pytest.raises(ValueError, match="Invalid statement_type"):
                 await provider.get_financial_statements("AAPL", "invalid_type", "annual")
@@ -609,14 +525,10 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_esg_metrics_success(self) -> None:
         """Test getting ESG metrics successfully."""
-        with patch("asyncio.get_event_loop") as mock_get_loop:
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_ticker.info = {"esgScores": {"environment": 75, "social": 80, "governance": 70}}
+        mock_ticker = MagicMock()
+        mock_ticker.info = {"esgScores": {"environment": 75, "social": 80, "governance": 70}}
 
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_ticker.info])
-            mock_get_loop.return_value = mock_loop
-
+        with patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_ticker.info])):
             provider = YFinanceFundamentalProvider()
             result = await provider.get_esg_metrics("AAPL")
 
@@ -627,17 +539,13 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_esg_metrics_no_data(self) -> None:
         """Test getting ESG metrics when no data available."""
+        mock_ticker = MagicMock()
+        mock_ticker.info = {}
+
         with (
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger"),
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_ticker.info])),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_ticker.info = {}
-
-            mock_loop.run_in_executor = AsyncMock(side_effect=[mock_ticker, mock_ticker.info])
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             result = await provider.get_esg_metrics("AAPL")
 
@@ -648,13 +556,9 @@ class TestYFinanceFundamentalProvider:
     async def test_get_esg_metrics_handles_exception(self) -> None:
         """Test get_esg_metrics handles exceptions."""
         with (
-            patch("asyncio.get_event_loop") as mock_get_loop,
             patch("copinance_os.data.providers.yfinance.logger") as mock_logger,
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=Exception("API error"))),
         ):
-            mock_loop = MagicMock()
-            mock_loop.run_in_executor = AsyncMock(side_effect=Exception("API error"))
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             result = await provider.get_esg_metrics("AAPL")
 
@@ -1028,82 +932,74 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_detailed_fundamentals_success(self) -> None:
         """Test get_detailed_fundamentals successfully."""
+        mock_ticker = MagicMock()
+        mock_ticker.info = {
+            "longName": "Apple Inc.",
+            "sector": "Technology",
+            "industry": "Consumer Electronics",
+            "marketCap": 3000000000000,
+            "currentPrice": 150.0,
+            "sharesOutstanding": 16000000000,
+            "enterpriseValue": 3100000000000,
+            "currency": "USD",
+        }
+
+        # Mock DataFrames
+        mock_income_df = MagicMock()
+        mock_income_df.empty = False
+        mock_income_df.columns = [datetime(2024, 12, 31)]
+
+        mock_balance_df = MagicMock()
+        mock_balance_df.empty = False
+        mock_balance_df.columns = [datetime(2024, 12, 31)]
+
+        mock_cashflow_df = MagicMock()
+        mock_cashflow_df.empty = False
+        mock_cashflow_df.columns = [datetime(2024, 12, 31)]
+
+        def income_getitem_side_effect(col):
+            mock_series = MagicMock()
+            mock_series.index = ["Total Revenue", "Net Income"]
+            mock_series.loc = MagicMock(return_value=Decimal("1000000"))
+            return mock_series
+
+        mock_income_df.__getitem__ = MagicMock(side_effect=income_getitem_side_effect)
+
+        def balance_getitem_side_effect(col):
+            mock_series = MagicMock()
+            mock_series.index = ["Total Assets", "Total Equity"]
+            mock_series.loc = MagicMock(return_value=Decimal("5000000"))
+            return mock_series
+
+        mock_balance_df.__getitem__ = MagicMock(side_effect=balance_getitem_side_effect)
+
+        def cashflow_getitem_side_effect(col):
+            mock_series = MagicMock()
+            mock_series.index = ["Operating Cash Flow", "Net Income"]
+            mock_series.loc = MagicMock(return_value=Decimal("250000"))
+            return mock_series
+
+        mock_cashflow_df.__getitem__ = MagicMock(side_effect=cashflow_getitem_side_effect)
+
+        mock_ticker.financials = mock_income_df
+        mock_ticker.balance_sheet = mock_balance_df
+        mock_ticker.cashflow = mock_cashflow_df
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch(
+                "asyncio.to_thread",
+                new=AsyncMock(
+                    side_effect=[
+                        mock_ticker,
+                        mock_ticker.info,
+                        mock_income_df,
+                        mock_balance_df,
+                        mock_cashflow_df,
+                    ]
+                ),
+            ),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_ticker.info = {
-                "longName": "Apple Inc.",
-                "sector": "Technology",
-                "industry": "Consumer Electronics",
-                "marketCap": 3000000000000,
-                "currentPrice": 150.0,
-                "sharesOutstanding": 16000000000,
-                "enterpriseValue": 3100000000000,
-                "currency": "USD",
-            }
-
-            # Mock DataFrames
-            mock_income_df = MagicMock()
-            mock_income_df.empty = False
-            mock_income_df.columns = [datetime(2024, 12, 31)]
-            mock_income_df.__getitem__ = MagicMock(
-                return_value=MagicMock(
-                    index=["Total Revenue"],
-                    loc=MagicMock(return_value=Decimal("1000000")),
-                )
-            )
-
-            mock_balance_df = MagicMock()
-            mock_balance_df.empty = False
-            mock_balance_df.columns = [datetime(2024, 12, 31)]
-
-            mock_cashflow_df = MagicMock()
-            mock_cashflow_df.empty = False
-            mock_cashflow_df.columns = [datetime(2024, 12, 31)]
-
-            # Setup column access for income statement
-            def income_getitem_side_effect(col):
-                mock_series = MagicMock()
-                mock_series.index = ["Total Revenue", "Net Income"]
-                mock_series.loc = MagicMock(return_value=Decimal("1000000"))
-                return mock_series
-
-            mock_income_df.__getitem__ = MagicMock(side_effect=income_getitem_side_effect)
-
-            def balance_getitem_side_effect(col):
-                mock_series = MagicMock()
-                mock_series.index = ["Total Assets", "Total Equity"]
-                mock_series.loc = MagicMock(return_value=Decimal("5000000"))
-                return mock_series
-
-            mock_balance_df.__getitem__ = MagicMock(side_effect=balance_getitem_side_effect)
-
-            def cashflow_getitem_side_effect(col):
-                mock_series = MagicMock()
-                mock_series.index = ["Operating Cash Flow", "Net Income"]
-                mock_series.loc = MagicMock(return_value=Decimal("250000"))
-                return mock_series
-
-            mock_cashflow_df.__getitem__ = MagicMock(side_effect=cashflow_getitem_side_effect)
-
-            mock_ticker.financials = mock_income_df
-            mock_ticker.balance_sheet = mock_balance_df
-            mock_ticker.cashflow = mock_cashflow_df
-
-            mock_loop.run_in_executor = AsyncMock(
-                side_effect=[
-                    mock_ticker,
-                    mock_ticker.info,
-                    mock_income_df,
-                    mock_balance_df,
-                    mock_cashflow_df,
-                ]
-            )
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             result = await provider.get_detailed_fundamentals(
                 "AAPL", periods=1, period_type="annual"
@@ -1140,32 +1036,31 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_get_detailed_fundamentals_empty_statements(self) -> None:
         """Test get_detailed_fundamentals when all statements are empty."""
+        mock_ticker = MagicMock()
+        mock_ticker.info = {}
+
+        mock_income_df = MagicMock()
+        mock_income_df.empty = True
+        mock_balance_df = MagicMock()
+        mock_balance_df.empty = True
+        mock_cashflow_df = MagicMock()
+        mock_cashflow_df.empty = True
+
         with (
             patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
-            patch("asyncio.get_event_loop") as mock_get_loop,
+            patch(
+                "asyncio.to_thread",
+                new=AsyncMock(
+                    side_effect=[
+                        mock_ticker,
+                        mock_ticker.info,
+                        mock_income_df,
+                        mock_balance_df,
+                        mock_cashflow_df,
+                    ]
+                ),
+            ),
         ):
-            mock_loop = MagicMock()
-            mock_ticker = MagicMock()
-            mock_ticker.info = {}
-
-            mock_income_df = MagicMock()
-            mock_income_df.empty = True
-            mock_balance_df = MagicMock()
-            mock_balance_df.empty = True
-            mock_cashflow_df = MagicMock()
-            mock_cashflow_df.empty = True
-
-            mock_loop.run_in_executor = AsyncMock(
-                side_effect=[
-                    mock_ticker,
-                    mock_ticker.info,
-                    mock_income_df,
-                    mock_balance_df,
-                    mock_cashflow_df,
-                ]
-            )
-            mock_get_loop.return_value = mock_loop
-
             provider = YFinanceFundamentalProvider()
             with pytest.raises(ValueError, match="No financial data found"):
                 await provider.get_detailed_fundamentals("INVALID", periods=1, period_type="annual")

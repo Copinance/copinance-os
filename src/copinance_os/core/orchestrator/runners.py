@@ -5,15 +5,17 @@ from __future__ import annotations
 from typing import Any
 
 from copinance_os.core.orchestrator.research_orchestrator import ResearchOrchestrator
-from copinance_os.domain.models.job import Job, JobScope, RunJobResult
-from copinance_os.research.workflows.analyze import (
+from copinance_os.domain.models.analysis import (
     AnalyzeInstrumentRequest,
-    AnalyzeInstrumentRunner,
     AnalyzeMarketRequest,
-    AnalyzeMarketRunner,
     execution_type_from_scope_and_mode,
     get_default_instrument_timeframe,
     resolve_analyze_mode,
+)
+from copinance_os.domain.models.job import Job, JobScope, RunJobResult
+from copinance_os.domain.ports.analysis_execution import (
+    AnalyzeInstrumentRunner,
+    AnalyzeMarketRunner,
 )
 
 
@@ -43,6 +45,7 @@ class DefaultAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
             "option_side": request.option_side.value,
             "include_prompt": request.include_prompt_in_results,
             "stream": request.stream,
+            "no_cache": request.no_cache,
         }
         if request.conversation_history:
             context["conversation_history"] = [t.model_dump() for t in request.conversation_history]
@@ -86,6 +89,7 @@ class DefaultAnalyzeMarketRunner(AnalyzeMarketRunner):
             "include_global": request.include_global,
             "include_advanced": request.include_advanced,
             "stream": request.stream,
+            "no_cache": request.no_cache,
         }
         if request.conversation_history:
             context["conversation_history"] = [t.model_dump() for t in request.conversation_history]

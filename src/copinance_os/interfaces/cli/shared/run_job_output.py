@@ -18,8 +18,6 @@ from copinance_os.interfaces.cli.shared.utils import (
     save_analysis_results,
 )
 
-console = Console()
-
 _RUN_INFO_KEYS = (
     "execution_type",
     "scope",
@@ -206,6 +204,7 @@ def _render_market_analysis_summary(results: dict[str, Any]) -> Group | None:
 
 def render_run_job_results(response: RunJobResult, *, json_output: bool = False) -> None:
     """Print ``RunJobResult`` to the console or as JSON."""
+    console = Console()
     if json_output:
         print_run_job_result_json(response)
         return

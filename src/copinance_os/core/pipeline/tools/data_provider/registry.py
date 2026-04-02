@@ -2,7 +2,6 @@
 
 from typing import Any
 
-from copinance_os.core.pipeline.tools.analysis import create_rule_based_regime_tools
 from copinance_os.core.pipeline.tools.data_provider.fundamental_data import (
     FundamentalDataFindSecFundsTool,
     FundamentalDataGetFinancialStatementsTool,
@@ -30,7 +29,6 @@ from copinance_os.core.pipeline.tools.data_provider.provider_selector import (
     MultiProviderSelector,
     ProviderSelector,
 )
-from copinance_os.core.pipeline.tools.tool_registry import ToolRegistry
 from copinance_os.domain.ports.data_providers import (
     FundamentalDataProvider,
     MarketDataProvider,
@@ -166,47 +164,3 @@ def create_fundamental_data_tools_with_providers(
     else:
         # Use single provider for all tools
         return create_fundamental_data_tools(default_provider, cache_manager=cache_manager)
-
-
-class DataProviderToolRegistry:
-    """Convenience registry that automatically creates tools from data providers."""
-
-    def __init__(
-        self,
-        market_data_provider: MarketDataProvider | None = None,
-        fundamental_data_provider: FundamentalDataProvider | None = None,
-    ) -> None:
-        """Initialize registry with data providers.
-
-        Args:
-            market_data_provider: Optional market data provider
-            fundamental_data_provider: Optional fundamental data provider
-        """
-        self._registry: ToolRegistry = ToolRegistry()
-
-        if market_data_provider:
-            tools = create_market_data_tools(market_data_provider)
-            self._registry.register_many(tools)
-            # Also register market regime detection tools
-            regime_tools = create_rule_based_regime_tools(market_data_provider)
-            self._registry.register_many(regime_tools)
-
-        if fundamental_data_provider:
-            tools = create_fundamental_data_tools(fundamental_data_provider)
-            self._registry.register_many(tools)
-
-    def get_registry(self) -> ToolRegistry:
-        """Get the underlying tool registry.
-
-        Returns:
-            ToolRegistry instance
-        """
-        return self._registry
-
-    def register_tool(self, tool: Tool) -> None:
-        """Register an additional tool.
-
-        Args:
-            tool: Tool to register
-        """
-        self._registry.register(tool)

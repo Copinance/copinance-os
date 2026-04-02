@@ -402,15 +402,10 @@ class GeminiProvider(LLMProvider):
         config.update(kwargs)
         return config
 
-    def _call_gemini_api(
+    async def _call_gemini_api(
         self, contents: str | list[Any], config: dict[str, Any] | None = None
     ) -> Any:
-        """Call Gemini with a string or multi-turn ``contents`` list.
-
-        Returns:
-            Awaitable (Future) compatible with ``await`` from async callers.
-        """
-        loop = asyncio.get_event_loop()
+        """Call Gemini with a string or multi-turn ``contents`` list."""
 
         def _generate() -> Any:
             if config:
@@ -432,7 +427,7 @@ class GeminiProvider(LLMProvider):
                 contents=contents,
             )
 
-        return loop.run_in_executor(None, _generate)
+        return await asyncio.to_thread(_generate)
 
     @staticmethod
     def _gemini_build_contents(

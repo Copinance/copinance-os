@@ -7,6 +7,8 @@ them in a unified registry.
 
 from typing import Literal
 
+import structlog
+
 from copinance_os.core.pipeline.tools.analysis.market_regime.rule_based import (
     create_rule_based_regime_tools,
 )
@@ -15,6 +17,8 @@ from copinance_os.core.pipeline.tools.analysis.market_regime.statistical import 
 )
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import Tool
+
+logger = structlog.get_logger(__name__)
 
 
 def create_all_regime_tools(
@@ -77,5 +81,6 @@ def create_regime_tools_by_type(
         return create_rule_based_regime_tools(market_data_provider)
     elif method == "statistical":
         return create_statistical_regime_tools(market_data_provider)
-    else:
-        raise ValueError(f"Unknown method: {method}. Use 'rule_based' or 'statistical'")
+    # Unreachable with Literal type — guarded by mypy
+    logger.warning("Unknown regime detection method, returning empty tool list", method=method)
+    return []

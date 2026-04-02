@@ -21,6 +21,7 @@ from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators im
     create_macro_regime_indicators_tool,
 )
 from copinance_os.data.cache import CacheManager
+from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.models.market import MarketDataPoint
 from copinance_os.domain.models.regime import (
@@ -47,7 +48,6 @@ from copinance_os.domain.models.regime import (
 )
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
-from copinance_os.research.workflows.analyze import MARKET_DETERMINISTIC_TYPE
 
 logger = structlog.get_logger(__name__)
 
@@ -93,10 +93,13 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
         include_global = bool(context.get("include_global", True))
         include_advanced = bool(context.get("include_advanced", True))
 
+        use_cache = not bool(context.get("no_cache"))
+        cache_manager = self._cache_manager if use_cache else None
+
         # Market regime indicators (VIX, breadth, rotation)
         market_indicators_tool = create_market_regime_indicators_tool(
             self._market_data_provider,
-            cache_manager=self._cache_manager,
+            cache_manager=cache_manager,
         )
         market_indicators_result = await market_indicators_tool.execute(
             market_index=market_index,
@@ -130,9 +133,9 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
         end_str = end_date.strftime("%Y-%m-%d")
         regime_historical_data = None
 
-        if self._cache_manager:
+        if cache_manager:
             try:
-                entry = await self._cache_manager.get(
+                entry = await cache_manager.get(
                     "get_historical_market_data",
                     symbol=market_index,
                     start_date=start_str,
@@ -166,13 +169,13 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
                     end_date=end_date,
                     interval="1d",
                 )
-                if self._cache_manager and regime_historical_data:
+                if cache_manager and regime_historical_data:
                     try:
                         serialized = [
                             p.model_dump(mode="json") if hasattr(p, "model_dump") else p
                             for p in regime_historical_data
                         ]
-                        await self._cache_manager.set(
+                        await cache_manager.set(
                             "get_historical_market_data",
                             data=serialized,
                             metadata={
@@ -307,7 +310,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
         macro_tool = create_macro_regime_indicators_tool(
             macro_data_provider=self._macro_data_provider,
             market_data_provider=self._market_data_provider,
-            cache_manager=self._cache_manager,
+            cache_manager=cache_manager,
         )
         macro_result = await macro_tool.execute(
             lookback_days=lookback_days,

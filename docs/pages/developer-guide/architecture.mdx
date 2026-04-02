@@ -22,11 +22,11 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 │                           Build requests / jobs; call orchestrator      │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
-┌───────────────────────────────▼───────────────────────────────┐
-│  core/orchestrator        ResearchOrchestrator → JobRunner    │
-│  core/execution_engine    AnalysisExecutor implementations    │
-│  core/pipeline/tools      ToolRegistry, regime & data tools   │
-└───────────────────────────────┬───────────────────────────────┘
+┌───────────────────────────────▼─────────────────────────────────────────────────────────────────────────────┐
+│  core/orchestrator        ResearchOrchestrator → JobRunner                                                  │
+│  core/execution_engine    AnalysisExecutor implementations                                                  │
+│  core/pipeline/tools      ToolRegistry, discovery (PluginSpec / entry points / scan), data & regime tools   │
+└───────────────────────────────┬─────────────────────────────────────────────────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼───────────────────────────────┐
 │  domain                   Models, ports, strategy protocols   │
@@ -41,25 +41,27 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-Optional **`interfaces/api`** (FastAPI) lives next to **`interfaces/cli`**; **`ai/agents`**, **`ai/reasoning`**, **`ai/summarization`**, **`core/events`**, **`domain/portfolio`**, and **`domain/risk`** are reserved placeholders—see the package tree below.
+Optional **`interfaces/api`** (FastAPI) lives next to **`interfaces/cli`**. **`core/events`** is a reserved stub for a future event bus. The shipped tree is below. **There are no first-class `domain/portfolio` or `domain/risk` packages in this repository** (nothing to import or extend under those paths—do not go looking for stubs). Likewise there is no separate top-level **`ai/*`** beyond **`ai/llm`**. If you need portfolio or risk workflows, implement them against **`domain.ports`** and wire them in **`infra/di`** like any other adapter.
 
 ## Package tree (source)
 
-Full `src/copinance_os/` layout with **reserved**, **in progress**, **optional**, and **scaffold** labels (same as the repository README).
+Full `src/copinance_os/` layout with **reserved**, **in progress**, **optional**, and **scaffold** labels. For a product-oriented overview, see the repository **README**.
 
 ```
 copinance_os/
 ├── ai/
-│   ├── agents/                         # [reserved — future multi-agent workflows]
-│   ├── llm/                            # Providers (Gemini, Ollama), prompts, resources
-│   ├── reasoning/                      # [reserved]
-│   └── summarization/                  # [reserved]
+│   └── llm/                            # Providers (Gemini, OpenAI, Ollama, …), analyzer impl, prompts, resources
+│       ├── analyzer_factory.py         # LLMAnalyzerFactory (wires LLMProvider → LLMAnalyzer port)
+│       └── providers/factory.py        # LLMProviderFactory
 ├── core/
 │   ├── events/                         # [reserved — event bus / domain events]
 │   ├── execution_engine/               # Instrument, market, question-driven executors
+│   │   ├── factory.py                  # AnalysisExecutorFactory — builds executor list for DI
 │   │   └── backtest/                   # Simple long-only executor wiring
 │   ├── orchestrator/                   # ResearchOrchestrator, DefaultJobRunner, analyze runners
-│   └── pipeline/tools/                 # ToolRegistry, tool executor, context tools
+│   └── pipeline/tools/                 # ToolRegistry, tool executor, context tools, discovery/
+│       ├── discovery/                  # PluginSpec bundles, entry points (copinance_os.tool_bundles), package scan
+│       ├── bundles/                    # Optional scan targets: modules exporting tool_bundle_factory
 │       ├── data_provider/              # Market & fundamental tools (cached provider calls)
 │       └── analysis/market_regime/
 │           ├── rule_based.py           # Trend, volatility, cycle tools (live)
@@ -76,26 +78,22 @@ copinance_os/
 ├── domain/
 │   ├── backtest/                       # Deterministic simple long-only backtest models
 │   ├── indicators/                     # Trend, volatility, oscillators, returns
-│   ├── models/                         # Job, market, fundamentals, regime, profile, …
+│   ├── models/                         # Job, market, fundamentals, analysis requests, tool_bundle_context, …
 │   ├── plugins/                        # PluginSpec, PluginRegistry
-│   ├── portfolio/                      # [reserved]
-│   ├── ports/                          # Data, tools, execution, analytics, storage, …
-│   ├── risk/                           # [reserved]
+│   ├── ports/                          # Data, tools, execution, analytics, storage, tool bundles, …
 │   ├── services/                       # Analysis report builders (instrument, market, question-driven)
 │   ├── strategies/                     # Protocols for screening / valuation / future workflows
 │   └── validation/
 ├── infra/
 │   ├── config/                         # Settings (pydantic-settings)
-│   ├── di/                             # Container, use cases, repositories, providers
-│   ├── factories/                      # Analysis executors, LLM analyzer
+│   ├── di/                             # Container, use cases, repositories, providers (wires AnalysisExecutorFactory)
 │   └── plugins/                        # Load plugin specs (YAML/JSON) → callable registries
 ├── interfaces/
 │   ├── api/                            # [optional — minimal FastAPI app; requires `pip install fastapi`]
 │   └── cli/                            # `__main__`→`main`; `dispatch/` (Typer vs generic research); `root` (lazy Typer); `commands/`; `shared/`
 └── research/
-    ├── experiments/                    # [scaffold — docstring-only; links to backtest domain/API]
     ├── reports/                        # Re-exports of domain report builders
-    └── workflows/                      # analyze, market, profile, fundamentals, backtest
+    └── workflows/                      # analyze, market, profile, fundamentals, backtest use cases
 ```
 
 Legend: **`[reserved]`** = placeholder package for future work · **`[in progress]`** = partial implementation · **`[optional]`** = extra dependency · **`[scaffold]`** = minimal stub only
@@ -105,41 +103,43 @@ Legend: **`[reserved]`** = placeholder package for future work · **`[in progres
 | Area | Role |
 |------|------|
 | `copinance_os.domain` | Entities and value objects (`Job`, `Stock`, market types, profiles). **Ports**: data providers, repositories, storage, `JobRunner`, `AnalysisExecutor`, tools, analytics estimators, `LLMAnalyzer`. Strategy protocols for future screening / valuation flows. |
-| `copinance_os.research.workflows` | Application-facing use cases and request types (`AnalyzeInstrumentRequest`, market search, profile CRUD, backtest workflow inputs). |
+| `copinance_os.research.workflows` | Application-facing **use cases** (analyze, market, profile, fundamentals, backtest). Analyze and market **DTOs** live in **`domain.models.analysis`** and **`domain.models.market_requests`** (re-exported from workflow modules). |
 | `copinance_os.core.orchestrator` | **`ResearchOrchestrator`**: `run_job`, and helpers (e.g. simple backtest entry). **`DefaultJobRunner`** resolves **`Job`** → **`AnalysisExecutor`**. Use cases in `research.workflows` call here. |
 | `copinance_os.core.execution_engine` | Executors: deterministic instrument/market analysis, question-driven analysis. |
-| `copinance_os.core.pipeline.tools` | Tool implementations (market data, fundamentals, regime, macro) and registry. |
+| `copinance_os.core.pipeline.tools` | Tool implementations (market data, fundamentals, regime, macro), `ToolRegistry`, and **discovery** (`build_data_provider_tool_registry`, `collect_question_driven_tools`; context type in `domain.models.tool_bundle_context`). |
 | `copinance_os.data` | **Providers** (yfinance, FRED; **SEC/EDGAR** in `data.providers.sec` via edgartools), **cache**, **repositories**, **loaders**, **analytics** (e.g. `data.analytics.options` for BSM Greeks). |
 | `copinance_os.ai.llm` | LLM provider adapters, configuration, prompt resources. |
 | `copinance_os.infra.di` | Dependency injection: `get_container()`, lazy container proxy, singletons. |
 | `copinance_os.interfaces.cli` | Console script → **`main`**: **`dispatch.parse_root_argv`** (Typer vs generic research), lazy Typer **`root`**, **`commands/*`**. |
 | `copinance_os.interfaces.api` | Optional **`create_app`** FastAPI factory (install `fastapi`). |
 | `copinance_os.research.reports` | Re-exports of domain report builders for research-facing imports. |
-| `copinance_os.research.experiments` | Scaffold only (package docstring); links to backtest / optional API. |
-| `copinance_os.ai` (except `llm/`) | **`agents/`**, **`reasoning/`**, **`summarization/`** — reserved placeholders. |
-| `copinance_os.core.events` | Reserved — future event bus. |
-| `copinance_os.domain.portfolio`, `domain.risk` | Reserved — future portfolio/risk modules. |
+| `copinance_os.ai` | Ships **`llm/`** only today (providers, analyzer, prompts). |
+| `copinance_os.core.events` | Reserved — future event bus (package stub). |
 
 ## Vocabulary
 
 | Term | Meaning | Typical code location |
 |------|---------|------------------------|
-| **Analysis request** | Typed input for progressive analyze flows (`AnalyzeInstrumentRequest`, `AnalyzeMarketRequest`). | `copinance_os.research.workflows.analyze` |
-| **Analysis mode** | `auto`, `deterministic`, or `question_driven`; resolves how a job is built. | Same module + `resolve_analyze_mode` |
+| **Analysis request** | Typed input for progressive analyze flows (`AnalyzeInstrumentRequest`, `AnalyzeMarketRequest`); mode helpers (`resolve_analyze_mode`, `execution_type_from_scope_and_mode`, …). | `copinance_os.domain.models.analysis` (also re-exported from `research.workflows.analyze`) |
+| **Analysis mode** | `auto`, `deterministic`, or `question_driven`; resolves how a job is built. | `domain.models.analysis` + `resolve_analyze_mode` |
 | **Job** | Non-persisted execution envelope: scope, symbols, timeframe, **`execution_type`**. | `copinance_os.domain.models.job` |
-| **Execution type** | String discriminator for which executor runs (e.g. `deterministic_instrument_analysis`). Derive with `execution_type_from_scope_and_mode`. | `research.workflows.analyze` |
+| **Execution type** | String discriminator for which executor runs (e.g. `deterministic_instrument_analysis`). Derive with `execution_type_from_scope_and_mode`. | `domain.models.analysis` |
 | **ResearchOrchestrator** | Facade over **`JobRunner.run`**: the supported entry for running a constructed `Job` with context. | `copinance_os.core.orchestrator.research_orchestrator` |
 | **AnalysisExecutor** | Implements one analysis style; validates and executes a `Job`. | `copinance_os.core.execution_engine` |
-| **Tool** | Callable unit exposed to the LLM with schema and structured results. | `copinance_os.core.pipeline.tools`, `domain.ports.tools` |
+| **Tool** | Callable unit exposed to the LLM with schema and structured results. | `copinance_os.core.pipeline.tools`, `domain.ports.tools`, `domain.models.tool_bundle_context` |
 
 ## Orchestration: what to call
 
 - **Recommended:** `container.research_orchestrator()` then `await orchestrator.run_job(job, context)`. This matches how default analyze runners work.
 - **Advanced:** Implement the **`JobRunner`** port and pass it to **`ResearchOrchestrator(job_runner=...)`**. The stock **`Container`** does **not** expose `job_runner()` as a getter—custom routing uses a custom orchestrator, a custom **`Container`** wiring, or `set_container()` (see [Extending](extending)).
 
+## Container and performance
+
+The global container from **`get_container()`** is a **lazy proxy**: resolving it (or accessors like `container.research_orchestrator()`) constructs the real **`Container`** once per process. Heavy dependencies (providers, executors) are created on first use, not at import time. The CLI keeps **`copinance --help`** fast by **lazy-loading** Typer subcommands (`analyze`, `market`, …) so those modules—and their imports—are not loaded until you run them.
+
 ## Dependency injection and startup
 
-The global container is a **lazy proxy**: nothing heavy runs at import time. Resolving `get_container()` or attributes like `container.research_orchestrator()` builds the real container once; many services are **singletons** per process.
+Use **`get_container(...)`** from `copinance_os.infra.di`. **Analysis executors** are produced by **`AnalysisExecutorFactory.create_all`** (`core.execution_engine.factory`) inside DI configuration, not by a separate `infra/factories` package. **LLM analyzers** for question-driven mode are created via **`LLMAnalyzerFactory`** (`ai.llm.analyzer_factory`).
 
 See [Using as a Library](/getting-started/library#configuration) for `get_container(...)` options (LLM, FRED, cache, storage, prompts).
 
@@ -152,7 +152,7 @@ Implementations live in `data`, `ai`, and `infra`; contracts live under **`copin
 - **AI:** `LLMAnalyzer`
 - **Execution:** `JobRunner`, `AnalysisExecutor`
 - **Persistence:** `StockRepository`, `AnalysisProfileRepository`, `Storage`, cache backends
-- **Tools:** `Tool`, `ToolSchema`, `ToolParameter`
+- **Tools:** `Tool`, `ToolSchema`, `ToolParameter`; **bundles:** `ToolBundleFactory` / `ToolBundleContext` (`domain.models.tool_bundle_context`, `domain.ports.tool_bundles`)
 - **Strategies:** screening, due diligence, valuation, risk, thematic, monitoring (protocols for future workflows)
 
 Step-by-step: [Extending](extending). Interface listing: [API Reference](/api-reference/data-providers) and `src/copinance_os/domain/ports/`.

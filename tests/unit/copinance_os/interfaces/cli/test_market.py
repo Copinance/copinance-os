@@ -37,10 +37,11 @@ class TestMarketCLI:
     """Test market-related CLI commands."""
 
     @patch("copinance_os.interfaces.cli.commands.market.get_container")
-    @patch("copinance_os.interfaces.cli.commands.market.console")
+    @patch("copinance_os.interfaces.cli.commands.market.Console")
     def test_search_instruments_with_results(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
+        mock_console = mock_console_class.return_value
         mock_response = SearchInstrumentsResponse(
             instruments=[Stock(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ")]
         )
@@ -60,10 +61,11 @@ class TestMarketCLI:
         assert mock_console.print.called
 
     @patch("copinance_os.interfaces.cli.commands.market.get_container")
-    @patch("copinance_os.interfaces.cli.commands.market.console")
+    @patch("copinance_os.interfaces.cli.commands.market.Console")
     def test_search_instruments_no_results(
-        self, mock_console: MagicMock, mock_get_container: MagicMock
+        self, mock_console_class: MagicMock, mock_get_container: MagicMock
     ) -> None:
+        mock_console = mock_console_class.return_value
         mock_use_case = AsyncMock()
         mock_use_case.execute = AsyncMock(return_value=SearchInstrumentsResponse(instruments=[]))
         mock_get_container.return_value.search_instruments_use_case.return_value = mock_use_case
@@ -76,12 +78,13 @@ class TestMarketCLI:
         assert any("No instruments found" in str(call) for call in print_calls)
 
     @patch("copinance_os.interfaces.cli.commands.market.get_container")
-    @patch("copinance_os.interfaces.cli.commands.market.console")
+    @patch("copinance_os.interfaces.cli.commands.market.Console")
     def test_get_market_quote(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
+        mock_console = mock_console_class.return_value
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=None)
         mock_get_container.return_value.cache_manager.return_value = cache
@@ -116,12 +119,13 @@ class TestMarketCLI:
         assert mock_console.print.called
 
     @patch("copinance_os.interfaces.cli.commands.market.get_container")
-    @patch("copinance_os.interfaces.cli.commands.market.console")
+    @patch("copinance_os.interfaces.cli.commands.market.Console")
     def test_get_market_history(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
+        mock_console = mock_console_class.return_value
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=None)
         mock_get_container.return_value.cache_manager.return_value = cache
@@ -162,10 +166,11 @@ class TestMarketCLI:
         assert mock_console.print.called
 
     @patch("copinance_os.interfaces.cli.commands.market.handle_cli_error")
-    @patch("copinance_os.interfaces.cli.commands.market.console")
+    @patch("copinance_os.interfaces.cli.commands.market.Console")
     def test_get_market_history_rejects_invalid_interval(
-        self, mock_console: MagicMock, mock_handle_error: MagicMock
+        self, mock_console_class: MagicMock, mock_handle_error: MagicMock
     ) -> None:
+        mock_console = mock_console_class.return_value
         get_market_history(
             _typer_ctx(),
             symbol="AAPL",
@@ -179,12 +184,13 @@ class TestMarketCLI:
         mock_console.print.assert_not_called()
 
     @patch("copinance_os.interfaces.cli.commands.market.get_container")
-    @patch("copinance_os.interfaces.cli.commands.market.console")
+    @patch("copinance_os.interfaces.cli.commands.market.Console")
     def test_get_market_fundamentals(
         self,
-        mock_console: MagicMock,
+        mock_console_class: MagicMock,
         mock_get_container: MagicMock,
     ) -> None:
+        mock_console = mock_console_class.return_value
         cache = AsyncMock()
         cache.get = AsyncMock(return_value=None)
         mock_get_container.return_value.cache_manager.return_value = cache

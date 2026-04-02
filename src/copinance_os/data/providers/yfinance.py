@@ -165,8 +165,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             return False
         try:
             # Quick test to see if we can fetch data
-            loop = asyncio.get_event_loop()
-            test_ticker = await loop.run_in_executor(None, lambda: yf.Ticker("AAPL").info)
+            test_ticker = await asyncio.to_thread(lambda: yf.Ticker("AAPL").info)
             return test_ticker is not None
         except Exception as e:
             logger.warning("yfinance availability check failed", error=str(e))
@@ -195,14 +194,11 @@ class YFinanceMarketProvider(MarketDataProvider):
             - exchange: Exchange name
         """
         try:
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol))
-            info = await loop.run_in_executor(None, lambda: ticker.info)
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
+            info = await asyncio.to_thread(lambda: ticker.info)
 
             # Get latest price data
-            hist = await loop.run_in_executor(
-                None, lambda: ticker.history(period="1d", interval="1m")
-            )
+            hist = await asyncio.to_thread(lambda: ticker.history(period="1d", interval="1m"))
 
             quote = {
                 "symbol": symbol.upper(),
@@ -219,7 +215,7 @@ class YFinanceMarketProvider(MarketDataProvider):
                 "market_cap": int(info.get("marketCap", 0)) if info.get("marketCap") else None,
                 "currency": info.get("currency", "USD"),
                 "exchange": info.get("exchange", ""),
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # Add latest price from history if available
@@ -258,12 +254,10 @@ class YFinanceMarketProvider(MarketDataProvider):
                 raise ImportError(
                     "yfinance is not installed. Install it with: pip install yfinance"
                 )
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol))
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
 
             # yfinance uses period or start/end dates
-            hist: DataFrame = await loop.run_in_executor(
-                None,
+            hist: DataFrame = await asyncio.to_thread(
                 lambda: ticker.history(start=start_date, end=end_date, interval=interval),
             )
 
@@ -327,14 +321,12 @@ class YFinanceMarketProvider(MarketDataProvider):
                     "yfinance is not installed. Install it with: pip install yfinance"
                 )
             # For intraday, we get the last trading day's data
-            end_date = datetime.now()
+            end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=7)  # Get last week for intraday
 
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol))
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
 
-            hist: DataFrame = await loop.run_in_executor(
-                None,
+            hist: DataFrame = await asyncio.to_thread(
                 lambda: ticker.history(start=start_date, end=end_date, interval=interval),
             )
 
@@ -394,9 +386,8 @@ class YFinanceMarketProvider(MarketDataProvider):
                     "yfinance is not installed. Install it with: pip install yfinance"
                 )
 
-            loop = asyncio.get_event_loop()
             # Use yfinance Search to find stocks by name or symbol
-            search = await loop.run_in_executor(None, lambda: yf.Search(query, max_results=limit))
+            search = await asyncio.to_thread(lambda: yf.Search(query, max_results=limit))
 
             # Get quotes from search results
             quotes = search.quotes
@@ -443,9 +434,8 @@ class YFinanceMarketProvider(MarketDataProvider):
                     "yfinance is not installed. Install it with: pip install yfinance"
                 )
 
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(underlying_symbol))
-            available_expirations = await loop.run_in_executor(None, lambda: list(ticker.options))
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(underlying_symbol))
+            available_expirations = await asyncio.to_thread(lambda: list(ticker.options))
 
             if not available_expirations:
                 raise ValueError(f"No listed options available for {underlying_symbol}")
@@ -459,11 +449,10 @@ class YFinanceMarketProvider(MarketDataProvider):
                     f"Expiration {selected_expiration} is not available for {underlying_symbol}"
                 )
 
-            option_chain = await loop.run_in_executor(
-                None,
+            option_chain = await asyncio.to_thread(
                 lambda: ticker.option_chain(selected_expiration),
             )
-            info = await loop.run_in_executor(None, lambda: ticker.info)
+            info = await asyncio.to_thread(lambda: ticker.info)
 
             def _to_contracts(frame: DataFrame, side: OptionSide) -> list[OptionContract]:
                 contracts: list[OptionContract] = []
@@ -502,9 +491,7 @@ class YFinanceMarketProvider(MarketDataProvider):
                 info.get("currentPrice") or info.get("regularMarketPrice")
             )
             if underlying_price is None:
-                fast_info = await loop.run_in_executor(
-                    None, lambda: getattr(ticker, "fast_info", {})
-                )
+                fast_info = await asyncio.to_thread(lambda: getattr(ticker, "fast_info", {}))
                 if isinstance(fast_info, dict):
                     underlying_price = _safe_decimal(
                         fast_info.get("lastPrice") or fast_info.get("regularMarketPrice")
@@ -574,8 +561,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
         if not YFINANCE_AVAILABLE:
             return False
         try:
-            loop = asyncio.get_event_loop()
-            test_ticker = await loop.run_in_executor(None, lambda: yf.Ticker("AAPL").info)
+            test_ticker = await asyncio.to_thread(lambda: yf.Ticker("AAPL").info)
             return test_ticker is not None
         except Exception as e:
             logger.warning("yfinance availability check failed", error=str(e))
@@ -606,8 +592,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 raise ImportError(
                     "yfinance is not installed. Install it with: pip install yfinance"
                 )
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol))
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
 
             # Map statement types to yfinance properties
             # Note: yfinance uses properties, not methods, so we access them directly
@@ -632,7 +617,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                     return cast(DataFrame, prop())
                 return cast(DataFrame, prop)
 
-            statement_df: DataFrame = await loop.run_in_executor(None, _get_statement)
+            statement_df: DataFrame = await asyncio.to_thread(_get_statement)
 
             if statement_df.empty:
                 logger.warning(
@@ -725,9 +710,8 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
         consider integrating with Sustainalytics, MSCI, or other ESG providers.
         """
         try:
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol))
-            info = await loop.run_in_executor(None, lambda: ticker.info)
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
+            info = await asyncio.to_thread(lambda: ticker.info)
 
             # Extract any ESG-related fields from info
             esg_data = {
@@ -1135,11 +1119,10 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                     "yfinance is not installed. Install it with: pip install yfinance"
                 )
 
-            loop = asyncio.get_event_loop()
-            ticker = await loop.run_in_executor(None, lambda: yf.Ticker(symbol))
+            ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
 
             # Get company info
-            info = await loop.run_in_executor(None, lambda: ticker.info)
+            info = await asyncio.to_thread(lambda: ticker.info)
 
             # Get financial statements
             method_map = {
@@ -1152,14 +1135,14 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 "cash_flow": ("cashflow" if period_type == "annual" else "quarterly_cashflow"),
             }
 
-            income_df: DataFrame = await loop.run_in_executor(
-                None, lambda: getattr(ticker, method_map["income_statement"])
+            income_df: DataFrame = await asyncio.to_thread(
+                lambda: getattr(ticker, method_map["income_statement"])
             )
-            balance_df: DataFrame = await loop.run_in_executor(
-                None, lambda: getattr(ticker, method_map["balance_sheet"])
+            balance_df: DataFrame = await asyncio.to_thread(
+                lambda: getattr(ticker, method_map["balance_sheet"])
             )
-            cashflow_df: DataFrame = await loop.run_in_executor(
-                None, lambda: getattr(ticker, method_map["cash_flow"])
+            cashflow_df: DataFrame = await asyncio.to_thread(
+                lambda: getattr(ticker, method_map["cash_flow"])
             )
 
             # Check if all statements are empty (invalid symbol)

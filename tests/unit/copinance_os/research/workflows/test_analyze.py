@@ -68,6 +68,7 @@ class TestDefaultAnalyzeInstrumentRunner:
         assert job.timeframe == JobTimeframe.MID_TERM
         assert context["question"] is None
         assert context["stream"] is False
+        assert context["no_cache"] is False
 
     @pytest.mark.asyncio
     async def test_run_builds_agentic_options_job(self) -> None:
@@ -121,6 +122,19 @@ class TestDefaultAnalyzeInstrumentRunner:
         )
         context = mock_job_runner.run.call_args[0][1]
         assert context["stream"] is True
+
+    @pytest.mark.asyncio
+    async def test_run_passes_no_cache_in_context(self) -> None:
+        mock_job_runner = AsyncMock(spec=JobRunner)
+        mock_job_runner.run = AsyncMock(
+            return_value=RunJobResult(success=True, results={}, error_message=None)
+        )
+        runner = DefaultAnalyzeInstrumentRunner(
+            research_orchestrator=ResearchOrchestrator(mock_job_runner)
+        )
+        await runner.run(AnalyzeInstrumentRequest(symbol="AAPL", no_cache=True))
+        context = mock_job_runner.run.call_args[0][1]
+        assert context["no_cache"] is True
 
 
 @pytest.mark.unit
@@ -189,6 +203,7 @@ class TestDefaultAnalyzeMarketRunner:
         assert context["lookback_days"] == 90
         assert context["include_vix"] is False
         assert context["stream"] is False
+        assert context["no_cache"] is False
 
     @pytest.mark.asyncio
     async def test_run_builds_question_driven_market_job(self) -> None:
@@ -215,3 +230,16 @@ class TestDefaultAnalyzeMarketRunner:
         assert job.execution_type == MARKET_QUESTION_DRIVEN_TYPE
         assert context["question"] == "Is this risk on or risk off?"
         assert context["stream"] is False
+
+    @pytest.mark.asyncio
+    async def test_run_passes_no_cache_in_context(self) -> None:
+        mock_job_runner = AsyncMock(spec=JobRunner)
+        mock_job_runner.run = AsyncMock(
+            return_value=RunJobResult(success=True, results={}, error_message=None)
+        )
+        runner = DefaultAnalyzeMarketRunner(
+            research_orchestrator=ResearchOrchestrator(mock_job_runner)
+        )
+        await runner.run(AnalyzeMarketRequest(market_index="SPY", no_cache=True))
+        context = mock_job_runner.run.call_args[0][1]
+        assert context["no_cache"] is True

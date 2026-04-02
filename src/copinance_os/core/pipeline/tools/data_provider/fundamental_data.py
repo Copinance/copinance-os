@@ -10,6 +10,7 @@ from copinance_os.core.pipeline.tools.data_provider.provider_selector import (
     ProviderSelector,
 )
 from copinance_os.data.cache import CacheManager
+from copinance_os.domain.exceptions import ConfigurationError
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider
 from copinance_os.domain.ports.tools import ToolSchema
@@ -43,7 +44,10 @@ class BaseSecEdgarExtendedFundamentalTool(BaseDataProviderTool[FundamentalDataPr
                 selected_provider = provider.get_provider(tool_name="get_sec_filings")
 
             if selected_provider is None:
-                raise ValueError("No provider available for SEC/EDGAR extended tools")
+                raise ConfigurationError(
+                    "No provider available for SEC/EDGAR extended tools — "
+                    "configure an EDGAR provider (e.g. COPINANCEOS_EDGAR_IDENTITY)"
+                )
             super().__init__(selected_provider, cache_manager=cache_manager, use_cache=use_cache)
         else:
             super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
@@ -299,7 +303,9 @@ class FundamentalDataGetSECFilingsTool(BaseDataProviderTool[FundamentalDataProvi
                 selected_provider = provider.get_provider(tool_name="get_sec_filings")
 
             if selected_provider is None:
-                raise ValueError("No provider available for SEC filings tool")
+                raise ConfigurationError(
+                    "No provider available for SEC filings tool — configure an EDGAR provider (e.g. COPINANCEOS_EDGAR_IDENTITY)"
+                )
             super().__init__(selected_provider, cache_manager=cache_manager, use_cache=use_cache)
         else:
             super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
@@ -460,7 +466,9 @@ class FundamentalDataGetSECFilingContentTool(BaseDataProviderTool[FundamentalDat
                 selected_provider = provider.get_provider(tool_name="get_sec_filing_content")
 
             if selected_provider is None:
-                raise ValueError("No provider available for SEC filing content tool")
+                raise ConfigurationError(
+                    "No provider available for SEC filing content tool — configure an EDGAR provider (e.g. COPINANCEOS_EDGAR_IDENTITY)"
+                )
             super().__init__(selected_provider, cache_manager=cache_manager, use_cache=use_cache)
         else:
             super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)

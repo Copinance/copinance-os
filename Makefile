@@ -1,4 +1,4 @@
-.PHONY: help venv setup install install-dev test test-unit test-integration coverage lint format format-check type-check quality clean clean-cache clean-cache-data clean-venv clean-docs cli docs docs-serve pre-commit check version
+.PHONY: help venv setup install install-dev test test-unit test-integration coverage lint format format-check type-check quality clean clean-cache clean-cache-data clean-venv clean-docs cli docs docs-serve pre-commit check version zip-config
 
 ESC := \033
 RESET := $(ESC)[0m
@@ -12,7 +12,7 @@ SETUP_TARGETS := venv setup install install-dev
 QUALITY_TARGETS := lint format format-check type-check quality pre-commit
 TEST_TARGETS := test test-unit test-integration coverage check
 DOCS_TARGETS := docs docs-serve
-UTILITY_TARGETS := cli version
+UTILITY_TARGETS := cli version zip-config
 CLEAN_TARGETS := clean clean-cache clean-cache-data clean-venv clean-docs
 
 # Detect Python version and virtual environment
@@ -194,3 +194,11 @@ check: format quality test ## Run all checks (quality + tests)
 
 version: ## Show package version
 	@$(PYTHON_CMD) -c "from copinance import __version__; print(__version__)"
+
+zip-config: ## Zip .claude, .cursor, and CLAUDE.md into timestamped archive
+	@test -d .claude || (printf "$(YELLOW)Missing .claude/$(RESET)\n"; exit 1)
+	@test -d .cursor || (printf "$(YELLOW)Missing .cursor/$(RESET)\n"; exit 1)
+	@test -f CLAUDE.md || (printf "$(YELLOW)Missing CLAUDE.md$(RESET)\n"; exit 1)
+	@out="copinance-os-claude-cursor-$$(date +%Y%m%d-%H%M%S).zip"; \
+	zip -r "$$out" .claude .cursor CLAUDE.md -x "*.DS_Store" && \
+	printf "$(GREEN)Created:$(RESET) %s/%s\n" "$(CURDIR)" "$$out"

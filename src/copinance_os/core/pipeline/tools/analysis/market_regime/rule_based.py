@@ -58,7 +58,7 @@ Market Regimes & Cycles:
       → Why regimes exist and change over time
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from math import log
 from typing import Any
 
@@ -255,7 +255,7 @@ class MarketRegimeDetectTrendTool(Tool):
 
             # Use pre-fetched data if provided, otherwise fetch
             if historical_data is None:
-                end_date = datetime.now()
+                end_date = datetime.now(UTC)
                 start_date = end_date - timedelta(days=lookback_days)
 
                 historical_data = await self._provider.get_historical_data(
@@ -548,7 +548,7 @@ class MarketRegimeDetectVolatilityTool(Tool):
 
             # Use pre-fetched data if provided, otherwise fetch
             if historical_data is None:
-                end_date = datetime.now()
+                end_date = datetime.now(UTC)
                 start_date = end_date - timedelta(days=lookback_days)
 
                 historical_data = await self._provider.get_historical_data(
@@ -737,7 +737,7 @@ class MarketRegimeDetectCyclesTool(Tool):
 
             # Use pre-fetched data if provided, otherwise fetch
             if historical_data is None:
-                end_date = datetime.now()
+                end_date = datetime.now(UTC)
                 start_date = end_date - timedelta(days=lookback_days)
 
                 historical_data = await self._provider.get_historical_data(

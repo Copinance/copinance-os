@@ -21,7 +21,7 @@ from copinance_os.infra.di.data_providers import configure_data_providers
 from copinance_os.infra.di.repositories import configure_repositories
 from copinance_os.infra.di.services import configure_services
 from copinance_os.infra.di.storage import configure_storage
-from copinance_os.infra.di.use_cases import configure_use_cases
+from copinance_os.infra.di.use_cases import configure_profile_use_cases, configure_use_cases
 from copinance_os.research.workflows.analyze import (
     AnalyzeInstrumentUseCase,
     AnalyzeMarketUseCase,
@@ -81,9 +81,10 @@ class Container(containers.DeclarativeContainer):
     _services_config = configure_services(profile_repository)
     profile_management_service = _services_config["profile_management_service"]
 
-    # Data providers (singletons, can be overridden)
-    # fred_api_key_config is optional - if not provided, configure_data_providers will use settings
-    _data_providers_config = providers.Callable(
+    # Data providers (singletons, can be overridden).
+    # Singleton caches the provider dict so inner Singletons (yfinance, cache, …) are not
+    # rebuilt on every use-case resolution (see configure_profile_use_cases vs full graph).
+    _data_providers_config = providers.Singleton(
         configure_data_providers,
         llm_config=llm_config,
         fred_api_key=providers.Callable(
@@ -120,8 +121,16 @@ class Container(containers.DeclarativeContainer):
         config=_data_providers_config,
     )
 
-    # Use cases
-    _use_cases_config = providers.Callable(
+    # Profile use cases: resolved without market/fundamentals/cache (fast CLI path).
+    _profile_use_cases_config = providers.Singleton(
+        configure_profile_use_cases,
+        profile_repository=profile_repository,
+        current_profile=current_profile,
+        profile_management_service=profile_management_service,
+    )
+
+    # Market / research / analysis use cases (pulls full provider graph when first used).
+    _use_cases_config = providers.Singleton(
         configure_use_cases,
         stock_repository=stock_repository,
         profile_repository=profile_repository,
@@ -157,27 +166,27 @@ class Container(containers.DeclarativeContainer):
     )
     create_profile_use_case = providers.Callable(
         lambda config: config["create_profile_use_case"](),
-        config=_use_cases_config,
+        config=_profile_use_cases_config,
     )
     get_current_profile_use_case = providers.Callable(
         lambda config: config["get_current_profile_use_case"](),
-        config=_use_cases_config,
+        config=_profile_use_cases_config,
     )
     set_current_profile_use_case = providers.Callable(
         lambda config: config["set_current_profile_use_case"](),
-        config=_use_cases_config,
+        config=_profile_use_cases_config,
     )
     delete_profile_use_case = providers.Callable(
         lambda config: config["delete_profile_use_case"](),
-        config=_use_cases_config,
+        config=_profile_use_cases_config,
     )
     get_profile_use_case = providers.Callable(
         lambda config: config["get_profile_use_case"](),
-        config=_use_cases_config,
+        config=_profile_use_cases_config,
     )
     list_profiles_use_case = providers.Callable(
         lambda config: config["list_profiles_use_case"](),
-        config=_use_cases_config,
+        config=_profile_use_cases_config,
     )
     get_stock_fundamentals_use_case = providers.Callable(
         lambda config: config["get_stock_fundamentals_use_case"](),

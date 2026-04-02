@@ -4,9 +4,9 @@ from dependency_injector import providers
 
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.ai.llm.resources import PromptManager
+from copinance_os.core.execution_engine.factory import AnalysisExecutorFactory
 from copinance_os.core.orchestrator.research_orchestrator import ResearchOrchestrator
 from copinance_os.core.orchestrator.run_job import DefaultJobRunner
-from copinance_os.infra.factories import AnalysisExecutorFactory
 from copinance_os.research.workflows.fundamentals import GetStockFundamentalsUseCase
 from copinance_os.research.workflows.market import (
     GetHistoricalDataUseCase,
@@ -25,6 +25,60 @@ from copinance_os.research.workflows.profile import (
 )
 
 
+def configure_profile_use_cases(
+    profile_repository: providers.Provider,
+    current_profile: providers.Provider,
+    profile_management_service: providers.Provider,
+) -> dict[str, providers.Provider]:
+    """Profile-only use cases (no market, fundamentals, or LLM dependencies)."""
+
+    create_profile_use_case = providers.Factory(
+        CreateProfileUseCase,
+        profile_repository=profile_repository,
+        profile_service=profile_management_service,
+        current_profile=current_profile,
+    )
+
+    get_current_profile_use_case = providers.Factory(
+        GetCurrentProfileUseCase,
+        profile_repository=profile_repository,
+        current_profile=current_profile,
+    )
+
+    set_current_profile_use_case = providers.Factory(
+        SetCurrentProfileUseCase,
+        profile_repository=profile_repository,
+        profile_service=profile_management_service,
+        current_profile=current_profile,
+    )
+
+    delete_profile_use_case = providers.Factory(
+        DeleteProfileUseCase,
+        profile_repository=profile_repository,
+        profile_service=profile_management_service,
+        current_profile=current_profile,
+    )
+
+    get_profile_use_case = providers.Factory(
+        GetProfileUseCase,
+        profile_repository=profile_repository,
+    )
+
+    list_profiles_use_case = providers.Factory(
+        ListProfilesUseCase,
+        profile_repository=profile_repository,
+    )
+
+    return {
+        "create_profile_use_case": create_profile_use_case,
+        "get_current_profile_use_case": get_current_profile_use_case,
+        "set_current_profile_use_case": set_current_profile_use_case,
+        "delete_profile_use_case": delete_profile_use_case,
+        "get_profile_use_case": get_profile_use_case,
+        "list_profiles_use_case": list_profiles_use_case,
+    }
+
+
 def configure_use_cases(
     stock_repository: providers.Provider,
     profile_repository: providers.Provider,
@@ -38,11 +92,11 @@ def configure_use_cases(
     llm_config: LLMConfig | None = None,
     prompt_manager: PromptManager | None = None,
 ) -> dict[str, providers.Provider]:
-    """Configure use case providers.
+    """Configure market and analysis use case providers (excludes profile CRUD; see ``configure_profile_use_cases``).
 
     Args:
         stock_repository: Stock repository provider
-        profile_repository: Analysis profile repository provider
+        profile_repository: Analysis profile repository provider (for job runner / orchestration)
         current_profile: Current profile provider
         market_data_provider: Market data provider
         fundamental_data_provider: Fundamental data provider
@@ -81,44 +135,6 @@ def configure_use_cases(
     get_options_chain_use_case = providers.Factory(
         GetOptionsChainUseCase,
         market_data_provider=market_data_provider,
-    )
-
-    # Profile use cases
-    create_profile_use_case = providers.Factory(
-        CreateProfileUseCase,
-        profile_repository=profile_repository,
-        profile_service=profile_management_service,
-        current_profile=current_profile,
-    )
-
-    get_current_profile_use_case = providers.Factory(
-        GetCurrentProfileUseCase,
-        profile_repository=profile_repository,
-        current_profile=current_profile,
-    )
-
-    set_current_profile_use_case = providers.Factory(
-        SetCurrentProfileUseCase,
-        profile_repository=profile_repository,
-        profile_service=profile_management_service,
-        current_profile=current_profile,
-    )
-
-    delete_profile_use_case = providers.Factory(
-        DeleteProfileUseCase,
-        profile_repository=profile_repository,
-        profile_service=profile_management_service,
-        current_profile=current_profile,
-    )
-
-    get_profile_use_case = providers.Factory(
-        GetProfileUseCase,
-        profile_repository=profile_repository,
-    )
-
-    list_profiles_use_case = providers.Factory(
-        ListProfilesUseCase,
-        profile_repository=profile_repository,
     )
 
     # Fundamentals use case
@@ -161,12 +177,6 @@ def configure_use_cases(
         "get_quote_use_case": get_quote_use_case,
         "get_historical_data_use_case": get_historical_data_use_case,
         "get_options_chain_use_case": get_options_chain_use_case,
-        "create_profile_use_case": create_profile_use_case,
-        "get_current_profile_use_case": get_current_profile_use_case,
-        "set_current_profile_use_case": set_current_profile_use_case,
-        "delete_profile_use_case": delete_profile_use_case,
-        "get_profile_use_case": get_profile_use_case,
-        "list_profiles_use_case": list_profiles_use_case,
         "get_stock_fundamentals_use_case": get_stock_fundamentals_use_case,
         "analysis_executors": analysis_executors,
         "research_orchestrator": research_orchestrator,

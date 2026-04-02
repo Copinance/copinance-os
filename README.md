@@ -34,7 +34,7 @@ Copinance OS treats **financial computation and research orchestration as first-
 <tr>
   <td align="center" width="33%">
     <b>Deterministic domain</b><br>
-    Pure strategies, indicators, and portfolio logic — composable pipelines with predictable outputs for the same inputs.<br>
+    Strategies, indicators, and composable analysis pipelines—with predictable outputs for the same inputs.<br>
     Pydantic models at boundaries; avoid passing untyped DataFrames across modules.
   </td>
   <td align="center" width="33%">
@@ -52,7 +52,7 @@ Copinance OS treats **financial computation and research orchestration as first-
   <td align="center" width="33%">
     <b>Macro to micro</b><br>
     Broad macro dashboards (e.g. FRED-backed indicators) alongside equities, options (QuantLib), and fundamentals.<br>
-    SEC EDGAR access via <a href="https://edgartools.readthedocs.io/">edgartools</a> for filings and text-aware agent tools.
+    SEC EDGAR access via <a href="https://edgartools.readthedocs.io/">edgartools</a> for filings and LLM tool-calling over filing text when configured.
   </td>
   <td align="center" width="33%">
     <b>Audience-aware output</b><br>
@@ -116,7 +116,7 @@ pip install -e ".[dev,ollama]"
 
 ### Using the CLI
 
-After `**pip install -e .` (or `make setup`), the entry point is `copinance`. You can substitute `python -m copinance_os.interfaces.cli` anywhere below if you prefer the module form.
+After `pip install -e .` (or `make setup`), the entry point is `copinance`. You can substitute `python -m copinance_os.interfaces.cli` anywhere below if you prefer the module form.
 
 ```bash
 # Profile
@@ -138,7 +138,7 @@ copinance analyze --stream macro --question "Is credit leading equities?"
 
 Full CLI command reference: [User Guide - CLI](https://copinance.github.io/copinance-os/user-guide/cli/).
 
-**Machine-readable output:** put `**--json`** on the `**analyze**` or `**market**` group before the subcommand, or `**--json**` before a natural-language question—stdout is JSON only (no Rich tables). `analyze --json` emits `**RunJobResult**`; `market --json` emits a command envelope (`command` plus payload).
+**Machine-readable output:** pass **`--json`** on the **`analyze`** or **`market`** group before the subcommand, or **`--json`** before a natural-language question—stdout is JSON only (no Rich tables). `analyze --json` emits a **`RunJobResult`**; `market --json` emits a command envelope (`command` plus payload).
 
 ```bash
 copinance analyze --json equity AAPL --timeframe mid_term
@@ -148,7 +148,7 @@ copinance market --json quote AAPL
 copinance market --json history AAPL --start 2026-01-01 --end 2026-03-14
 ```
 
-**Shell completion (Tab):** The CLI is built with **Typer**; install shell integration so Tab can complete subcommands and flags. Activate your venv first (`source .venv/bin/activate`) so `**copinance`** is on `**PATH**`, then run one of:
+**Shell completion (Tab):** The CLI is built with **Typer**; install shell integration so Tab can complete subcommands and flags. Activate your venv first (`source .venv/bin/activate`) so **`copinance`** is on **`PATH`**, then run one of:
 
 ```bash
 copinance --install-completion bash
@@ -156,9 +156,9 @@ copinance --install-completion zsh   # default login shell on macOS; use this if
 copinance --install-completion fish
 ```
 
-Follow the instructions Typer prints (usually adding a `source …` line to `**~/.bashrc**`, `**~/.zshrc**`, or the path shown for fish). Open a **new terminal** afterward. Completion works by **re-invoking `copinance`**; if the venv is not active, Tab will not find the command. It completes **commands and options** (e.g. `analyze`, `market`, `--json`); it does **not** complete arbitrary text for `**copinance "…"`** natural-language questions.
+Follow the instructions Typer prints (usually adding a `source …` line to **`~/.bashrc`**, **`~/.zshrc`**, or the path shown for fish). Open a **new terminal** afterward. Completion works by **re-invoking `copinance`**; if the venv is not active, Tab will not find the command. It completes **commands and options** (e.g. `analyze`, `market`, `--json`); it does **not** complete arbitrary text for natural-language questions (`copinance "…"`).
 
-**Multi-turn question-driven analysis** (follow-up questions with memory of prior answers) is supported through `**AnalyzeInstrumentRequest` / `AnalyzeMarketRequest`** (`conversation_history` + new `question`), not via CLI flags. Successful runs include `**conversation_turns**` in `results` for chaining. See the [library guide](https://copinance.github.io/copinance-os/getting-started/library#multi-turn-question-driven-analysis).
+**Multi-turn question-driven analysis** (follow-up questions with memory of prior answers) is supported through **`AnalyzeInstrumentRequest` / `AnalyzeMarketRequest`** from **`copinance_os.domain.models.analysis`** (also re-exported from `research.workflows.analyze`): pass **`conversation_history`** plus the new **`question`**, not via CLI flags. Successful runs include **`conversation_turns`** in **`results`** for chaining. See the [library guide](https://copinance.github.io/copinance-os/getting-started/library#multi-turn-question-driven-analysis).
 
 Full flag reference: [User Guide - CLI](https://copinance.github.io/copinance-os/user-guide/cli/).
 
@@ -261,4 +261,3 @@ This project is licensed under the Apache License 2.0. See the LICENSE file for 
 ## Support
 
 GitHub Issues: [Report bugs or request features](https://github.com/copinance/copinance-os/issues)
-

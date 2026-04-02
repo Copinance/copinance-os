@@ -5,21 +5,21 @@ from __future__ import annotations
 from uuid import UUID
 
 import typer
+from rich.console import Console
 
+from copinance_os.domain.models.analysis import (
+    AnalyzeInstrumentRequest,
+    AnalyzeMarketRequest,
+    AnalyzeMode,
+)
 from copinance_os.domain.models.job import JobTimeframe
 from copinance_os.domain.models.market import MarketType, OptionSide
 from copinance_os.interfaces.cli.shared.container_access import get_container
 from copinance_os.interfaces.cli.shared.error_handler import handle_cli_error
 from copinance_os.interfaces.cli.shared.profile_context import ensure_profile_with_literacy
-from copinance_os.interfaces.cli.shared.run_job_output import console, render_run_job_results
+from copinance_os.interfaces.cli.shared.run_job_output import render_run_job_results
 from copinance_os.interfaces.cli.shared.utils import async_command
-from copinance_os.research.workflows.analyze import (
-    AnalyzeInstrumentRequest,
-    AnalyzeInstrumentUseCase,
-    AnalyzeMarketRequest,
-    AnalyzeMarketUseCase,
-    AnalyzeMode,
-)
+from copinance_os.research.workflows.analyze import AnalyzeInstrumentUseCase, AnalyzeMarketUseCase
 
 analyze_app = typer.Typer(
     help=(
@@ -79,8 +79,14 @@ async def analyze_equity(
         "--include-prompt",
         help="Include rendered prompts in the saved results for question-driven runs",
     ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass data/tool cache reads and writes for this run",
+    ),
 ) -> None:
     """Analyze an equity with deterministic or question-driven execution."""
+    console = Console()
     final_profile_id = await ensure_profile_with_literacy(profile_id)
     use_case: AnalyzeInstrumentUseCase = get_container().analyze_instrument_use_case()
     json_output = bool(ctx.obj and ctx.obj.get("json_output"))
@@ -96,6 +102,7 @@ async def analyze_equity(
         profile_id=final_profile_id,
         include_prompt_in_results=include_prompt_in_results,
         stream=stream_flag,
+        no_cache=no_cache,
     )
     try:
         status_text = (
@@ -154,8 +161,14 @@ async def analyze_options(
         "--include-prompt",
         help="Include rendered prompts in the saved results for question-driven runs",
     ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass data/tool cache reads and writes for this run",
+    ),
 ) -> None:
     """Analyze options with deterministic or question-driven execution."""
+    console = Console()
     final_profile_id = await ensure_profile_with_literacy(profile_id)
     use_case: AnalyzeInstrumentUseCase = get_container().analyze_instrument_use_case()
     json_output = bool(ctx.obj and ctx.obj.get("json_output"))
@@ -171,6 +184,7 @@ async def analyze_options(
         profile_id=final_profile_id,
         include_prompt_in_results=include_prompt_in_results,
         stream=stream_flag,
+        no_cache=no_cache,
     )
     try:
         status_text = (
@@ -295,6 +309,11 @@ async def analyze_macro(
         "--include-prompt",
         help="Include rendered prompts in the saved results for question-driven runs",
     ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass data/tool cache reads and writes for this run",
+    ),
 ) -> None:
     """Analyze the broader market with deterministic or question-driven execution.
 
@@ -303,6 +322,7 @@ async def analyze_macro(
     the 11 S&P sector ETFs (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE)
     are always fetched for breadth and rotation; they do not change with --market-index.
     """
+    console = Console()
     final_profile_id = await ensure_profile_with_literacy(profile_id)
     use_case: AnalyzeMarketUseCase = get_container().analyze_market_use_case()
     json_output = bool(ctx.obj and ctx.obj.get("json_output"))
@@ -328,6 +348,7 @@ async def analyze_macro(
         profile_id=final_profile_id,
         include_prompt_in_results=include_prompt_in_results,
         stream=stream_flag,
+        no_cache=no_cache,
     )
     try:
         status_text = (

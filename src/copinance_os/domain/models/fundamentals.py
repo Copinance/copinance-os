@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from copinance_os.domain.models.base import Entity, ValueObject
 
@@ -214,3 +214,17 @@ class StockFundamentals(Entity):
     metadata: dict[str, str] = Field(
         default_factory=dict, description="Additional fundamentals metadata"
     )
+
+
+class GetStockFundamentalsRequest(BaseModel):
+    """Request for stock fundamentals."""
+
+    symbol: str = Field(..., description="Stock symbol to analyze")
+    periods: int = Field(default=5, description="Number of periods to retrieve (e.g., 5 years)")
+    period_type: str = Field(default="annual", description="Period type: 'annual' or 'quarterly'")
+
+
+class GetStockFundamentalsResponse(BaseModel):
+    """Response from getting stock fundamentals."""
+
+    fundamentals: StockFundamentals = Field(..., description="Comprehensive stock fundamentals")

@@ -64,14 +64,28 @@ Latest **13F-HR** portfolio for an **institutional filer** (manager CIK/ticker y
 
 Tools that call **SEC/EDGAR** are registered when your app wires a **SEC-capable** fundamentals provider for question-driven analysis; otherwise those tools may error or return empty data depending on the deployment.
 
-## Creating Tools
+## Creating tools
+
+Prefer **bundle discovery** so market, regime, and fundamental tools stay aligned with the rest of the app:
 
 ```python
-from copinance_os.core.pipeline.tools.data_provider import create_market_data_tools
+from copinance_os.core.pipeline.tools import build_data_provider_tool_registry
 from copinance_os.data.providers import YFinanceMarketProvider
 
-provider = YFinanceMarketProvider()
-tools = create_market_data_tools(provider, cache_manager=cache_manager)
+registry = build_data_provider_tool_registry(
+    market_data_provider=YFinanceMarketProvider(),
+    fundamental_data_provider=my_fundamentals_provider,  # optional
+)
+# Names: get_market_quote, get_historical_market_data, …
+```
+
+For **market (and options) tools only**, call the adapter factory directly (not re-exported from `data_provider`):
+
+```python
+from copinance_os.core.pipeline.tools.data_provider.registry import create_market_data_tools
+from copinance_os.data.providers import YFinanceMarketProvider
+
+tools = create_market_data_tools(YFinanceMarketProvider(), cache_manager=cache_manager)
 ```
 
 ## See Also

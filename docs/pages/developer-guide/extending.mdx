@@ -150,7 +150,7 @@ container.llm_analyzer.override(
 
 ### LLM backends: text streaming
 
-Built-in **`GeminiProvider`** and **`OllamaProvider`** subclass **`LLMProvider`** and implement **`_iter_native_text_stream`** for API-native chunking. **`supports_native_text_stream()`** respects **`disable_native_text_stream`**. When adding a new vendor adapter, either:
+Built-in **`GeminiProvider`**, **`OpenAIProvider`**, and **`OllamaProvider`** subclass **`LLMProvider`** and implement **`_iter_native_text_stream`** where the remote API supports streaming. **`supports_native_text_stream()`** respects **`disable_native_text_stream`**. When adding a new vendor adapter, either:
 
 - Implement **`_iter_native_text_stream`** and return **`True`** from **`supports_native_text_stream()`** when the remote API supports streaming, or
 - Rely on the base **`generate_text_stream`** logic: **`auto`** / **`buffered`** will call **`generate_text`** only.
@@ -185,7 +185,7 @@ class MyCustomExecutor(BaseAnalysisExecutor):
 
 ### 2. Register in Container
 
-Add your executor in **`infra/factories/analysis_executor.py`** (or build a custom list) and wire it through dependency injection, or override **`container.analysis_executors`** on a **`Container`** you own. Jobs are run via the **`JobRunner`** port (default: finds an executor and runs it). For custom global orchestration (queues, retries), implement **`JobRunner`** and pass it to **`ResearchOrchestrator(job_runner=...)`**—the default **`Container`** does not expose **`job_runner()`** as a method.
+Stock wiring builds the executor list with **`AnalysisExecutorFactory.create_all`** in **`copinance_os.core.execution_engine.factory`**. For a **one-off** integration, override **`container.analysis_executors`** with your own `providers.Factory` / list that includes **`MyCustomExecutor`**, or fork the factory locally. Jobs are run via the **`JobRunner`** port (default: finds an executor and runs it). For custom global orchestration (queues, retries), implement **`JobRunner`** and pass it to **`ResearchOrchestrator(job_runner=...)`**—the default **`Container`** does not expose **`job_runner()`** as a method.
 
 ## Custom prompt templates
 

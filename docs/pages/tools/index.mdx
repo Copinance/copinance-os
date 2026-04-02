@@ -39,25 +39,37 @@ See [CLI Reference — Question-driven examples](/user-guide/cli#question-driven
 
 ### Programmatic usage
 
+Tools are assembled from **bundle factories** driven by `PluginSpec` lists, optional **setuptools entry points** (group `copinance_os.tool_bundles`), and an optional **package scan** of `copinance_os.core.pipeline.tools.bundles` for modules that define `tool_bundle_factory`. Dependencies are passed in a **`ToolBundleContext`** (`domain.models.tool_bundle_context`).
+
+**Question-driven tool list** (same composition the agent executor uses—market, regime, indicators, macro when providers exist, fundamentals when configured):
+
 ```python
-from copinance_os.core.pipeline.tools import (
-    create_rule_based_regime_tools,
-    create_market_data_tools,
-    ToolRegistry,
-)
+from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
+from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
 from copinance_os.data.providers import YFinanceMarketProvider
 
-provider = YFinanceMarketProvider()
-regime_tools = create_rule_based_regime_tools(provider)
-data_tools = create_market_data_tools(provider)
-
-result = await regime_tools[0].execute(symbol="AAPL")
-
-registry = ToolRegistry()
-registry.register_many(regime_tools)
-registry.register_many(data_tools)
-tool = registry.get("detect_market_trend")
+ctx = ToolBundleContext(market_data_provider=YFinanceMarketProvider())
+tools = collect_question_driven_tools(ctx)
+# tools is list[Tool] — pass to your LLM adapter; optional: scan_bundles_package=None to disable scan
 ```
+
+**Preset registry** (market data + rule-based regime + fundamentals only):
+
+```python
+from copinance_os.core.pipeline.tools import build_data_provider_tool_registry
+from copinance_os.data.providers import YFinanceMarketProvider
+
+registry = build_data_provider_tool_registry(
+    market_data_provider=YFinanceMarketProvider(),
+    fundamental_data_provider=None,  # set when you wire fundamentals
+)
+tool = registry.get("detect_market_trend")
+result = await tool.execute(symbol="AAPL") if tool else None
+```
+
+**Custom composition** via `load_tools_from_plugin_specs` and `DATA_PROVIDER_TOOL_BUNDLE_SPECS` / `QUESTION_DRIVEN_TOOL_BUNDLE_SPECS` (exported from `copinance_os.core.pipeline.tools.discovery`).
+
+**Low-level constructors** (tests or one-off tools): `create_rule_based_regime_tools` and regime registry helpers under `copinance_os.core.pipeline.tools.analysis.market_regime`; market/fundamental tool builders under `copinance_os.core.pipeline.tools.data_provider.registry`.
 
 ## Tool architecture
 
@@ -66,6 +78,8 @@ All tools implement the **`Tool`** port (`copinance_os.domain.ports.tools`):
 - **Schema** — JSON Schema for LLM function calling
 - **Validation** — Typed parameters
 - **Structured results** — Errors and payloads suitable for prompts and logs
+
+Bundle callables take **`ToolBundleContext`** and return `list[Tool]`; discovery resolves `PluginSpec` entries lazily via `import_path` + `qualified_name` (`domain.plugins.spec`).
 
 ## See also
 

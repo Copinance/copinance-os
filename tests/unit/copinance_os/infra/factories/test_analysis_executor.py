@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.factories.analysis_executor import AnalysisExecutorFactory
+from copinance_os.core.execution_engine.factory import AnalysisExecutorFactory
 
 
 @pytest.mark.unit
@@ -28,7 +28,7 @@ class TestAnalysisExecutorFactory:
             "cache_manager": MagicMock(),
         }
 
-    @patch("copinance_os.infra.factories.analysis_executor.InstrumentAnalysisExecutor")
+    @patch("copinance_os.core.execution_engine.factory.InstrumentAnalysisExecutor")
     def test_create_all_returns_static_executor(
         self, mock_market_executor: MagicMock, mock_dependencies: dict
     ) -> None:
@@ -39,10 +39,10 @@ class TestAnalysisExecutorFactory:
         assert mock_executor in result
         mock_market_executor.assert_called_once()
 
-    @patch("copinance_os.infra.factories.analysis_executor.LLMProviderFactory")
-    @patch("copinance_os.infra.factories.analysis_executor.LLMAnalyzerFactory")
-    @patch("copinance_os.infra.factories.analysis_executor.QuestionDrivenAnalysisExecutor")
-    @patch("copinance_os.infra.factories.analysis_executor.InstrumentAnalysisExecutor")
+    @patch("copinance_os.core.execution_engine.factory.LLMProviderFactory")
+    @patch("copinance_os.core.execution_engine.factory.LLMAnalyzerFactory")
+    @patch("copinance_os.core.execution_engine.factory.QuestionDrivenAnalysisExecutor")
+    @patch("copinance_os.core.execution_engine.factory.InstrumentAnalysisExecutor")
     def test_create_all_with_llm_analyzer(
         self,
         mock_market: MagicMock,
@@ -67,10 +67,10 @@ class TestAnalysisExecutorFactory:
         assert mock_agentic_executor in result
         mock_agentic.assert_called_once()
 
-    @patch("copinance_os.infra.factories.analysis_executor.LLMProviderFactory")
-    @patch("copinance_os.infra.factories.analysis_executor.LLMAnalyzerFactory")
-    @patch("copinance_os.infra.factories.analysis_executor.QuestionDrivenAnalysisExecutor")
-    @patch("copinance_os.infra.factories.analysis_executor.InstrumentAnalysisExecutor")
+    @patch("copinance_os.core.execution_engine.factory.LLMProviderFactory")
+    @patch("copinance_os.core.execution_engine.factory.LLMAnalyzerFactory")
+    @patch("copinance_os.core.execution_engine.factory.QuestionDrivenAnalysisExecutor")
+    @patch("copinance_os.core.execution_engine.factory.InstrumentAnalysisExecutor")
     def test_create_all_without_api_key(
         self,
         mock_market: MagicMock,
@@ -93,9 +93,9 @@ class TestAnalysisExecutorFactory:
         mock_agentic.assert_called_once()
         assert mock_agentic.call_args.kwargs.get("llm_analyzer") is None
 
-    @patch("copinance_os.infra.factories.analysis_executor.LLMProviderFactory")
-    @patch("copinance_os.infra.factories.analysis_executor.LLMAnalyzerFactory")
-    @patch("copinance_os.infra.factories.analysis_executor.InstrumentAnalysisExecutor")
+    @patch("copinance_os.core.execution_engine.factory.LLMProviderFactory")
+    @patch("copinance_os.core.execution_engine.factory.LLMAnalyzerFactory")
+    @patch("copinance_os.core.execution_engine.factory.InstrumentAnalysisExecutor")
     def test_create_all_handles_llm_factory_exception(
         self,
         mock_market: MagicMock,

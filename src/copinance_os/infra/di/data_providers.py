@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from dependency_injector import providers
 
+from copinance_os.ai.llm.analyzer_factory import LLMAnalyzerFactory
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.data.analytics.options import QuantLibBsmGreekEstimator
 from copinance_os.data.cache import CacheManager, LocalFileCacheBackend
@@ -16,7 +17,6 @@ from copinance_os.data.providers import (
 )
 from copinance_os.data.providers.market import OptionAnalyticsMarketDataProvider
 from copinance_os.infra.config import get_settings
-from copinance_os.infra.factories import LLMAnalyzerFactory
 
 
 def configure_data_providers(
