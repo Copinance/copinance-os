@@ -293,14 +293,39 @@ def render_run_job_results(response: RunJobResult, *, json_output: bool = False)
                     padding=(1, 2),
                 )
             )
-        if analysis:
+        if analysis or (
+            isinstance(results, dict)
+            and results.get("multi_expiration")
+            and results.get("expirations")
+        ):
             if analysis_streamed:
                 console.print(
                     "[dim]Tokens were printed live above. Full answer (markdown) follows for readability "
                     "and copy-paste.[/dim]\n"
                 )
             _analysis_border = "yellow" if synthesis_partial else "green"
-            if _is_options_analysis_dict(analysis):
+            if (
+                isinstance(results, dict)
+                and results.get("multi_expiration")
+                and results.get("expirations")
+            ):
+                exp_blocks = results.get("expirations")
+                if isinstance(exp_blocks, list):
+                    for i, block in enumerate(exp_blocks):
+                        if not isinstance(block, dict):
+                            continue
+                        inner = block.get("analysis")
+                        title = f"[bold]Analysis ({block.get('expiration_date', i + 1)})[/bold]"
+                        if isinstance(inner, dict) and _is_options_analysis_dict(inner):
+                            console.print(
+                                Panel(
+                                    _render_options_analysis_tables(inner),
+                                    title=title,
+                                    border_style=_analysis_border,
+                                    padding=(1, 2),
+                                )
+                            )
+            elif analysis and _is_options_analysis_dict(analysis):
                 console.print(
                     Panel(
                         _render_options_analysis_tables(analysis),
@@ -309,7 +334,7 @@ def render_run_job_results(response: RunJobResult, *, json_output: bool = False)
                         padding=(1, 2),
                     )
                 )
-            elif isinstance(analysis, dict):
+            elif isinstance(analysis, dict) and analysis:
                 # Generic dict: key-value table
                 gen = Table(title="Analysis", show_header=False)
                 gen.add_column("Key", style="cyan")
@@ -324,7 +349,7 @@ def render_run_job_results(response: RunJobResult, *, json_output: bool = False)
                         padding=(1, 2),
                     )
                 )
-            else:
+            elif analysis:
                 analysis_text = str(analysis).strip()
                 renderable = Markdown(analysis_text) if analysis_text else analysis_text
                 console.print(

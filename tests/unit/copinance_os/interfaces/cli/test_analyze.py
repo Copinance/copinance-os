@@ -93,7 +93,7 @@ class TestAnalyzeCLI:
         analyze_options(
             _typer_ctx(),
             underlying_symbol="AAPL",
-            expiration_date="2026-06-19",
+            expiration=["2026-06-19"],
             option_side=OptionSide.CALL,
             timeframe=JobTimeframe.SHORT_TERM,
             question="Is skew bearish?",
@@ -108,7 +108,7 @@ class TestAnalyzeCLI:
         assert request.symbol == "AAPL"
         assert request.question == "Is skew bearish?"
         assert request.no_cache is False
-        assert request.expiration_date == "2026-06-19"
+        assert request.expiration_dates == ["2026-06-19"]
         assert request.option_side == OptionSide.CALL
         assert mock_console.print.called
 

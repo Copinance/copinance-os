@@ -20,6 +20,10 @@ Search by symbol or display name. Returns matching instruments with exchange and
 
 Options chain for an underlying: expiration dates, calls, puts, strike, last price, implied volatility, open interest, volume, and BSM Greeks when QuantLib is available. See [Options & Greeks](options-and-greeks) for how Greeks are computed.
 
+**Parameters:** `underlying_symbol` (required); optional `expiration_date` (single YYYY-MM-DD), optional **`expiration_dates`** (array of YYYY-MM-DD)—when both are set they are merged and deduplicated. Omit both to use the provider default expiry. Optional `option_side` (`call` / `put` / `all`).
+
+**Response:** One expiry returns the same chain object as before. **Multiple** expiries return **`multi_expiration`: true**, **`underlying_symbol`**, and **`expirations`**: an array of serialized chains (each filtered by `option_side`). The question-driven prompt includes a second example call with `expiration_dates` for agents.
+
 ## Fundamental data
 
 ### `get_equity_fundamentals`

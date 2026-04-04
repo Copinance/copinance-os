@@ -18,6 +18,23 @@ from copinance_os.domain.exceptions import (
 logger = structlog.get_logger(__name__)
 
 
+def flatten_exception_message(exc: BaseException) -> str:
+    """Return one user-facing message, unwrapping nested exception groups.
+
+    ``asyncio.TaskGroup`` and similar APIs wrap child failures in
+    :class:`ExceptionGroup`; the default ``str()`` is often opaque
+    (for example, "unhandled errors in a TaskGroup (1 sub-exception)").
+    """
+    if isinstance(exc, BaseExceptionGroup):
+        parts: list[str] = []
+        for sub in exc.exceptions:
+            parts.append(flatten_exception_message(sub))
+        joined = " | ".join(p for p in parts if p)
+        return joined if joined else repr(exc)
+    text = str(exc).strip()
+    return text if text else type(exc).__name__
+
+
 def convert_to_domain_exception(
     error: Exception,
     component: str,

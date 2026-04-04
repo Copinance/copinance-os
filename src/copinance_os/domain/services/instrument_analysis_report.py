@@ -32,7 +32,21 @@ def build_instrument_analysis_report(results: dict[str, Any]) -> AnalysisReport 
 
     key_metrics: dict[str, Any] = {"execution_mode": results.get("execution_mode")}
     analysis = results.get("analysis")
-    if isinstance(analysis, dict):
+    if results.get("multi_expiration"):
+        key_metrics["multi_expiration"] = True
+        if results.get("expiration_dates_requested"):
+            key_metrics["expiration_dates_requested"] = results["expiration_dates_requested"]
+        expirations = results.get("expirations")
+        if isinstance(expirations, list):
+            key_metrics["expirations"] = [
+                {
+                    "expiration_date": block.get("expiration_date"),
+                    "metrics": (block.get("analysis") or {}).get("metrics"),
+                }
+                for block in expirations
+                if isinstance(block, dict)
+            ]
+    elif isinstance(analysis, dict):
         key_metrics["symbol"] = analysis.get("symbol")
         key_metrics["timeframe"] = analysis.get("timeframe")
         metrics = analysis.get("metrics")

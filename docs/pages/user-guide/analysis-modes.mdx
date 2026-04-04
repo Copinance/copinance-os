@@ -27,15 +27,18 @@ copinance analyze equity AAPL --timeframe mid_term
 
 What it does:
 1. Fetches the current underlying quote
-2. Loads the options chain for the selected expiration
-3. Summarizes open interest, volume, and implied volatility
-4. Highlights the at-the-money contract
+2. Loads the option chain(s) for the selected expiration(s)—one chain per requested expiry, or the provider default when you omit expiries
+3. Summarizes open interest, volume, and implied volatility (per expiry when multiple)
+4. Highlights the at-the-money contract (per expiry when multiple)
 
 Example:
 
 ```bash
 # Run deterministic options analysis for a given expiration
 copinance analyze options AAPL --expiration 2026-06-19
+
+# Multiple expirations in one run
+copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 ```
 
 ## Question-Driven Analysis
@@ -54,7 +57,7 @@ For example prompts (filings, comparisons, insiders, institutions), see [CLI —
 copinance analyze equity AAPL --question "What are the key financial risks?"
 ```
 
-**Options:** Ask about specific stock options data; use `analyze options` and optionally `--expiration` and `--side` so the AI gets options context and can fetch the options chain.
+**Options:** Ask about specific stock options data; use `analyze options` and optionally **`--expiration` / `-e`** (repeat per date for multiple expiries) and `--side` so the AI gets options context and can fetch the options chain.
 ```bash
 # Question-driven options analysis (positioning, open interest, active calls)
 copinance analyze options AAPL --question "How is the options chain positioned?"

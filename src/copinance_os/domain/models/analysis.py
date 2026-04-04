@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -59,6 +60,34 @@ def resolve_analyze_mode(mode: AnalyzeMode, question: str | None) -> AnalyzeMode
     return mode
 
 
+def merge_instrument_expiration_inputs(
+    expiration_date: str | None,
+    expiration_dates: list[str] | None,
+) -> list[str]:
+    """Merge single-date and list inputs into deduplicated YYYY-MM-DD strings (order preserved).
+
+    Raises ValueError if any segment is not a valid calendar date in that format.
+    """
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def _push(raw: str) -> None:
+        s = raw.strip()
+        if not s:
+            return
+        datetime.strptime(s, "%Y-%m-%d")
+        if s not in seen:
+            seen.add(s)
+            ordered.append(s)
+
+    if expiration_dates:
+        for d in expiration_dates:
+            _push(d)
+    if expiration_date:
+        _push(expiration_date)
+    return ordered
+
+
 class AnalyzeInstrumentRequest(BaseModel):
     """Request to analyze an instrument statically or agentically."""
 
@@ -82,6 +111,13 @@ class AnalyzeInstrumentRequest(BaseModel):
     expiration_date: str | None = Field(
         None,
         description="Optional expiration date (YYYY-MM-DD) for options analysis",
+    )
+    expiration_dates: list[str] | None = Field(
+        None,
+        description=(
+            "Optional list of expiration dates (YYYY-MM-DD) for options analysis. "
+            "Merged with expiration_date when both are set (deduplicated)."
+        ),
     )
     option_side: OptionSide = Field(
         OptionSide.ALL,
@@ -122,8 +158,12 @@ class AnalyzeInstrumentRequest(BaseModel):
         if self.market_type != MarketType.OPTIONS:
             if self.expiration_date is not None:
                 raise ValueError("expiration_date is only supported for options analysis")
+            if self.expiration_dates:
+                raise ValueError("expiration_dates is only supported for options analysis")
             if self.option_side != OptionSide.ALL:
                 raise ValueError("option_side is only supported for options analysis")
+        else:
+            merge_instrument_expiration_inputs(self.expiration_date, self.expiration_dates)
 
         resolved_mode = resolve_analyze_mode(self.mode, self.question)
         normalized_question = (self.question or "").strip()

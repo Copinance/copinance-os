@@ -162,10 +162,13 @@ copinance market options SPY --no-cache
 
 # Narrow terminal: hide Greek columns
 copinance market options MSTR --side all --limit 20 --no-greeks
+
+# Two expiries: one table each (JSON: multi_expiration + expirations array)
+copinance market options AAPL -e 2026-06-19 -e 2026-09-18
 ```
 
 **Options:**
-- `-e` / `--expiration <date>`: Expiration in `YYYY-MM-DD`
+- `-e` / `--expiration <date>`: Expiration in `YYYY-MM-DD` (default when omitted: earliest listed on or after today). **Repeat** for multiple expiries.
 - `-s` / `--side <side>`: `call`, `put`, or `all`
 - `--limit` / `-n <number>`: Maximum contracts to show (default: `0` = show all)
 - `--no-cache`: Bypass cache and fetch fresh data
@@ -315,7 +318,7 @@ Use **`--mode question_driven`** to force tool-using mode even if you omit `--qu
 
 ### Analyze Options
 
-Run options analysis. By default it returns deterministic options-chain output. Add `--question` to let the AI fetch and interpret the relevant options and market data.
+Run options analysis. By default it returns deterministic options-chain output (one expiry unless you repeat **`-e` / `--expiration`**). Add `--question` to let the AI fetch and interpret the relevant options and market data.
 
 ```bash
 # Run deterministic options analysis for AAPL (default expiration/side)
@@ -326,12 +329,15 @@ copinance analyze options AAPL --expiration 2026-06-19 --side put --timeframe sh
 
 # Question-driven analysis: AI uses options and market tools to answer the question
 copinance analyze options AAPL --question "What does skew say about sentiment?" --expiration 2026-06-19
+
+# Multiple expiries in one run (repeat the flag; merged, deduplicated)
+copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
+copinance analyze options SPY --question "Compare term structure" -e 2026-06-20 -e 2026-12-19
 ```
 
 **Options:**
 - **`--json`** / **`--stream`** (group, before `options`): same as equity group.
-- `--expiration <date>`: Optional expiration date (YYYY-MM-DD)
-- `--side <side>`: `call`, `put`, or `all`
+- `-e` / `--expiration <date>`: Optional expiration in `YYYY-MM-DD`. **Repeat** the flag to pass **multiple** dates (library: `expiration_dates` on `AnalyzeInstrumentRequest`). Omit for the provider default expiry.
 - `--timeframe <timeframe>`: `short_term`, `mid_term`, or `long_term`
 - `--question` / `-q`: Optional natural-language question
 - `--mode <mode>`: `auto`, `deterministic`, or `question_driven`
@@ -428,7 +434,7 @@ copinance cache refresh get_historical_market_data --arg symbol=AAPL --arg start
 ```
 
 **Options:**
-- `--arg key=value`: Cache parameter (repeat for multiple). Must match the tool’s cache key (e.g. `symbol`, `underlying_symbol`, `expiration_date`).
+- `--arg key=value`: Cache parameter (repeat for multiple). Must match the tool’s cache key (e.g. `symbol`, `underlying_symbol`, `expiration_date`). For **`get_options_chain`**, a multi-expiry agent call stores **`expiration_dates`** (list) in the key—refresh with the same argument shape the tool used.
 
 ### Cache Information
 

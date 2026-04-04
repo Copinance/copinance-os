@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from copinance_os.data.loaders.persistence import get_cache_dir
+from copinance_os.domain.models.analysis import merge_instrument_expiration_inputs
 from copinance_os.domain.models.market import OptionsChain, OptionSide
 from copinance_os.infra.config import get_storage_path_safe
 from copinance_os.interfaces.cli.shared.container_access import get_container
@@ -314,11 +315,14 @@ async def get_market_history(
 async def get_options_chain(
     ctx: typer.Context,
     underlying_symbol: str = typer.Argument(..., help="Underlying symbol (e.g. AAPL, SPY)"),
-    expiration_date: str | None = typer.Option(
+    expiration: list[str] | None = typer.Option(
         None,
         "--expiration",
         "-e",
-        help="Expiration in YYYY-MM-DD (default: earliest listed expiry on or after today)",
+        help=(
+            "Expiration in YYYY-MM-DD (default when omitted: earliest listed expiry on or after today). "
+            "Repeat the flag for multiple expiries."
+        ),
     ),
     option_side: OptionSide = typer.Option(
         OptionSide.ALL,
@@ -353,28 +357,47 @@ async def get_options_chain(
     Greek columns are shown by default; values appear as '-' when not computed. Cached
     chains saved before Greek support may omit them until you pass ``--no-cache``.
 
+    Repeat ``-e`` / ``--expiration`` for multiple listed expiries (separate table per expiry;
+    ``--json`` uses a ``multi_expiration`` envelope when more than one date is requested).
+
     Uses the same cache as question-driven analysis for identical underlying/expiration keys.
     """
     console = Console()
     symbol_upper = underlying_symbol.upper()
+    try:
+        merged_exps = merge_instrument_expiration_inputs(None, expiration)
+    except ValueError as e:
+        handle_cli_error(
+            e,
+            context={"underlying_symbol": underlying_symbol, "feature": "options"},
+        )
+        return
+
+    if not merged_exps:
+        expiries: list[str | None] = [None]
+    elif len(merged_exps) == 1:
+        expiries = [merged_exps[0]]
+    else:
+        expiries = list(merged_exps)
+
     cache_manager = get_container().cache_manager()
-    options_data: OptionsChain | dict[str, Any] | None = None
+    use_case = get_container().get_options_chain_use_case()
 
-    if not no_cache:
-        try:
-            entry = await cache_manager.get(
-                "get_options_chain",
-                underlying_symbol=symbol_upper,
-                expiration_date=expiration_date,
-            )
-            if entry and entry.data:
-                options_data = dict(entry.data)
-        except Exception:
-            pass
+    async def fetch_chain(expiration_date: str | None) -> OptionsChain | dict[str, Any]:
+        options_data: OptionsChain | dict[str, Any] | None = None
+        if not no_cache:
+            try:
+                entry = await cache_manager.get(
+                    "get_options_chain",
+                    underlying_symbol=symbol_upper,
+                    expiration_date=expiration_date,
+                )
+                if entry and entry.data:
+                    options_data = dict(entry.data)
+            except Exception:
+                pass
 
-    if options_data is None:
-        try:
-            use_case = get_container().get_options_chain_use_case()
+        if options_data is None:
             response = await use_case.execute(
                 GetOptionsChainRequest(
                     underlying_symbol=symbol_upper,
@@ -382,117 +405,154 @@ async def get_options_chain(
                 )
             )
             options_data = response.chain
+            chain = options_data
+            if not no_cache and isinstance(chain, OptionsChain):
+                try:
+                    payload = chain.model_dump(mode="json")
+                    await cache_manager.set(
+                        "get_options_chain",
+                        data=payload,
+                        metadata={
+                            "underlying_symbol": symbol_upper,
+                            "expiration_date": expiration_date,
+                        },
+                        underlying_symbol=symbol_upper,
+                        expiration_date=expiration_date,
+                    )
+                except Exception:
+                    pass
+        return options_data
+
+    json_mode = bool(ctx.obj and ctx.obj.get("json_output"))
+    json_expiration_payloads: list[dict[str, Any]] = []
+    sym_common: str | None = None
+
+    for exp_idx, expiration_date in enumerate(expiries):
+        try:
+            options_data = await fetch_chain(expiration_date)
         except Exception as e:
             handle_cli_error(
                 e, context={"underlying_symbol": underlying_symbol, "feature": "options"}
             )
             return
 
-        chain = options_data
-        if not no_cache and isinstance(chain, OptionsChain):
-            try:
-                payload = chain.model_dump(mode="json")
-                await cache_manager.set(
-                    "get_options_chain",
-                    data=payload,
-                    metadata={
-                        "underlying_symbol": symbol_upper,
-                        "expiration_date": expiration_date,
-                    },
-                    underlying_symbol=symbol_upper,
-                    expiration_date=expiration_date,
-                )
-            except Exception:
-                pass
+        underlying_price, exp_str, contracts = options_chain_to_display(option_side, options_data)
+        sym = (
+            options_data.underlying_symbol
+            if hasattr(options_data, "underlying_symbol")
+            else options_data.get("underlying_symbol", symbol_upper)
+        )
+        if sym_common is None:
+            sym_common = sym
 
-    underlying_price, exp_str, contracts = options_chain_to_display(option_side, options_data)
-    sym = (
-        options_data.underlying_symbol
-        if hasattr(options_data, "underlying_symbol")
-        else options_data.get("underlying_symbol", symbol_upper)
-    )
-
-    if ctx.obj and ctx.obj.get("json_output"):
         chain_payload: Any
         if hasattr(options_data, "model_dump"):
             chain_payload = options_data.model_dump(mode="json")
         else:
             chain_payload = dict(options_data) if isinstance(options_data, dict) else options_data
-        print_json_stdout(
-            {
-                "command": "options",
-                "underlying": sym,
-                "expiration_display": exp_str,
-                "underlying_price": underlying_price,
-                "option_side": option_side.value,
-                "contracts": contracts,
-                "chain": chain_payload,
-            }
-        )
-        return
 
-    console.print(
-        f"[bold]Options chain for {sym}[/bold] "
-        f"(expiration: {exp_str}, underlying: {underlying_price})"
-    )
-
-    if not contracts:
-        console.print("No contracts available", style="yellow")
-        return
-
-    show_greeks_columns = not no_greeks
-    any_greeks = any(c.get("delta") is not None for c in contracts)
-    if show_greeks_columns and not any_greeks:
-        console.print(
-            "[dim]Greeks: none on this snapshot (expired expiry vs today, missing spot/IV, "
-            "or QuantLib). Default expiry is the first listed date on or after today; "
-            "override with [bold]-e YYYY-MM-DD[/bold]. Refresh with [bold]--no-cache[/bold].[/dim]"
-        )
-
-    table = Table(title=f"{option_side.value.capitalize()} contracts")
-    table.add_column("Contract", style="cyan")
-    table.add_column("Side", style="magenta")
-    table.add_column("Strike", justify="right")
-    table.add_column("Last", justify="right")
-    table.add_column("IV", justify="right")
-    table.add_column("OI", justify="right")
-    table.add_column("Vol", justify="right")
-
-    if show_greeks_columns:
-        table.add_column("Delta", justify="right", style="dim")
-        table.add_column("Gamma", justify="right", style="dim")
-        table.add_column("Theta", justify="right", style="dim")
-        table.add_column("Vega", justify="right", style="dim")
-        table.add_column("Rho", justify="right", style="dim")
-
-    to_show = contracts[:limit] if limit else contracts
-    for c in to_show:
-        row_cells: list[str] = [
-            c["contract_symbol"],
-            c["side"],
-            str(c["strike"]),
-            str(c["last_price"]) if c.get("last_price") is not None else "-",
-            str(c["implied_volatility"]) if c.get("implied_volatility") is not None else "-",
-            str(c["open_interest"]) if c.get("open_interest") is not None else "-",
-            str(c["volume"]) if c.get("volume") is not None else "-",
-        ]
-        if show_greeks_columns:
-            row_cells.extend(
-                [
-                    fmt_optional_greek(c.get("delta")),
-                    fmt_optional_greek(c.get("gamma")),
-                    fmt_optional_greek(c.get("theta")),
-                    fmt_optional_greek(c.get("vega")),
-                    fmt_optional_greek(c.get("rho")),
-                ]
+        if json_mode:
+            json_expiration_payloads.append(
+                {
+                    "expiration_display": exp_str,
+                    "underlying_price": underlying_price,
+                    "contracts": contracts,
+                    "chain": chain_payload,
+                }
             )
-        table.add_row(*row_cells)
+            continue
 
-    console.print(table)
-    if limit and len(contracts) > limit:
+        if exp_idx > 0:
+            console.print()
+
         console.print(
-            f"[dim](showing {limit} of {len(contracts)} contracts; use --limit 0 to show all)[/dim]"
+            f"[bold]Options chain for {sym}[/bold] "
+            f"(expiration: {exp_str}, underlying: {underlying_price})"
         )
+
+        if not contracts:
+            console.print("No contracts available", style="yellow")
+            continue
+
+        show_greeks_columns = not no_greeks
+        any_greeks = any(c.get("delta") is not None for c in contracts)
+        if show_greeks_columns and not any_greeks:
+            console.print(
+                "[dim]Greeks: none on this snapshot (expired expiry vs today, missing spot/IV, "
+                "or QuantLib). Default expiry is the first listed date on or after today; "
+                "override with [bold]-e YYYY-MM-DD[/bold]. Refresh with [bold]--no-cache[/bold].[/dim]"
+            )
+
+        table = Table(title=f"{option_side.value.capitalize()} contracts")
+        table.add_column("Contract", style="cyan")
+        table.add_column("Side", style="magenta")
+        table.add_column("Strike", justify="right")
+        table.add_column("Last", justify="right")
+        table.add_column("IV", justify="right")
+        table.add_column("OI", justify="right")
+        table.add_column("Vol", justify="right")
+
+        if show_greeks_columns:
+            table.add_column("Delta", justify="right", style="dim")
+            table.add_column("Gamma", justify="right", style="dim")
+            table.add_column("Theta", justify="right", style="dim")
+            table.add_column("Vega", justify="right", style="dim")
+            table.add_column("Rho", justify="right", style="dim")
+
+        to_show = contracts[:limit] if limit else contracts
+        for c in to_show:
+            row_cells: list[str] = [
+                c["contract_symbol"],
+                c["side"],
+                str(c["strike"]),
+                str(c["last_price"]) if c.get("last_price") is not None else "-",
+                str(c["implied_volatility"]) if c.get("implied_volatility") is not None else "-",
+                str(c["open_interest"]) if c.get("open_interest") is not None else "-",
+                str(c["volume"]) if c.get("volume") is not None else "-",
+            ]
+            if show_greeks_columns:
+                row_cells.extend(
+                    [
+                        fmt_optional_greek(c.get("delta")),
+                        fmt_optional_greek(c.get("gamma")),
+                        fmt_optional_greek(c.get("theta")),
+                        fmt_optional_greek(c.get("vega")),
+                        fmt_optional_greek(c.get("rho")),
+                    ]
+                )
+            table.add_row(*row_cells)
+
+        console.print(table)
+        if limit and len(contracts) > limit:
+            console.print(
+                f"[dim](showing {limit} of {len(contracts)} contracts; use --limit 0 to show all)[/dim]"
+            )
+
+    if json_mode:
+        out_sym = sym_common or symbol_upper
+        if len(json_expiration_payloads) == 1:
+            one = json_expiration_payloads[0]
+            print_json_stdout(
+                {
+                    "command": "options",
+                    "underlying": out_sym,
+                    "expiration_display": one["expiration_display"],
+                    "underlying_price": one["underlying_price"],
+                    "option_side": option_side.value,
+                    "contracts": one["contracts"],
+                    "chain": one["chain"],
+                }
+            )
+        else:
+            print_json_stdout(
+                {
+                    "command": "options",
+                    "underlying": out_sym,
+                    "multi_expiration": True,
+                    "option_side": option_side.value,
+                    "expirations": json_expiration_payloads,
+                }
+            )
 
 
 @market_app.command("fundamentals")

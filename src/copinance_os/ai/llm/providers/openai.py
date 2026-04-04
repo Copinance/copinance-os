@@ -706,6 +706,13 @@ class OpenAIProvider(LLMProvider):
                     "Tool-calling loop ended before a natural-language answer "
                     "(output still looked like a tool call, or the loop stopped early)."
                 )
+            elif not (response_text or "").strip():
+                synthesis_status = "partial"
+                partial_reason = (
+                    "No final natural-language answer after tool calls (empty assistant text). "
+                    "The loop may have stopped after repeated identical tool calls, or the last "
+                    "model turn only requested tools."
+                )
 
         if synthesis_status == "partial" and partial_reason:
             text_out = build_partial_synthesis_message(

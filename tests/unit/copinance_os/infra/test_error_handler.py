@@ -11,8 +11,35 @@ from copinance_os.domain.exceptions import (
 )
 from copinance_os.infra.error_handler import (
     convert_to_domain_exception,
+    flatten_exception_message,
     handle_infrastructure_error,
 )
+
+
+@pytest.mark.unit
+class TestFlattenExceptionMessage:
+    """Test flatten_exception_message."""
+
+    def test_plain_exception_uses_str(self) -> None:
+        assert flatten_exception_message(ValueError("bad")) == "bad"
+
+    def test_empty_message_falls_back_to_type_name(self) -> None:
+        assert flatten_exception_message(Exception("")) == "Exception"
+
+    def test_exception_group_unwraps_leaf_messages(self) -> None:
+        inner = ValueError("Expiration 2099-01-01 is not available for AAPL")
+        eg: BaseExceptionGroup[Exception] = ExceptionGroup("multi-expiry fetch failed", (inner,))
+        assert flatten_exception_message(eg) == "Expiration 2099-01-01 is not available for AAPL"
+
+    def test_nested_exception_group_joins_with_pipe(self) -> None:
+        eg = ExceptionGroup(
+            "outer",
+            (
+                ExceptionGroup("inner", (ValueError("first"),)),
+                ExceptionGroup("inner2", (RuntimeError("second"),)),
+            ),
+        )
+        assert flatten_exception_message(eg) == "first | second"
 
 
 @pytest.mark.unit

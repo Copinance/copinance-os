@@ -35,3 +35,28 @@ def test_build_instrument_analysis_report_maps_payload() -> None:
 @pytest.mark.unit
 def test_build_instrument_analysis_report_non_instrument_returns_none() -> None:
     assert build_instrument_analysis_report({"execution_type": "macro_analysis"}) is None
+
+
+@pytest.mark.unit
+def test_build_instrument_analysis_report_multi_expiration() -> None:
+    payload = {
+        "execution_type": "instrument_analysis",
+        "execution_mode": "deterministic",
+        "multi_expiration": True,
+        "expiration_dates_requested": ["2026-06-19", "2026-07-17"],
+        "summary": {"text": "Combined", "timeframe": "short_term"},
+        "expirations": [
+            {
+                "expiration_date": "2026-06-19",
+                "analysis": {"metrics": {"underlying_price": "100"}},
+            },
+            {
+                "expiration_date": "2026-07-17",
+                "analysis": {"metrics": {"underlying_price": "101"}},
+            },
+        ],
+    }
+    report = build_instrument_analysis_report(payload)
+    assert report is not None
+    assert report.key_metrics.get("multi_expiration") is True
+    assert len(report.key_metrics.get("expirations") or []) == 2

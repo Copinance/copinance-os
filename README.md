@@ -145,6 +145,8 @@ copinance profile list
 # Deterministic analysis (no LLM key required)
 copinance analyze equity AAPL --timeframe mid_term
 copinance analyze options AAPL
+# Multiple option expiries in one run (repeat -e per date)
+copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 
 # Question-driven analysis
 copinance analyze equity AAPL --question "What are the key financial risks?"
@@ -187,12 +189,12 @@ Open a new terminal after running the above. Tab completes subcommands and flags
 |---------|-------------|
 | `copinance "…"` | Natural-language research question (question-driven; full tool suite) |
 | `copinance analyze equity <SYMBOL>` | Equity analysis — deterministic or question-driven with `--question` |
-| `copinance analyze options <SYMBOL>` | Options analysis with BSM Greeks via QuantLib |
+| `copinance analyze options <SYMBOL>` | Options analysis with BSM Greeks via QuantLib; repeat `-e` / `--expiration` for multiple expiries |
 | `copinance analyze macro` | Macro + market regime dashboard |
 | `copinance market search "…"` | Search instruments by name or symbol |
 | `copinance market quote <SYMBOL>` | Current quote |
 | `copinance market history <SYMBOL>` | Historical OHLCV |
-| `copinance market options <SYMBOL>` | Options chain snapshot with Greeks |
+| `copinance market options <SYMBOL>` | Options chain snapshot with Greeks; repeat `-e` for multiple expiries |
 | `copinance market fundamentals <SYMBOL>` | Financial statements and ratios |
 | `copinance profile create` | Create an analysis profile (sets literacy level) |
 | `copinance cache info` / `clear` | Cache management |

@@ -10,6 +10,7 @@ from copinance_os.domain.models.analysis import (
     AnalyzeMarketRequest,
     execution_type_from_scope_and_mode,
     get_default_instrument_timeframe,
+    merge_instrument_expiration_inputs,
     resolve_analyze_mode,
 )
 from copinance_os.domain.models.job import Job, JobScope, RunJobResult
@@ -38,10 +39,15 @@ class DefaultAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
             profile_id=request.profile_id,
             error_message=None,
         )
+        merged_expirations = merge_instrument_expiration_inputs(
+            request.expiration_date,
+            request.expiration_dates,
+        )
         context: dict[str, Any] = {
             "question": request.question,
             "market_type": request.market_type.value,
-            "expiration_date": request.expiration_date,
+            "expiration_date": merged_expirations[0] if len(merged_expirations) == 1 else None,
+            "expiration_dates": merged_expirations,
             "option_side": request.option_side.value,
             "include_prompt": request.include_prompt_in_results,
             "stream": request.stream,

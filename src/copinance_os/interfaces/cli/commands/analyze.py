@@ -98,6 +98,7 @@ async def analyze_equity(
         question=question,
         mode=mode,
         expiration_date=None,
+        expiration_dates=None,
         option_side=OptionSide.ALL,
         profile_id=final_profile_id,
         include_prompt_in_results=include_prompt_in_results,
@@ -131,10 +132,11 @@ async def analyze_equity(
 async def analyze_options(
     ctx: typer.Context,
     underlying_symbol: str = typer.Argument(..., help="Underlying symbol"),
-    expiration_date: str | None = typer.Option(
+    expiration: list[str] | None = typer.Option(
         None,
         "--expiration",
-        help="Optional expiration date in YYYY-MM-DD format",
+        "-e",
+        help="Optional expiration date(s) in YYYY-MM-DD format; repeat the flag for multiple dates",
     ),
     option_side: OptionSide = typer.Option(
         OptionSide.ALL,
@@ -168,7 +170,14 @@ async def analyze_options(
         help="Bypass data/tool cache reads and writes for this run",
     ),
 ) -> None:
-    """Analyze options with deterministic or question-driven execution."""
+    """Analyze options with deterministic or question-driven execution.
+
+    Expirations: omit ``--expiration`` / ``-e`` to use the provider default expiry. Pass
+    ``-e YYYY-MM-DD`` once per expiry to analyze multiple dates in one run (merged with
+    ``expiration_dates`` in the library API). Deterministic multi-expiry results include
+    ``multi_expiration`` and per-expiry blocks; question-driven runs pass all expiries in
+    context for the agent.
+    """
     console = Console()
     final_profile_id = await ensure_profile_with_literacy(profile_id)
     use_case: AnalyzeInstrumentUseCase = get_container().analyze_instrument_use_case()
@@ -180,7 +189,8 @@ async def analyze_options(
         timeframe=timeframe,
         question=question,
         mode=mode,
-        expiration_date=expiration_date,
+        expiration_date=None,
+        expiration_dates=expiration,
         option_side=option_side,
         profile_id=final_profile_id,
         include_prompt_in_results=include_prompt_in_results,
@@ -208,7 +218,7 @@ async def analyze_options(
             context={
                 "instrument_symbol": underlying_symbol,
                 "market_type": MarketType.OPTIONS.value,
-                "expiration_date": expiration_date,
+                "expiration_dates": expiration,
             },
         )
 

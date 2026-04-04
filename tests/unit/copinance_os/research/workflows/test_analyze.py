@@ -87,6 +87,7 @@ class TestDefaultAnalyzeInstrumentRunner:
                 question="Is skew bearish?",
                 mode=AnalyzeMode.AUTO,
                 expiration_date="2026-06-19",
+                expiration_dates=None,
                 option_side=OptionSide.CALL,
             )
         )
@@ -100,6 +101,7 @@ class TestDefaultAnalyzeInstrumentRunner:
         assert job.timeframe == JobTimeframe.SHORT_TERM
         assert context["question"] == "Is skew bearish?"
         assert context["expiration_date"] == "2026-06-19"
+        assert context["expiration_dates"] == ["2026-06-19"]
         assert context["option_side"] == "call"
         assert context["stream"] is False
 

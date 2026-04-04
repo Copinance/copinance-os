@@ -177,3 +177,66 @@ class TestInstrumentAnalysisExecutor:
         assert isinstance(options_request, GetOptionsChainRequest)
         quote_request = mock_quote_use_case.execute.call_args[0][0]
         assert isinstance(quote_request, GetQuoteRequest)
+
+    @pytest.mark.asyncio
+    async def test_execute_options_analysis_multiple_expirations(self) -> None:
+        mock_quote_use_case = AsyncMock(spec=GetQuoteUseCase)
+        mock_quote_use_case.execute = AsyncMock(
+            return_value=GetQuoteResponse(
+                quote={"symbol": "AAPL", "current_price": "180"},
+                symbol="AAPL",
+            )
+        )
+
+        async def fake_options(req: GetOptionsChainRequest) -> GetOptionsChainResponse:
+            exp = (
+                date.fromisoformat(req.expiration_date)
+                if req.expiration_date
+                else date(2026, 6, 19)
+            )
+            return GetOptionsChainResponse(
+                chain=OptionsChain(
+                    underlying_symbol="AAPL",
+                    expiration_date=exp,
+                    available_expirations=[exp],
+                    underlying_price=Decimal("180"),
+                    calls=[
+                        OptionContract(
+                            underlying_symbol="AAPL",
+                            contract_symbol="AAPLC",
+                            side=OptionSide.CALL,
+                            strike=Decimal("180"),
+                            expiration_date=exp,
+                            last_price=Decimal("5"),
+                            open_interest=10,
+                            volume=5,
+                            implied_volatility=Decimal("0.2"),
+                        )
+                    ],
+                    puts=[],
+                ),
+                underlying_symbol="AAPL",
+            )
+
+        mock_options_use_case = AsyncMock(spec=GetOptionsChainUseCase)
+        mock_options_use_case.execute = AsyncMock(side_effect=fake_options)
+
+        executor = InstrumentAnalysisExecutor(
+            get_quote_use_case=mock_quote_use_case,
+            get_options_chain_use_case=mock_options_use_case,
+        )
+        job = Job(
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.OPTIONS,
+            instrument_symbol="AAPL",
+            timeframe=JobTimeframe.SHORT_TERM,
+            execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
+        )
+
+        results = await executor.execute(
+            job,
+            {"option_side": "call", "expiration_dates": ["2026-06-19", "2026-07-17"]},
+        )
+        assert results.get("multi_expiration") is True
+        assert len(results.get("expirations") or []) == 2
+        assert mock_options_use_case.execute.await_count == 2

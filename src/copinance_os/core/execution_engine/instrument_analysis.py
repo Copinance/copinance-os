@@ -1,5 +1,6 @@
 """Deterministic instrument analysis executor."""
 
+import asyncio
 import contextlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -30,6 +31,7 @@ from copinance_os.domain.models.market_requests import (
     GetQuoteResponse,
 )
 from copinance_os.domain.ports.use_cases import UseCase
+from copinance_os.infra.error_handler import flatten_exception_message
 
 logger = structlog.get_logger(__name__)
 
@@ -106,21 +108,26 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             ),
         }
 
-    async def _execute_options_analysis(
+    def _options_expiration_dates_from_context(self, context: dict[str, Any]) -> list[str | None]:
+        """Return ordered expirations to fetch: ``None`` means provider default (single slice)."""
+        raw = context.get("expiration_dates")
+        if isinstance(raw, list) and raw:
+            return [str(x) for x in raw]
+        legacy = context.get("expiration_date")
+        if legacy:
+            return [str(legacy)]
+        return [None]
+
+    async def _get_options_chain(
         self,
         symbol: str,
-        timeframe: JobTimeframe,
-        context: dict[str, Any],
+        expiration_date: str | None,
+        *,
         use_cache: bool,
-    ) -> dict[str, Any]:
+    ) -> OptionsChain:
         if not self._get_options_chain_use_case:
             raise ValueError("GetOptionsChainUseCase not available for options analysis")
 
-        expiration_date = context.get("expiration_date")
-        requested_side = context.get("option_side", OptionSide.ALL.value)
-        side = OptionSide(requested_side)
-
-        quote = await self._get_market_quote(symbol, use_cache=use_cache)
         options_chain: OptionsChain | None = None
         if self._cache_manager and use_cache:
             try:
@@ -163,7 +170,16 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                         underlying_symbol=symbol,
                         expiration_date=expiration_date,
                     )
+        return options_chain
 
+    def _build_options_slice_payload(
+        self,
+        symbol: str,
+        timeframe: JobTimeframe,
+        side: OptionSide,
+        quote: dict[str, Any],
+        options_chain: OptionsChain,
+    ) -> dict[str, Any]:
         if side == OptionSide.CALL:
             selected_contracts = options_chain.calls
         elif side == OptionSide.PUT:
@@ -251,30 +267,93 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             for contract in selected_contracts[:10]
         ]
 
+        options_chain_payload = {
+            "underlying_symbol": options_chain.underlying_symbol,
+            "expiration_date": options_chain.expiration_date.isoformat(),
+            "available_expirations": [
+                expiration.isoformat() for expiration in options_chain.available_expirations
+            ],
+            "underlying_price": (
+                str(options_chain.underlying_price)
+                if options_chain.underlying_price is not None
+                else None
+            ),
+            "currency": options_chain.currency,
+            "calls_count": len(options_chain.calls),
+            "puts_count": len(options_chain.puts),
+            "contracts_preview": contracts_preview,
+            "metadata": options_chain.metadata,
+        }
+        return {
+            "options_chain": options_chain_payload,
+            "analysis": analysis,
+            "summary": self._generate_options_summary(symbol, analysis),
+        }
+
+    async def _execute_options_analysis(
+        self,
+        symbol: str,
+        timeframe: JobTimeframe,
+        context: dict[str, Any],
+        use_cache: bool,
+    ) -> dict[str, Any]:
+        requested_side = context.get("option_side", OptionSide.ALL.value)
+        side = OptionSide(requested_side)
+        expirations_to_fetch = self._options_expiration_dates_from_context(context)
+
+        quote = await self._get_market_quote(symbol, use_cache=use_cache)
+
+        if len(expirations_to_fetch) == 1:
+            options_chain = await self._get_options_chain(
+                symbol, expirations_to_fetch[0], use_cache=use_cache
+            )
+            payload = self._build_options_slice_payload(
+                symbol, timeframe, side, quote, options_chain
+            )
+            return {
+                "execution_type": "instrument_analysis",
+                "execution_mode": "deterministic",
+                "market_type": MarketType.OPTIONS.value,
+                "current_quote": quote,
+                "options_chain": payload["options_chain"],
+                "analysis": payload["analysis"],
+                "summary": payload["summary"],
+            }
+
+        async def _one(exp: str | None) -> dict[str, Any]:
+            chain = await self._get_options_chain(symbol, exp, use_cache=use_cache)
+            return self._build_options_slice_payload(symbol, timeframe, side, quote, chain)
+
+        try:
+            async with asyncio.TaskGroup() as tg:
+                tasks = [tg.create_task(_one(exp)) for exp in expirations_to_fetch]
+            slices = [t.result() for t in tasks]
+        except BaseExceptionGroup as e:
+            raise RuntimeError(flatten_exception_message(e)) from e
+
+        summary_text = "\n\n".join(s["summary"]["text"] for s in slices)
+        combined_summary = {
+            "text": summary_text,
+            "timeframe": timeframe.value,
+            "analysis_date": datetime.now(UTC).isoformat(),
+        }
         return {
             "execution_type": "instrument_analysis",
             "execution_mode": "deterministic",
             "market_type": MarketType.OPTIONS.value,
+            "multi_expiration": True,
+            "expiration_dates_requested": [s["analysis"]["expiration_date"] for s in slices],
             "current_quote": quote,
-            "options_chain": {
-                "underlying_symbol": options_chain.underlying_symbol,
-                "expiration_date": options_chain.expiration_date.isoformat(),
-                "available_expirations": [
-                    expiration.isoformat() for expiration in options_chain.available_expirations
-                ],
-                "underlying_price": (
-                    str(options_chain.underlying_price)
-                    if options_chain.underlying_price is not None
-                    else None
-                ),
-                "currency": options_chain.currency,
-                "calls_count": len(options_chain.calls),
-                "puts_count": len(options_chain.puts),
-                "contracts_preview": contracts_preview,
-                "metadata": options_chain.metadata,
-            },
-            "analysis": analysis,
-            "summary": self._generate_options_summary(symbol, analysis),
+            "expirations": [
+                {
+                    "expiration_date": s["analysis"]["expiration_date"],
+                    "options_chain": s["options_chain"],
+                    "analysis": s["analysis"],
+                    "summary": s["summary"],
+                }
+                for s in slices
+            ],
+            "summary": combined_summary,
         }
 
     async def _get_instrument_info(self, symbol: str) -> dict[str, Any]:

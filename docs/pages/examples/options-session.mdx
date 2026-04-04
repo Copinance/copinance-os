@@ -11,6 +11,9 @@ copinance market options AAPL
 # Specific expiry, calls only
 copinance market options AAPL -e 2026-06-19 -s call
 
+# Two expiries (repeat -e); separate tables; --json returns multi_expiration payload
+copinance market options AAPL -e 2026-06-19 -e 2026-09-18
+
 # All sides, limit visible rows
 copinance market options AAPL --side all --limit 30
 
@@ -44,9 +47,12 @@ copinance analyze options AAPL
 
 # With a specific expiry
 copinance analyze options AAPL --expiration 2026-06-19
+
+# Multiple expiries (repeat -e / --expiration); deterministic JSON includes per-expiry blocks
+copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 ```
 
-Deterministic analysis saves a structured report to `.copinance/results/v2/` and prints a Rich panel. No LLM required.
+Deterministic analysis saves a structured report to `.copinance/results/v2/` and prints a Rich panel (one analysis panel per expiry when multiple). No LLM required.
 
 ## 4. Ask positioning questions
 
@@ -121,6 +127,7 @@ async def options_analysis():
         execution_type="deterministic_instrument_analysis",
     )
     result = await orchestrator.run_job(job, {})
+    # Multi-expiry: use context e.g. {"expiration_dates": ["2026-06-19", "2026-09-18"], "option_side": "all"}
     if result.success and result.report:
         print(result.report.key_metrics)
 

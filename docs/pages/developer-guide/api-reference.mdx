@@ -18,6 +18,8 @@ search_instruments(query, limit) -> list[dict[str, Any]]
 get_options_chain(underlying_symbol, expiration_date=None) -> OptionsChain
 ```
 
+Each call returns one **`OptionsChain`** for a single selected expiry (or the provider default when `expiration_date` is omitted). The LLM-facing **`get_options_chain`** tool in [Market data tools](../analysis-reference/market-data-tools#get_options_chain) can pass **`expiration_dates`** and performs multiple provider calls when needed.
+
 The default container exposes a composed `MarketDataProvider` (`OptionAnalyticsMarketDataProvider`) that fetches chains and then runs BSM Greek estimation. Vendor-only adapters live under `copinance_os.data.providers`.
 
 ### `FundamentalDataProvider`

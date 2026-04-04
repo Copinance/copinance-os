@@ -260,7 +260,14 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
 
             if market_type == MarketType.OPTIONS:
                 option_context_parts = []
-                if context.get("expiration_date"):
+                exp_list = context.get("expiration_dates")
+                if isinstance(exp_list, list) and len(exp_list) > 1:
+                    option_context_parts.append(
+                        f"expirations {', '.join(str(x) for x in exp_list)}"
+                    )
+                elif isinstance(exp_list, list) and len(exp_list) == 1:
+                    option_context_parts.append(f"expiration {exp_list[0]}")
+                elif context.get("expiration_date"):
                     option_context_parts.append(f"expiration {context['expiration_date']}")
                 if context.get("option_side") and context["option_side"] != "all":
                     option_context_parts.append(f"side {context['option_side']}")
@@ -580,6 +587,17 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             if example_args:
                 tool_examples.append(
                     f'  {{"tool": "{schema.name}", "args": {json.dumps(example_args)}}}'
+                )
+            if schema.name == "get_options_chain":
+                multi_exp_args = {
+                    "underlying_symbol": symbol,
+                    "expiration_dates": [
+                        end_date_example,
+                        (today + timedelta(days=45)).isoformat(),
+                    ],
+                }
+                tool_examples.append(
+                    f'  {{"tool": "get_options_chain", "args": {json.dumps(multi_exp_args)}}}'
                 )
 
         sec_routing = ""
