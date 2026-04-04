@@ -4,9 +4,13 @@
 
 **Financial research is not a privilege. It is a right.**
 
-**Technology should meet people where they are —not demand they adapt to it.**
+**Technology should meet people where they are — not demand they adapt to it.**
 
 **Technology should not intimidate. It should empower.**
+
+**AI should explain, not originate. Every number must trace to real data.**
+
+**Uncertainty should be named, not hidden. Methodology, confidence, and limitations are not fine print — they are the analysis.**
 
 ---
 
@@ -20,7 +24,7 @@ They have capital.
 
 They have motivation.
 
-What they don’t have is clarity, confidence, and support.
+What they don't have is clarity, confidence, and support.
 
 > "I want to invest, but I don't know how, and I'm afraid of getting it wrong."
 
@@ -35,18 +39,18 @@ This is not laziness.
 They open Reddit. They watch YouTube. They scroll TikTok.
 The advice conflicts. The jargon piles up. The fear grows.
 
-They ask a simple question — “Where do I even begin?” —
+They ask a simple question — "Where do I even begin?" —
 and receive a thousand incompatible answers.
 
 > Gen Z and Millennials, the dominant generational group, will be making the primary investment decisions in the upcoming 30 years.
 
 Yet today, they are frozen by uncertainty.
 
-### The Numbers Don’t Lie, The System Does
+### The Numbers Don't Lie, The System Does
 
 Retail investing is projected to approach $100 trillion by 2030 [[1]](#references).
 
-But the real story isn’t growth — it’s exclusion.
+But the real story isn't growth — it's exclusion.
 
 70% of willing investors are under-participating [[1]](#references).
 
@@ -74,12 +78,14 @@ And it has consequences: reduced liquidity, capital concentration, delayed wealt
 
 **This is a participation crisis hiding in plain sight.**
 
+The cause isn't one thing. It's five.
+
 ### The Five Blockers
 
 1. **Time Poverty** — Multiple jobs, side hustles, daily responsibilities [[8]](#references)
 2. **Fear of Loss** — 40% cite fear of losing money as their primary reason for staying out [[8]](#references)
 3. **Low Financial Literacy** — Fewer than 42% understand basic concepts [[7]](#references)
-4. **Decision Fatigue** — YouTube, Reddit, TikTok, Instagram—conflicting advice creates paralysis
+4. **Decision Fatigue** — YouTube, Reddit, TikTok, Instagram — conflicting advice creates paralysis
 5. **Lack of Behavioral Support** — No tools guiding them through volatile markets
 
 The greatest barrier is not technical.
@@ -92,20 +98,20 @@ The greatest barrier is not technical.
 
 The World Economic Forum has been explicit to fintech and tech companies [[1]](#references).
 
-> **"Design younger investor-focused wealth management platforms…"**
+> **Design younger investor-focused wealth management platforms…**
 
-> **"Create affordable and scalable financial advice solutions that meet the needs of new retail investors, ensuring that women, younger individuals and those from emerging markets can access quality guidance…"**
+> **Create affordable and scalable financial advice solutions that meet the needs of new retail investors, ensuring that women, younger individuals and those from emerging markets can access quality guidance…**
 
-> **"Build intuitive and holistic wealth platforms that provide retail investors with a comprehensive view of their portfolio, enabling them to make more informed decisions and track their progress over time…"**
+> **Build intuitive and holistic wealth platforms that provide retail investors with a comprehensive view of their portfolio, enabling them to make more informed decisions and track their progress over time…**
 
-> **"Offer unbiased, contextual guidance through just-in-time nudges during key 'teachable moments' and in-platform education tools aimed at optimizing individual behaviours along investment life cycles…"**
+> **Offer unbiased, contextual guidance through just-in-time nudges during key 'teachable moments' and in-platform education tools aimed at optimizing individual behaviours along investment life cycles…**
 
-> **"Use retail investors' behavioural data to create adaptive wealth management platforms that evolve based on user preferences, habits and needs…"**
+> **Use retail investors' behavioural data to create adaptive wealth management platforms that evolve based on user preferences, habits and needs…**
 
 This is not optional.
 It is a mandate.
 
-Copinance OS exists to enable this vision.
+Copinance OS exists to answer that call.
 
 ---
 
@@ -117,6 +123,8 @@ Not another expensive terminal.
 Not another proprietary black box.
 Not another course abandoned halfway through.
 
+**Copinance OS is the engine. Copinance — the platform — is one application built on top of it.** When I say "what I'm building," I mean the infrastructure that makes both possible: a research framework that any developer, researcher, or builder can run, extend, and shape into whatever form their users need.
+
 **Copinance OS is designed to be an infrastructure.**
 
 Infrastructure for:
@@ -125,14 +133,16 @@ Infrastructure for:
 * confidence over fear
 * understanding over jargon
 
-It is built to enable and try many applications, not dictate one.
+It is built to enable many applications, not dictate one.
 
 ### Systems That Speak at Your Level
 
-A beginner asks: “What is a P/E ratio?”
-A quant asks: “What’s the Sharpe-adjusted downside risk?”
+A beginner asks: "What is a P/E ratio?"
+A quant asks: "What's the Sharpe-adjusted downside risk?"
 
 **Both deserve first-class answers.**
+
+Copinance OS has three explicit literacy levels — beginner, intermediate, and advanced — and adapts every output accordingly. Not a dumbed-down mode and a real mode. Three genuine tiers, same underlying analysis, different depth of explanation.
 
 Copinance OS aims to adapt:
 
@@ -141,24 +151,21 @@ Copinance OS aims to adapt:
 * explanation
 * guidance
 
-Research shows AI-assisted investing tools reduce emotionally driven sell-offs by 27% in new users [[9]](#references).
+> Research shows AI-assisted investing tools reduce emotionally driven sell-offs by 27% in new users [[9]](#references).
 
 Structured, explainable support works.
 
 The future is not more content.
 It is less friction, better timing, and personalized guidance [[1]](#references).
 
-### What I'm Building
-
-- **Systems that speak at your level** — Adaptive language, depth, and guidance that reduces intimidation, confusion, and decision fatigue
-- **Literacy-aware intelligence** that explains when you need explanations and gets technical when you want depth
+- **Literacy-aware intelligence** that explains when clarity helps and deepens when you want it
 - **Human + AI partnership** that reduces emotional decision-making while preserving your judgment
 - **Framework flexibility** that works whether you're building an app, doing research, or learning to invest
 - **Open source research tools** (Apache-2.0) that anyone can see, audit, and improve
 
 ---
 
-### Why I'm Building This
+## Why I'm Building This
 
 The ecosystem is rich:
 
@@ -173,63 +180,64 @@ These tools are powerful.
 
 They also assume one thing:
 
-**You already know what you’re doing.**
+**You already know what you're doing.**
 
 They serve the confident 30%.
 
 **Copinance OS is built for the other 70%.**
 
-It does not replace these tools.
-It unlocks them.
+It does not replace these tools. It unlocks them.
 
 **I'm not competing with these projects. I'm complementing them.**
 
 ---
 
-### How I'm Building
+## How I'm Building
 
-### 1. Open Source by Design
+#### 1. Open Source by Design
 No black boxes. No vendor lock-in. Just code, community, and collaboration.
 
-### 2. Literacy-Aware Intelligence
+But for financial tools specifically, open source means something more: **trust requires auditability**. You should be able to read exactly how a ratio is computed, how a market regime is detected, how a prompt is constructed before it reaches an LLM. Closed financial tools ask you to trust them. Copinance OS shows you everything. That is a different kind of trust — and a stronger one.
+
+#### 2. Literacy-Aware Intelligence
 **Systems that speak at your level.** I meet you where you are, not where I think you should be.
 
-### 3. Framework, Not Application
+#### 3. Framework, Not Application
 **Copinance OS is designed to be the baseline for many cool applications built on top of it.** You control the UI, architecture, and experience. I provide the intelligence.
 
-### 4. Time-Agnostic Research
-Works across timeframes—day trading, swing trading, long-term investing.
+#### 4. Time-Agnostic Research
+Works across timeframes — day trading, swing trading, long-term investing.
 
-### 5. Human + AI Partnership
+#### 5. Human + AI Partnership
 Stock/macro analysis for consistency, agent (question-driven) analysis for adaptability.
 
-### 6. Data Democracy
+#### 6. Data Democracy
 Start with free data, scale as you grow. Your data, your control.
 
-### 7. Clean Architecture
+#### 7. Clean Architecture
 Built to last, evolve, and extend with 23+ extension interfaces.
 
-### 8. Quality Over Quantity
+#### 8. Quality Over Quantity
 Excellence in core capabilities, extensibility for everything else.
 
 ---
 
 ## What I'm NOT Building
 
-- **NOT a trading platform**: I help you research, not execute trades
-- **NOT a data provider**: I integrate with data providers; you choose your sources
-- **NOT a complete application**: I'm building a library/framework designed to be the baseline for many cool applications you can built on top of it
-- **NOT a get-rich-quick scheme**: Research takes work; I make it easier, not automatic
-- **NOT a proprietary black box**: Everything is open and transparent
+- **NOT a trading platform** — so your judgment stays central, not automated away
+- **NOT a data provider** — so you choose your sources and aren't locked into ours
+- **NOT a complete application** — so builders can shape the experience their users actually need
+- **NOT a get-rich-quick scheme** — so the work of understanding markets stays honest
+- **NOT a proprietary black box** — so you can always verify what the tool is doing and why
 
 ---
 
 ## My Commitment
 
 - **Stability**: Semantic versioning so you know what to expect
-- **Documentation**: Every feature fully explained
+- **Documentation**: Every feature fully explained — because clarity is the whole point
 - **Testing**: Comprehensive coverage so you can trust the code
-- **Support**: Active community and care for users
+- **Support**: An active community and genuine care for the people using this
 - **Longevity**: Built to last and evolve with you
 
 ---
@@ -240,7 +248,11 @@ Copinance OS exists so that anyone, anywhere, at any level, can conduct institut
 
 **This is infrastructure for financial knowledge democracy.**
 
-If you believe clarity is power —you’re already part of it.
+The capable many — the 70% who are willing, motivated, and excluded — deserve tools built by and for people like them.
+
+Read the code. Ask a question. Build something on top of it. Contribute a data provider, a tool, an idea.
+
+If you believe clarity is power — you're already part of this.
 
 ---
 
@@ -262,4 +274,4 @@ If you believe clarity is power —you’re already part of it.
 
 8. [Dorado. *Navigating Time Poverty in Investment Decision-Making*. 2024.](https://dorado.com.au/navigating-time-poverty-in-investment-decision-making/)
 
-9. [Behavioural Insights Team & Ontario Securities Commission. *AI and Retail Investing*. 2024.](https://www.osc.ca/en/investors/investor-research-and-reports/artificial-intelligence-and-retail-investing)
+9. [Behavioural Insights Team & Ontario Securities Commission. *AI and Retail Investing*. 2024.](https://www.osc.ca/en/investors/investor-research-and-retail-investing)
