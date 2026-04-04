@@ -74,6 +74,13 @@ Every event includes **`schema_version`** (integer, currently **1**) and **`kind
 - **`rollback`**: the model started answering but then issued tool calls; UI should **clear the provisional assistant bubble** for that turn and wait for the next deltas after tools return.
 - The **authoritative** assistant message for persistence is still the completed analysis text in **`RunJobResult.results`** (e.g. `analysis`, `conversation_turns` when present)—not a blind concat of deltas if you reset on rollback.
 
+### Compact timeline on success (`agent_progress_timeline`)
+
+For **question-driven** runs, successful **`RunJobResult.results`** may include **`agent_progress_timeline`**: a JSON array of the same logical events as SSE. Each row matches **`AgentProgressEvent`** `model_dump()` shape. Rows with **`kind: "llm_stream"`** and **`stream_kind: "text_delta"`** omit raw token text (empty **`text_delta`**) and set **`text_delta_chars`** so UIs can show streaming activity without storing huge strings.
+
+- **Opt out:** set **`include_agent_progress_timeline: false`** in **`run_job` context** to omit this key and avoid the small recording overhead.
+- **Use in gateways:** merge this array into your **`analysis_run_summary`** (or a dedicated SSE event) so the client can render a **phase timeline** and **tool list** even if it only consumes the final HTTP/SSE payload.
+
 ---
 
 ## 6. Correlation and logging
@@ -123,6 +130,7 @@ When you add **timelines, steppers, or tool badges** in the client:
 |------|----------|
 | Event union + `parse_agent_progress_event` | `copinance_os.domain.models.agent_progress` |
 | `ProgressSink` | `copinance_os.domain.ports.progress` |
+| `RecordingProgressSink` (timeline + optional forward) | `copinance_os.core.progress` |
 | Orchestration entry | `copinance_os.core.orchestrator.research_orchestrator.ResearchOrchestrator.run_job` |
 | Question-driven executor (emits phases + multiplexes stream) | `copinance_os.core.execution_engine.question_driven_analysis` |
 | Tool timing + summaries | `copinance_os.core.pipeline.tools.tool_executor` |

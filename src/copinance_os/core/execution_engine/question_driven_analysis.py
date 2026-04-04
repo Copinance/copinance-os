@@ -19,6 +19,7 @@ from copinance_os.core.execution_engine.llm_stream_stdout import stdout_llm_stre
 from copinance_os.core.pipeline.tools.context_tools import GetCurrentDateTool
 from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
 from copinance_os.core.progress.emit import maybe_emit_progress
+from copinance_os.core.progress.recording_sink import RecordingProgressSink
 from copinance_os.domain.models.agent_progress import (
     GatheringContextEvent,
     LlmStreamProgressEvent,
@@ -113,6 +114,9 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
                 - tool_calls: Tools that were used
                 - iterations: Number of LLM iterations
                 - conversation_turns: Full user/assistant transcript after success (for follow-up jobs)
+                - agent_progress_timeline: Optional compact list of progress event dicts (when
+                  ``include_agent_progress_timeline`` is true in context); text deltas omit token text
+                  and set ``text_delta_chars`` instead
         """
         is_market_wide = job.scope == JobScope.MARKET
         market_type = job.market_type or MarketType.EQUITY
@@ -134,13 +138,15 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
         results: dict[str, Any] = {}
         run_id = str(context.get("run_id") or uuid.uuid4())
         results["run_id"] = run_id
-        progress_sink: ProgressSink | None = context.get("progress_sink")
+        inner_sink: ProgressSink | None = context.get("progress_sink")
+        recording: RecordingProgressSink | None = None
+        progress_sink: ProgressSink | None = inner_sink
 
         async def emit_run_failed(message: str) -> None:
-            if progress_sink is None:
+            if inner_sink is None:
                 return
             await maybe_emit_progress(
-                progress_sink,
+                inner_sink,
                 RunFailedEvent(run_id=run_id, error_message=_truncate_run_message(message)),
             )
 
@@ -230,6 +236,10 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             logger.warning("Invalid conversation history", error=str(e))
             await emit_run_failed(results["message"])
             return results
+
+        if bool(context.get("include_agent_progress_timeline", True)):
+            recording = RecordingProgressSink(inner_sink)
+            progress_sink = recording
 
         conversation_history_digest = (
             json.dumps([t.model_dump() for t in prior_turns], ensure_ascii=False)
@@ -456,6 +466,9 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             iterations=results["iterations"],
             tools_used_count=len(results["tools_used"]),
         )
+
+        if recording is not None:
+            results["agent_progress_timeline"] = recording.timeline
 
         if progress_sink is not None:
             await maybe_emit_progress(
