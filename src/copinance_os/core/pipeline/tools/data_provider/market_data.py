@@ -2,14 +2,16 @@
 
 import asyncio
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 
 from copinance_os.core.pipeline.tools.data_provider.base import BaseDataProviderTool
+from copinance_os.data.analytics.options.positioning import build_options_positioning_dict
 from copinance_os.data.cache import CacheManager
 from copinance_os.domain.models.analysis import merge_instrument_expiration_inputs
 from copinance_os.domain.models.market import OptionSide
+from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import ToolSchema
@@ -389,3 +391,84 @@ class MarketDataGetOptionsChainTool(BaseDataProviderTool[MarketDataProvider]):
                 error=wrapped,
                 metadata={"underlying_symbol": kwargs.get("underlying_symbol")},
             )
+
+
+class MarketDataOptionsPositioningTool(BaseDataProviderTool[MarketDataProvider]):
+    """Aggregate options surface metrics (bias, gamma regime, IV skew, max pain, implied move, OI)."""
+
+    def __init__(
+        self,
+        provider: MarketDataProvider,
+        cache_manager: CacheManager | None = None,
+        use_cache: bool = True,
+    ) -> None:
+        super().__init__(provider, cache_manager=cache_manager, use_cache=use_cache)
+
+    def get_name(self) -> str:
+        return "get_options_positioning"
+
+    def get_description(self) -> str:
+        return (
+            "Compute aggregate options positioning metrics for an underlying: "
+            "bias, probabilities, IV metrics, gamma regime, max pain, implied move, OI clusters."
+        )
+
+    def get_schema(self) -> ToolSchema:
+        return self._build_schema(
+            name=self.get_name(),
+            description=self.get_description(),
+            parameters={
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "Underlying symbol (e.g. 'SPY')",
+                    },
+                    "window": {
+                        "type": "string",
+                        "description": "Horizon: near (1–2 weeks score) or mid (1–2 months damping)",
+                        "enum": ["near", "mid"],
+                        "default": "near",
+                    },
+                },
+                "required": ["symbol"],
+            },
+            returns={
+                "type": "object",
+                "description": "Validated options positioning payload (snake_case fields)",
+            },
+        )
+
+    async def execute(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
+        return await self._execute_with_cache(force_refresh=force_refresh, **kwargs)
+
+    async def _execute_impl(self, **kwargs: Any) -> ToolResult:
+        try:
+            validated = self.validate_parameters(**kwargs)
+            symbol = str(validated["symbol"]).strip().upper()
+            window_raw = validated.get("window", "near")
+            window: Literal["near", "mid"] = "mid" if str(window_raw).lower() == "mid" else "near"
+            quote = await self._provider.get_quote(symbol) or {}
+            chain = await self._provider.get_options_chain(
+                underlying_symbol=symbol,
+                expiration_date=None,
+            )
+            raw = build_options_positioning_dict(
+                chain,
+                list(chain.calls or []),
+                list(chain.puts or []),
+                quote,
+                symbol,
+                window,
+            )
+            model = OptionsPositioningResult.model_validate(raw)
+            return self._create_success_result(
+                data=model.model_dump(mode="json"),
+                metadata={"symbol": symbol, "window": window},
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to get options positioning",
+                error=str(e),
+                symbol=kwargs.get("symbol"),
+            )
+            return self._create_error_result(error=e, metadata={"symbol": kwargs.get("symbol")})

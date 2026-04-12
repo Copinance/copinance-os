@@ -6,6 +6,10 @@ from copinance_os.data.analytics.options.assumptions import (
     resolve_option_greek_assumptions,
 )
 from copinance_os.data.analytics.options.constants import DEFAULT_RISK_FREE_RATE
+from copinance_os.data.analytics.options.positioning import (
+    build_options_positioning_dict,
+    compute_options_positioning_context,
+)
 from copinance_os.data.analytics.options.quantlib_bsm_greeks import (
     QuantLibBsmGreekEstimator,
     compute_european_bsm_greeks,
@@ -20,4 +24,6 @@ __all__ = [
     "compute_european_bsm_greeks",
     "estimate_bsm_greeks_for_options_chain",
     "resolve_option_greek_assumptions",
+    "build_options_positioning_dict",
+    "compute_options_positioning_context",
 ]

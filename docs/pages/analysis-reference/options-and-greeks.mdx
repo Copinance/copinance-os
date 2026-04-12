@@ -2,6 +2,8 @@
 
 Option Greeks in Copinance OS are estimated with **European Black–Scholes–Merton** using QuantLib's `AnalyticEuropeanEngine` (`copinance_os.data.analytics.options`). Payoffs are European; American exercise or dividends beyond a continuous yield are not modeled.
 
+**Aggregate chain analytics** (dealer-style positioning summary: bias, IV rank/skew/term, flow scores, gamma regime, max pain, implied move, OI clusters) live in the same package: **`copinance_os.data.analytics.options.positioning`** (`build_options_positioning_dict`, `compute_options_positioning_context`). Domain types: **`copinance_os.domain.models.options_positioning`**. These paths are separate from per-row QuantLib Greeks but reuse normalized **`OptionContract`** fields (including **`greeks`** when present).
+
 ---
 
 ## Greek reference
@@ -107,7 +109,7 @@ The default DI container uses `QuantLibBsmGreekEstimator()` with `profile=None`,
 | Module | Role |
 |--------|------|
 | `copinance_os.data.providers.*` | Vendor adapters (yfinance fetches raw chain) |
-| `copinance_os.data.analytics.options` | QuantLib BSM Greek estimation |
+| `copinance_os.data.analytics.options` | QuantLib BSM Greek estimation **and** aggregate positioning (`positioning.py`, `contract_numeric.py`) |
 | `copinance_os.data.providers.market` | Composed `MarketDataProvider` (fetch + estimate in one call) |
 
 See [Architecture](../developer-guide/architecture) for layer rules.
@@ -117,6 +119,9 @@ See [Architecture](../developer-guide/architecture) for layer rules.
 ## See also
 
 - [CLI Reference — Options Chain Snapshot](../user-guide/cli#options-chain-snapshot)
+- [CLI Reference — Analyze aggregate options positioning](../user-guide/cli#analyze-aggregate-options-positioning)
+- [Market data tools — `get_options_positioning`](market-data-tools#get_options_positioning)
+- [Library — Options positioning context](../getting-started/library#options-positioning-context)
 - [Configuration](../getting-started/configuration#option-greek-estimation-bsm)
 - [Examples — Options Session](../examples/options-session)
 - [Analysis Modes — Options Analysis](../user-guide/analysis-modes#options-analysis)

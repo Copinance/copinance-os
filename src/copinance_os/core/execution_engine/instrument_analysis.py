@@ -3,11 +3,12 @@
 import asyncio
 import contextlib
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
+from copinance_os.data.analytics.options.positioning import build_options_positioning_dict
 from copinance_os.data.cache import CacheManager
 from copinance_os.data.schemas.market_data_conversions import (
     coerce_sorted_market_data_points,
@@ -30,10 +31,19 @@ from copinance_os.domain.models.market_requests import (
     GetQuoteRequest,
     GetQuoteResponse,
 )
+from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 from copinance_os.domain.ports.use_cases import UseCase
 from copinance_os.infra.error_handler import flatten_exception_message
 
 logger = structlog.get_logger(__name__)
+
+
+def _positioning_window_from_context(context: dict[str, Any]) -> Literal["near", "mid"]:
+    raw = context.get("positioning_window", "near")
+    s = str(raw).strip().lower()
+    if s == "mid":
+        return "mid"
+    return "near"
 
 
 class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
@@ -310,7 +320,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             payload = self._build_options_slice_payload(
                 symbol, timeframe, side, quote, options_chain
             )
-            return {
+            out: dict[str, Any] = {
                 "execution_type": "instrument_analysis",
                 "execution_mode": "deterministic",
                 "market_type": MarketType.OPTIONS.value,
@@ -319,6 +329,19 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 "analysis": payload["analysis"],
                 "summary": payload["summary"],
             }
+            pos_window = _positioning_window_from_context(context)
+            pos_raw = build_options_positioning_dict(
+                options_chain,
+                list(options_chain.calls or []),
+                list(options_chain.puts or []),
+                quote,
+                symbol,
+                pos_window,
+            )
+            out["positioning"] = OptionsPositioningResult.model_validate(pos_raw).model_dump(
+                mode="json"
+            )
+            return out
 
         async def _one(exp: str | None) -> dict[str, Any]:
             chain = await self._get_options_chain(symbol, exp, use_cache=use_cache)

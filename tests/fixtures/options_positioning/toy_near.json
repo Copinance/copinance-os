@@ -1,0 +1,180 @@
+{
+  "symbol": "SPY",
+  "window": "near",
+  "confidence": 0.523,
+  "market_bias": "bullish",
+  "bullish_probability": 0.523,
+  "bearish_probability": 0.2385,
+  "neutral_probability": 0.2385,
+  "key_levels": [
+    590.0,
+    600.0,
+    580.0
+  ],
+  "analyst_summary": "For SPY, the aggregate options surface leans bullish \u2014 more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 52% for the next 1-2 weeks horizon.",
+  "signals": [
+    {
+      "name": "Call Open Interest Share",
+      "value": 0.526,
+      "direction": "bullish",
+      "explanation": "A larger share of call OI points to aggregate upside interest in the chain \u2014 sometimes consistent with sizable call interest, but not exclusive to any one player."
+    },
+    {
+      "name": "Put/Call OI Ratio",
+      "value": 0.9,
+      "direction": "bullish",
+      "explanation": "Elevated put/call OI can indicate hedging pressure or defensive positioning."
+    },
+    {
+      "name": "Intraday Options Flow (Calls Share)",
+      "value": 0.526,
+      "direction": "neutral",
+      "explanation": "Call-heavy volume relative to puts may indicate bullish tactical flow."
+    },
+    {
+      "name": "Gamma Tilt",
+      "value": 0.088,
+      "direction": "bullish",
+      "explanation": "Positive gamma tilt can support stabilization and upside continuation."
+    }
+  ],
+  "signal_categories": {
+    "positioning": [
+      {
+        "name": "Call Open Interest Share",
+        "value": 0.526,
+        "direction": "bullish",
+        "explanation": "A larger share of call OI points to aggregate upside interest in the chain \u2014 sometimes consistent with sizable call interest, but not exclusive to any one player."
+      },
+      {
+        "name": "Put/Call OI Ratio",
+        "value": 0.9,
+        "direction": "bullish",
+        "explanation": "Elevated put/call OI can indicate hedging pressure or defensive positioning."
+      },
+      {
+        "name": "Intraday Options Flow (Calls Share)",
+        "value": 0.526,
+        "direction": "neutral",
+        "explanation": "Call-heavy volume relative to puts may indicate bullish tactical flow."
+      },
+      {
+        "name": "Gamma Tilt",
+        "value": 0.088,
+        "direction": "bullish",
+        "explanation": "Positive gamma tilt can support stabilization and upside continuation."
+      }
+    ],
+    "volatility": [
+      {
+        "name": "ATM Implied Volatility \u00b7 IV Rank",
+        "value": 18.0,
+        "direction": "bullish",
+        "explanation": "ATM IV is 18.00% (percentage points). Intra-chain IV rank 33% \u2014 how that ATM print ranks versus all implied volatilities in this snapshot."
+      },
+      {
+        "name": "25-Delta Skew",
+        "value": 1.0,
+        "direction": "neutral",
+        "explanation": "IV of the ~25-delta put minus the ~25-delta call (nearest expiry). Positive skew often reflects downside protection demand."
+      },
+      {
+        "name": "Term Structure",
+        "value": 0.0,
+        "direction": "neutral",
+        "explanation": "Need two expirations with ATM IV to infer term structure."
+      }
+    ],
+    "flow": [
+      {
+        "name": "Unusual Activity Score",
+        "value": 0.0,
+        "direction": "neutral",
+        "explanation": "Counts strikes where volume is elevated versus open interest (ratio > 2, volume > 500), scaled into a 0\u2013100-style intensity score."
+      },
+      {
+        "name": "Aggregate Volume / OI",
+        "value": 0.05,
+        "direction": "bearish",
+        "explanation": "Total options volume divided by total open interest \u2014 higher values can indicate more tactical trading versus stuck inventory."
+      }
+    ],
+    "gamma": [
+      {
+        "name": "Net Gamma Exposure",
+        "value": 5950000.0,
+        "direction": "bullish",
+        "explanation": "Sum of gamma \u00d7 OI \u00d7 100 \u00d7 spot for calls minus puts \u2014 a coarse dealer-gamma proxy."
+      },
+      {
+        "name": "Gamma Regime",
+        "value": 1.0,
+        "direction": "bullish",
+        "explanation": "Net gamma is positive \u2014 dealers are more likely to stabilize moves (fade extremes) if this positioning persists."
+      }
+    ],
+    "structure": [
+      {
+        "name": "Max Pain Strike",
+        "value": 590.0,
+        "direction": "neutral",
+        "explanation": "Strike that minimizes total intrinsic value paid to option holders at expiration (nearest expiry only) \u2014 a common magnet narrative, not a forecast."
+      },
+      {
+        "name": "Strike Magnets (OI)",
+        "value": 3.0,
+        "direction": "neutral",
+        "explanation": "Largest open-interest strikes in the nearest expiration \u2014 where inventory tends to cluster."
+      },
+      {
+        "name": "Implied Move (Straddle)",
+        "value": 0.3529,
+        "direction": "neutral",
+        "explanation": "ATM straddle mid / spot for the nearest expiration \u2014 a rough implied one-standard-deviation range proxy."
+      }
+    ]
+  },
+  "regime": "positive_gamma",
+  "regime_explanation": "Net gamma is positive \u2014 dealers are more likely to stabilize moves (fade extremes) if this positioning persists.",
+  "iv_metrics": {
+    "atm_iv": 18.0,
+    "skew_25_delta": 1.0,
+    "term_structure_slope": "flat",
+    "near_term_atm_iv": 18.0,
+    "far_term_atm_iv": 0.0
+  },
+  "max_pain": 590.0,
+  "implied_move": 0.3529,
+  "implied_move_absolute": 2.1,
+  "oi_clusters": [
+    {
+      "strike": 590.0,
+      "open_interest": 23000.0
+    },
+    {
+      "strike": 580.0,
+      "open_interest": 19000.0
+    },
+    {
+      "strike": 600.0,
+      "open_interest": 15000.0
+    }
+  ],
+  "scenarios": [
+    {
+      "label": "Bullish continuation",
+      "probability": 0.523,
+      "narrative": "Upside continuation if SPY holds above option-supported levels."
+    },
+    {
+      "label": "Bearish unwind",
+      "probability": 0.2385,
+      "narrative": "Downside pressure if hedging demand rises and calls unwind in SPY."
+    },
+    {
+      "label": "Range-bound",
+      "probability": 0.2385,
+      "narrative": "Mean-reverting regime likely if neither side gains flow dominance."
+    }
+  ]
+}

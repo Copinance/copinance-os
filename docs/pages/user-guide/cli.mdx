@@ -7,7 +7,7 @@ Complete guide to the Copinance OS CLI (`copinance_os.interfaces.cli`). The cons
 | Command | Description |
 |--------|-------------|
 | *(no subcommand)* | If the first argument is not a known subcommand, the rest is a **research question** (see [Natural language at the root](#natural-language-at-the-root)). |
-| `analyze` | Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. Group flags **`--json`** and **`--stream`** apply before the subcommand (`equity`, `options`, `macro`). |
+| `analyze` | Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. Group flags **`--json`** and **`--stream`** apply before the subcommand (`equity`, `options`, `positioning`, `macro`). |
 | `cache` | Cache management commands (clear, refresh, info). |
 | `market` | Market data: search, quote, history, options (BSM Greeks via QuantLib), fundamentals. |
 | `profile` | Analysis profile management commands. |
@@ -48,7 +48,7 @@ copinance --json --include-prompt "Summarize labor and inflation"
 
 Like **`analyze`**, root **`copinance "…"`** is **single-turn**: one natural-language question per invocation. **Multi-turn** conversation (prior Q&A in the same thread) is **library-only**—use **`AnalyzeMarketRequest`** with **`conversation_history`** in Python (same underlying path as this CLI entry); see [Library — Multi-turn question-driven analysis](../getting-started/library#multi-turn-question-driven-analysis).
 
-For symbol-scoped or instrument flows, use **`copinance analyze equity|options|macro`** instead.
+For symbol-scoped or instrument flows, use **`copinance analyze equity|options|positioning|macro`** instead.
 
 ## Machine-readable output (`--json`)
 
@@ -64,6 +64,7 @@ Use **`--json` on the command group** (before the subcommand) to print **JSON to
 
 ```bash
 copinance analyze --json equity AAPL --timeframe mid_term
+copinance analyze --json positioning SPY -w near
 copinance analyze --json macro --question "Risk-on or risk-off?"
 copinance --json "Summarize labor and inflation"
 copinance market --json quote AAPL
@@ -77,7 +78,7 @@ Rich human output and saving results under `.copinance/results/v2/` still apply 
 
 ## Streaming question-driven output (`--stream`)
 
-Use **`--stream` on the `analyze` group** (before `equity`, `options`, or `macro`) or **at the root** before a natural-language question to print **LLM tokens to stdout** as they are generated during question-driven tool loops. **`--json` turns streaming off.** After the run, Rich still prints the same **Analysis** panel (markdown) so you always have a readable block for copy-paste, plus run metadata and the saved file path. Library-oriented streaming options (`LLMConfig`, providers) are described in [Using as a Library — LLM text streaming](../getting-started/library#llm-text-streaming-library--llmprovider).
+Use **`--stream` on the `analyze` group** (before `equity`, `options`, or `macro`; not used for **`positioning`**, which is deterministic-only) or **at the root** before a natural-language question to print **LLM tokens to stdout** as they are generated during question-driven tool loops. **`--json` turns streaming off.** After the run, Rich still prints the same **Analysis** panel (markdown) so you always have a readable block for copy-paste, plus run metadata and the saved file path. Library-oriented streaming options (`LLMConfig`, providers) are described in [Using as a Library — LLM text streaming](../getting-started/library#llm-text-streaming-library--llmprovider).
 
 ```bash
 copinance analyze --stream equity AAPL --question "What is the beta?"
@@ -264,7 +265,7 @@ copinance profile delete <profile-id> --force
 
 ## Analyze Commands
 
-The `analyze` group accepts **`--json`** (see [Machine-readable output](#machine-readable-output---json)) and **`--stream`** (see [Streaming question-driven output](#streaming-question-driven-output---stream)); place them **before** the subcommand (`equity`, `options`, `macro`).
+The `analyze` group accepts **`--json`** (see [Machine-readable output](#machine-readable-output---json)) and **`--stream`** (see [Streaming question-driven output](#streaming-question-driven-output---stream)); place them **before** the subcommand (`equity`, `options`, `positioning`, `macro`).
 
 Run one-off analysis. Results are saved under `.copinance/results/v2/`; profiles, cache, and state live under versioned subdirectories inside `.copinance`.
 
@@ -318,7 +319,7 @@ Use **`--mode question_driven`** to force tool-using mode even if you omit `--qu
 
 ### Analyze Options
 
-Run options analysis. By default it returns deterministic options-chain output (one expiry unless you repeat **`-e` / `--expiration`**). Add `--question` to let the AI fetch and interpret the relevant options and market data.
+Run options analysis. By default it returns deterministic options-chain output (one expiry unless you repeat **`-e` / `--expiration`**). For **single-expiry** deterministic runs (including the default provider expiry), results also include a **`positioning`** object: aggregate surface metrics (bias, IV/skew/term, flow-style scores, gamma regime, max pain, implied move, OI clusters) as **snake_case** JSON — see [Options positioning context](../getting-started/library#options-positioning-context). **Multi-expiry** deterministic runs do not attach **`positioning`** (no merged full chain in that path). Add `--question` to let the AI fetch and interpret the relevant options and market data.
 
 ```bash
 # Run deterministic options analysis for AAPL (default expiration/side)
@@ -343,6 +344,23 @@ copinance analyze options SPY --question "Compare term structure" -e 2026-06-20 
 - `--mode <mode>`: `auto`, `deterministic`, or `question_driven`
 - `--profile-id <id>`: Profile ID for context
 - `--include-prompt`: Include rendered prompts in saved results for question-driven runs
+
+**Library:** for options-only runs you can set **`positioning_window`** (`"near"` \| `"mid"`) on **`AnalyzeInstrumentRequest`**; the runner passes it as context **`positioning_window`** (default **`near`**).
+
+### Analyze aggregate options positioning
+
+Deterministic **only**: fetches quote + default full chain and prints the same aggregate **`positioning`** payload as the instrument executor (snake_case fields). No `--question` / streaming.
+
+```bash
+copinance analyze positioning SPY
+copinance analyze positioning SPY --window mid
+copinance analyze --json positioning SPY -w near
+```
+
+**Options:**
+- **`--window` / `-w`**: `near` (default) or `mid` — horizon damping for the positioning score (see [Library — Options positioning context](../getting-started/library#options-positioning-context)).
+- **`--json`** (group, before `positioning`): machine **`RunJobResult`** JSON.
+- `--timeframe`, `--profile-id`, `--no-cache`, `--include-prompt`: same semantics as other **`analyze`** subcommands where applicable.
 
 ### Macro + Market Regime
 
@@ -416,7 +434,7 @@ copinance cache clear --tool get_options_chain
 ```
 
 **Options:**
-- `--tool <name>`: Clear cache for a specific tool only (e.g. `get_market_quote`, `get_historical_market_data`, `get_options_chain`)
+- `--tool <name>`: Clear cache for a specific tool only (e.g. `get_market_quote`, `get_historical_market_data`, `get_options_chain`, `get_options_positioning`)
 
 ### Refresh Cache
 

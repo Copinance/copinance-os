@@ -14,6 +14,7 @@ from copinance_os.domain.models.analysis import (
     resolve_analyze_mode,
 )
 from copinance_os.domain.models.job import Job, JobScope, RunJobResult
+from copinance_os.domain.models.market import MarketType
 from copinance_os.domain.ports.analysis_execution import (
     AnalyzeInstrumentRunner,
     AnalyzeMarketRunner,
@@ -57,6 +58,8 @@ class DefaultAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
             context["run_id"] = request.run_id
         if request.conversation_history:
             context["conversation_history"] = [t.model_dump() for t in request.conversation_history]
+        if request.market_type == MarketType.OPTIONS:
+            context["positioning_window"] = request.positioning_window or "near"
         return await self._orchestrator.run_job(job, context)
 
 

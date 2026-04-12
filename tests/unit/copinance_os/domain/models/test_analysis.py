@@ -45,3 +45,14 @@ def test_analyze_instrument_request_rejects_expiration_dates_for_equity() -> Non
             expiration_dates=["2026-06-19"],
             option_side=OptionSide.ALL,
         )
+
+
+@pytest.mark.unit
+def test_analyze_instrument_request_rejects_positioning_window_for_equity() -> None:
+    with pytest.raises(ValueError, match="positioning_window is only supported"):
+        AnalyzeInstrumentRequest(
+            symbol="AAPL",
+            market_type=MarketType.EQUITY,
+            mode=AnalyzeMode.DETERMINISTIC,
+            positioning_window="near",
+        )

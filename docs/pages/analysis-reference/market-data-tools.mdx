@@ -24,6 +24,14 @@ Options chain for an underlying: expiration dates, calls, puts, strike, last pri
 
 **Response:** One expiry returns the same chain object as before. **Multiple** expiries return **`multi_expiration`: true**, **`underlying_symbol`**, and **`expirations`**: an array of serialized chains (each filtered by `option_side`). The question-driven prompt includes a second example call with `expiration_dates` for agents.
 
+### `get_options_positioning`
+
+Aggregate **options surface / positioning** metrics for an underlying in one JSON object: directional bias and probabilities, categorized signals (positioning, volatility, flow, gamma, structure), IV metrics (ATM IV, 25-delta skew, term-structure label), gamma regime, max pain, implied move (ATM straddle / spot), and largest OI strikes. Implemented in **`copinance_os.data.analytics.options.positioning`**; results validate as **`OptionsPositioningResult`** (`domain.models.options_positioning`) with **snake_case** field names in tool output (`model_dump(mode="json")`).
+
+**Parameters:** `symbol` (required, underlying ticker); optional **`window`**: `near` (default) or `mid` — same horizon damping as the [Library — Options positioning context](../getting-started/library#options-positioning-context) helper.
+
+**Data:** Fetches quote + full chain (`get_options_chain` with `expiration_date=None`) via the wired **`MarketDataProvider`**.
+
 ## Fundamental data
 
 ### `get_equity_fundamentals`

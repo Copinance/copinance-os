@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal, cast
 from uuid import UUID
 
 import typer
@@ -105,6 +106,7 @@ async def analyze_equity(
         stream=stream_flag,
         run_id=None,
         no_cache=no_cache,
+        positioning_window=None,
     )
     try:
         status_text = (
@@ -197,6 +199,7 @@ async def analyze_options(
         stream=stream_flag,
         run_id=None,
         no_cache=no_cache,
+        positioning_window=None,
     )
     try:
         status_text = (
@@ -220,6 +223,69 @@ async def analyze_options(
                 "market_type": MarketType.OPTIONS.value,
                 "expiration_dates": expiration,
             },
+        )
+
+
+@analyze_app.command("positioning")
+@async_command
+async def analyze_positioning(
+    ctx: typer.Context,
+    symbol: str = typer.Argument(..., help="Underlying symbol"),
+    window: str = typer.Option(
+        "near",
+        "--window",
+        "-w",
+        help="Positioning horizon: near (1–2 weeks) or mid (1–2 months damping)",
+    ),
+    timeframe: JobTimeframe | None = typer.Option(
+        None,
+        help="Analysis timeframe context. Defaults to short_term for options.",
+    ),
+    profile_id: UUID | None = typer.Option(None, help="Profile ID for context (optional)"),
+    include_prompt_in_results: bool = typer.Option(
+        False,
+        "--include-prompt",
+        help="Include rendered prompts in the saved results for question-driven runs",
+    ),
+    no_cache: bool = typer.Option(
+        False,
+        "--no-cache",
+        help="Bypass data/tool cache reads and writes for this run",
+    ),
+) -> None:
+    """Deterministic aggregate options positioning (surface bias, IV, gamma, max pain, implied move)."""
+    w = str(window).strip().lower()
+    if w not in ("near", "mid"):
+        raise typer.BadParameter("window must be 'near' or 'mid'")
+    pos_window = cast(Literal["near", "mid"], w)
+    console = Console()
+    final_profile_id = await ensure_profile_with_literacy(profile_id)
+    use_case: AnalyzeInstrumentUseCase = get_container().analyze_instrument_use_case()
+    json_output = bool(ctx.obj and ctx.obj.get("json_output"))
+    request = AnalyzeInstrumentRequest(
+        symbol=symbol,
+        market_type=MarketType.OPTIONS,
+        timeframe=timeframe,
+        question=None,
+        mode=AnalyzeMode.DETERMINISTIC,
+        expiration_date=None,
+        expiration_dates=None,
+        option_side=OptionSide.ALL,
+        profile_id=final_profile_id,
+        include_prompt_in_results=include_prompt_in_results,
+        stream=False,
+        run_id=None,
+        no_cache=no_cache,
+        positioning_window=pos_window,
+    )
+    try:
+        with console.status("[bold blue]Computing options positioning...[/bold blue]"):
+            response = await use_case.execute(request)
+        render_run_job_results(response, json_output=json_output)
+    except Exception as e:
+        handle_cli_error(
+            e,
+            context={"instrument_symbol": symbol, "command": "analyze positioning"},
         )
 
 

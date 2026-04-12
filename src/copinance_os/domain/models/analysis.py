@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -141,6 +142,10 @@ class AnalyzeInstrumentRequest(BaseModel):
         False,
         description="When True, skip tool/data cache reads and writes for this run",
     )
+    positioning_window: Literal["near", "mid"] | None = Field(
+        None,
+        description="Options positioning horizon (near vs mid); only used when market_type is options",
+    )
     conversation_history: list[LLMConversationTurn] = Field(
         default_factory=list,
         description=(
@@ -164,6 +169,9 @@ class AnalyzeInstrumentRequest(BaseModel):
                 raise ValueError("option_side is only supported for options analysis")
         else:
             merge_instrument_expiration_inputs(self.expiration_date, self.expiration_dates)
+
+        if self.market_type != MarketType.OPTIONS and self.positioning_window is not None:
+            raise ValueError("positioning_window is only supported for options analysis")
 
         resolved_mode = resolve_analyze_mode(self.mode, self.question)
         normalized_question = (self.question or "").strip()

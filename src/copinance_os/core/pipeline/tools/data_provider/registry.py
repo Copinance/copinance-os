@@ -23,6 +23,7 @@ from copinance_os.core.pipeline.tools.data_provider.market_data import (
     MarketDataGetHistoricalDataTool,
     MarketDataGetOptionsChainTool,
     MarketDataGetQuoteTool,
+    MarketDataOptionsPositioningTool,
     MarketDataSearchInstrumentsTool,
 )
 from copinance_os.core.pipeline.tools.data_provider.provider_selector import (
@@ -54,6 +55,7 @@ def create_market_data_tools(
         MarketDataGetHistoricalDataTool(provider, cache_manager=cache_manager),
         MarketDataSearchInstrumentsTool(provider, cache_manager=cache_manager),
         MarketDataGetOptionsChainTool(provider, cache_manager=cache_manager),
+        MarketDataOptionsPositioningTool(provider, cache_manager=cache_manager),
     ]
 
 

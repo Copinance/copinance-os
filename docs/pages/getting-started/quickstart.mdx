@@ -100,6 +100,9 @@ copinance analyze equity AAPL --timeframe mid_term
 # Deterministic options analysis
 copinance analyze options AAPL --expiration 2026-06-19
 
+# Deterministic aggregate options positioning (bias, IV metrics, gamma regime, max pain, …)
+copinance analyze positioning SPY --window near
+
 # Multiple expiries (repeat --expiration / -e per date)
 copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 

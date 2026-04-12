@@ -148,6 +148,10 @@ copinance analyze options AAPL
 # Multiple option expiries in one run (repeat -e per date)
 copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 
+# Aggregate options surface (bias, IV/skew, gamma regime, max pain, implied move, OI clusters)
+copinance analyze positioning SPY --window near
+copinance analyze --json positioning SPY -w near
+
 # Question-driven analysis
 copinance analyze equity AAPL --question "What are the key financial risks?"
 
@@ -166,6 +170,7 @@ Pass `--json` before a subcommand or question to get JSON to stdout — useful f
 
 ```bash
 copinance analyze --json equity AAPL --timeframe mid_term
+copinance analyze --json positioning SPY -w near
 copinance analyze --json macro --question "Risk-on or risk-off?"
 copinance --json "Summarize labor and inflation"
 copinance market --json quote AAPL
@@ -189,7 +194,8 @@ Open a new terminal after running the above. Tab completes subcommands and flags
 |---------|-------------|
 | `copinance "…"` | Natural-language research question (question-driven; full tool suite) |
 | `copinance analyze equity <SYMBOL>` | Equity analysis — deterministic or question-driven with `--question` |
-| `copinance analyze options <SYMBOL>` | Options analysis with BSM Greeks via QuantLib; repeat `-e` / `--expiration` for multiple expiries |
+| `copinance analyze options <SYMBOL>` | Options chain snapshot analysis; BSM Greeks via QuantLib when configured; repeat `-e` / `--expiration` for multiple expiries. Single-expiry deterministic runs also include a **`positioning`** block (aggregate surface metrics). |
+| `copinance analyze positioning <SYMBOL>` | Deterministic aggregate options positioning only (`--window` / `-w`: `near` or `mid`; default `near`) |
 | `copinance analyze macro` | Macro + market regime dashboard |
 | `copinance market search "…"` | Search instruments by name or symbol |
 | `copinance market quote <SYMBOL>` | Current quote |

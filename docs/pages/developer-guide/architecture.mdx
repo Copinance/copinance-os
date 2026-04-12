@@ -4,7 +4,7 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 
 ## Design principles
 
-1. **Financial and quantitative work is deterministic** — Implemented in domain models, data providers, analytics (QuantLib), and `core.execution_engine` executors. Outputs are structured and testable.
+1. **Financial and quantitative work is deterministic** — Implemented in domain models, data providers, analytics (**`data/analytics/options`**: QuantLib BSM Greeks + aggregate positioning), and `core.execution_engine` executors. Outputs are structured and testable.
 2. **LLMs do not replace computation** — They explain, route questions to tools, and format answers. Tool implementations perform fetches and numeric work.
 3. **Contracts over raw blobs** — Prefer Pydantic models and explicit result types between layers; avoid passing untyped pandas frames across module boundaries.
 4. **One front door for job execution** — **`ResearchOrchestrator`** wraps the **`JobRunner`** port so use cases, CLI, and integrations do not scatter direct calls to executors. Override **`JobRunner`** only when you need custom orchestration (retries, queues, multi-tenant routing).
@@ -35,7 +35,7 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
                                 │
 ┌───────────────────────────────▼─────────────────────────────────┐
 │  data                     Providers, cache, repositories,       │
-│                           loaders, analytics (options Greeks)   │
+│                           loaders; options analytics (BSM + OI)   │
 │  ai/llm                   Providers, prompts (explanation)      │
 │  infra                    Settings, logging, DI container       │
 └─────────────────────────────────────────────────────────────────┘
@@ -68,7 +68,7 @@ copinance_os/
 │           ├── macro_indicators.py     # FRED/yfinance macro aggregation
 │           └── statistical.py          # HMM / regime-switching (stub — no registered tools yet)
 ├── data/
-│   ├── analytics/options/              # QuantLib BSM Greek estimation
+│   ├── analytics/options/              # QuantLib BSM Greek estimation; aggregate positioning (`positioning.py`)
 │   ├── cache/
 │   ├── loaders/
 │   ├── providers/                      # yfinance, FRED, market/ (option analytics), sec/edgartools

@@ -173,6 +173,9 @@ class TestInstrumentAnalysisExecutor:
         assert results["execution_type"] == "instrument_analysis"
         assert results["market_type"] == "options"
         assert results["options_chain"]["calls_count"] == 1
+        assert isinstance(results.get("positioning"), dict)
+        assert results["positioning"]["symbol"] == "AAPL"
+        assert "market_bias" in results["positioning"]
         options_request = mock_options_use_case.execute.call_args[0][0]
         assert isinstance(options_request, GetOptionsChainRequest)
         quote_request = mock_quote_use_case.execute.call_args[0][0]
