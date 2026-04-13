@@ -7,7 +7,7 @@ This site is built with [Nextra](https://nextra.site/) on Next.js. **Page conten
 The docs track the `copinance_os` package:
 
 - **Domain** contracts (models, ports, strategy protocols)
-- **Data providers** — yfinance, FRED, SEC/EDGAR (`data.providers.sec`), QuantLib Greeks, **`data/analytics/options`** aggregate positioning (`build_options_positioning_dict`, `compute_options_positioning_context`)
+- **Data providers** — yfinance, FRED, SEC/EDGAR (`data.providers.sec`), QuantLib BSM Greeks (first- and higher-order on `OptionGreeks` when valid), **`data/analytics/options`** aggregate positioning (`build_options_positioning_dict`, `compute_options_positioning_context`; vanna/charm, mispricing, moneyness, pin risk, …). Repo-only integrator notes: [`docs/integration/options-positioning-library-integration.md`](integration/options-positioning-library-integration.md).
 - **Core orchestration** — `ResearchOrchestrator`, `DefaultJobRunner`, `AnalysisExecutorFactory`, execution engine, pipeline tools, tool bundle discovery (`core.pipeline.tools.discovery`)
 - **AI/LLM** — provider adapters (Gemini, OpenAI, Ollama), streaming, tool-calling loop
 - **Infra** — DI container, plugin loading, settings

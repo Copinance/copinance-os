@@ -25,9 +25,10 @@ class OptionSide(StrEnum):
 
 
 class OptionGreeks(ValueObject):
-    """First-order sensitivities for a European vanilla option under Black–Scholes–Merton.
+    """Sensitivities for a European vanilla option under Black–Scholes–Merton.
 
-    Computed with QuantLib's ``AnalyticEuropeanEngine`` (analytic formulas). Convention
+    First-order Greeks come from QuantLib's ``AnalyticEuropeanEngine``. Higher-order
+    analytics (vanna, charm, volga) use the same BSM inputs in closed form. Convention
     for ``theta``, ``vega``, and ``rho`` matches QuantLib's implementation (same units
     as ``EuropeanOption.theta()``, ``vega()``, and ``rho()``).
     """
@@ -37,6 +38,15 @@ class OptionGreeks(ValueObject):
     theta: Decimal = Field(..., description="Theta (time decay; QuantLib convention)")
     vega: Decimal = Field(..., description="Vega (∂V/∂σ; QuantLib convention)")
     rho: Decimal = Field(..., description="Rho (∂V/∂r; QuantLib convention)")
+    vanna: Decimal | None = Field(default=None, description="Vanna (∂²V/∂S∂σ)")
+    charm: Decimal | None = Field(default=None, description="Charm (∂Δ/∂T, calendar time)")
+    volga: Decimal | None = Field(default=None, description="Volga (∂²V/∂σ²)")
+    theoretical_price: Decimal | None = Field(
+        default=None, description="BSM fair value (NPV) from the pricing engine"
+    )
+    itm_probability: Decimal | None = Field(
+        default=None, description="Risk-neutral probability of expiring in the money"
+    )
 
 
 class MarketDataPoint(ValueObject):

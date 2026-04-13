@@ -1,6 +1,6 @@
 # Options Session
 
-An options research session: inspect the chain with BSM Greeks, ask positioning questions, run deterministic options analysis, or fetch **aggregate positioning** only via **`copinance analyze positioning <SYMBOL>`** (see [CLI — Analyze aggregate options positioning](../user-guide/cli#analyze-aggregate-options-positioning)). QuantLib must be installed (it is included in the default `make setup`).
+An options research session: inspect the chain with BSM Greeks (including higher-order fields when valid), ask positioning questions, run deterministic options analysis, or fetch **aggregate positioning** only via **`copinance analyze positioning <SYMBOL>`** (see [CLI — Analyze aggregate options positioning](../user-guide/cli#analyze-aggregate-options-positioning)). The aggregate JSON includes GEX, vanna/charm, mispricing, moneyness, and pin-style metrics when the chain supports them. QuantLib must be installed (it is included in the default `make setup`).
 
 ## 1. View the options chain
 

@@ -319,7 +319,7 @@ Use **`--mode question_driven`** to force tool-using mode even if you omit `--qu
 
 ### Analyze Options
 
-Run options analysis. By default it returns deterministic options-chain output (one expiry unless you repeat **`-e` / `--expiration`**). For **single-expiry** deterministic runs (including the default provider expiry), results also include a **`positioning`** object: aggregate surface metrics (bias, IV/skew/term, flow-style scores, gamma regime, max pain, implied move, OI clusters) as **snake_case** JSON — see [Options positioning context](../getting-started/library#options-positioning-context). **Multi-expiry** deterministic runs do not attach **`positioning`** (no merged full chain in that path). Add `--question` to let the AI fetch and interpret the relevant options and market data.
+Run options analysis. By default it returns deterministic options-chain output (one expiry unless you repeat **`-e` / `--expiration`**). For **single-expiry** deterministic runs (including the default provider expiry), results also include a **`positioning`** object: aggregate surface metrics (bias, IV/skew/term, flow-style scores, gamma regime, GEX, vanna/charm, mispricing, moneyness, pin risk, max pain, implied move, OI clusters) as **snake_case** JSON — see [Options positioning context](../getting-started/library#options-positioning-context). **Multi-expiry** deterministic runs do not attach **`positioning`** (no merged full chain in that path). Add `--question` to let the AI fetch and interpret the relevant options and market data.
 
 ```bash
 # Run deterministic options analysis for AAPL (default expiration/side)
@@ -349,7 +349,7 @@ copinance analyze options SPY --question "Compare term structure" -e 2026-06-20 
 
 ### Analyze aggregate options positioning
 
-Deterministic **only**: fetches quote + default full chain and prints the same aggregate **`positioning`** payload as the instrument executor (snake_case fields). No `--question` / streaming.
+Deterministic **only**: fetches quote + default full chain and prints the same aggregate **`positioning`** payload as the instrument executor (snake_case fields), including extended dealer-style blocks where data supports them. No `--question` / streaming.
 
 ```bash
 copinance analyze positioning SPY

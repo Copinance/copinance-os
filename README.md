@@ -49,7 +49,7 @@ Copinance OS treats **financial computation and research orchestration as first-
 <tr>
   <td align="center" width="33%">
     <b>Macro to micro</b><br>
-    Broad macro dashboards (FRED-backed indicators) alongside equities, options (QuantLib), and fundamentals.<br>
+    Broad macro dashboards (FRED-backed indicators) alongside equities, options (QuantLib BSM Greeks plus vanna/charm/volga where available), aggregate **positioning** (GEX, vanna/charm, mispricing, moneyness, pin risk), and fundamentals.<br>
     SEC EDGAR access via <a href="https://edgartools.readthedocs.io/">edgartools</a> for filings and LLM tool-calling over filing text when configured.
   </td>
   <td align="center" width="33%">
@@ -148,7 +148,7 @@ copinance analyze options AAPL
 # Multiple option expiries in one run (repeat -e per date)
 copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 
-# Aggregate options surface (bias, IV/skew, gamma regime, max pain, implied move, OI clusters)
+# Aggregate options surface (bias, IV/skew, gamma regime, GEX, vanna/charm, mispricing, pin risk, …)
 copinance analyze positioning SPY --window near
 copinance analyze --json positioning SPY -w near
 
@@ -194,8 +194,8 @@ Open a new terminal after running the above. Tab completes subcommands and flags
 |---------|-------------|
 | `copinance "…"` | Natural-language research question (question-driven; full tool suite) |
 | `copinance analyze equity <SYMBOL>` | Equity analysis — deterministic or question-driven with `--question` |
-| `copinance analyze options <SYMBOL>` | Options chain snapshot analysis; BSM Greeks via QuantLib when configured; repeat `-e` / `--expiration` for multiple expiries. Single-expiry deterministic runs also include a **`positioning`** block (aggregate surface metrics). |
-| `copinance analyze positioning <SYMBOL>` | Deterministic aggregate options positioning only (`--window` / `-w`: `near` or `mid`; default `near`) |
+| `copinance analyze options <SYMBOL>` | Options chain snapshot analysis; BSM Greeks via QuantLib when configured (first- and higher-order Greeks on contracts when inputs are valid); repeat `-e` / `--expiration` for multiple expiries. Single-expiry deterministic runs also include a **`positioning`** block (aggregate surface metrics). |
+| `copinance analyze positioning <SYMBOL>` | Deterministic aggregate options positioning only (`--window` / `-w`: `near` or `mid`; default `near`); same payload shape as the instrument executor’s **`positioning`** |
 | `copinance analyze macro` | Macro + market regime dashboard |
 | `copinance market search "…"` | Search instruments by name or symbol |
 | `copinance market quote <SYMBOL>` | Current quote |
@@ -275,10 +275,11 @@ pytest --cov=copinance_os --cov-report=html  # explicit HTML report
 - **[Documentation site](https://copinance.github.io/copinance-os/)** — Introduction (home), then the sections below in sidebar order
   - **[Getting Started](https://copinance.github.io/copinance-os/getting-started/installation/)** — Installation, Quick Start, Configuration, Using as a Library
   - **[User Guide](https://copinance.github.io/copinance-os/user-guide/cli/)** — CLI Reference, Analysis Modes
-  - **[Analysis Reference](https://copinance.github.io/copinance-os/analysis-reference/)** — Market Data Tools, Macro & Market Regime, Options & Greeks (BSM, chain metadata), SEC Filings (EDGAR)
+  - **[Analysis Reference](https://copinance.github.io/copinance-os/analysis-reference/)** — Market Data Tools, Macro & Market Regime, Options & Greeks (BSM, higher-order Greeks, chain metadata, aggregate positioning), SEC Filings (EDGAR)
   - **[Examples](https://copinance.github.io/copinance-os/examples/)** — Equity Deep Dive, Macro Dashboard, Options Session
   - **[Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/)** — Architecture, Extending, Testing, [API Reference](https://copinance.github.io/copinance-os/developer-guide/api-reference/) (ports and extension interfaces)
 - **[docs/README.md](docs/README.md)** — Build the docs site locally (Nextra)
+- **[docs/integration/options-positioning-library-integration.md](docs/integration/options-positioning-library-integration.md)** — Library notes for aggregate positioning and Greek enrichment (I/O contracts, pitfalls, tests)
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** · **[GOVERNANCE.md](GOVERNANCE.md)** · **[CHANGELOG.md](CHANGELOG.md)**
 
 ---

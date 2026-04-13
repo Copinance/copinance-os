@@ -98,7 +98,7 @@ Key rules:
 3. **Data / core / ai**: Implement adapters, executors, or LLM wiring as appropriate
 4. **Interfaces**: Add CLI commands if needed
 5. **Tests**: Mirror package layout under `tests/unit/copinance_os/`
-6. **Documentation**: Update relevant docs in `docs/pages/` and docstrings
+6. **Documentation**: Update relevant docs in `docs/pages/` and docstrings; for cross-cutting integrator notes (e.g. options positioning I/O), add or extend Markdown under **`docs/integration/`** and link from the root **README** if end-users need it
 
 ## Pull request process
 

@@ -1,17 +1,17 @@
 {
   "symbol": "SPY",
   "window": "near",
-  "confidence": 0.523,
+  "confidence": 0.6028,
   "market_bias": "bullish",
-  "bullish_probability": 0.523,
-  "bearish_probability": 0.2385,
-  "neutral_probability": 0.2385,
+  "bullish_probability": 0.6505,
+  "bearish_probability": 0.1748,
+  "neutral_probability": 0.1748,
   "key_levels": [
     590.0,
     600.0,
     580.0
   ],
-  "analyst_summary": "For SPY, the aggregate options surface leans bullish \u2014 more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 52% for the next 1-2 weeks horizon.",
+  "analyst_summary": "For SPY, the aggregate options surface leans bullish \u2014 more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 60% for the next 1-2 weeks horizon.",
   "signals": [
     {
       "name": "Call Open Interest Share",
@@ -36,6 +36,18 @@
       "value": 0.088,
       "direction": "bullish",
       "explanation": "Positive gamma tilt can support stabilization and upside continuation."
+    },
+    {
+      "name": "Dollar Call Flow Share",
+      "value": 0.5263,
+      "direction": "neutral",
+      "explanation": "Dollar call volume \u00f7 total dollar volume \u2014 economic magnitude of flow, not just contract counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+    },
+    {
+      "name": "Dollar Put/Call Open Interest",
+      "value": 0.9,
+      "direction": "bullish",
+      "explanation": "Dollar-weighted put/call OI ratio \u2014 magnitude-weighted positioning vs simple counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
     }
   ],
   "signal_categories": {
@@ -63,6 +75,18 @@
         "value": 0.088,
         "direction": "bullish",
         "explanation": "Positive gamma tilt can support stabilization and upside continuation."
+      },
+      {
+        "name": "Dollar Call Flow Share",
+        "value": 0.5263,
+        "direction": "neutral",
+        "explanation": "Dollar call volume \u00f7 total dollar volume \u2014 economic magnitude of flow, not just contract counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+      },
+      {
+        "name": "Dollar Put/Call Open Interest",
+        "value": 0.9,
+        "direction": "bullish",
+        "explanation": "Dollar-weighted put/call OI ratio \u2014 magnitude-weighted positioning vs simple counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
       }
     ],
     "volatility": [
@@ -76,7 +100,7 @@
         "name": "25-Delta Skew",
         "value": 1.0,
         "direction": "neutral",
-        "explanation": "IV of the ~25-delta put minus the ~25-delta call (nearest expiry). Positive skew often reflects downside protection demand."
+        "explanation": "IV of the ~25-delta put minus the ~25-delta call (nearest expiry). Positive skew often reflects downside protection demand. Wing richness (butterfly) and 10\u0394 skew extend the surface read (Carr & Wu 2009; Bates 2000)."
       },
       {
         "name": "Term Structure",
@@ -97,6 +121,12 @@
         "value": 0.05,
         "direction": "bearish",
         "explanation": "Total options volume divided by total open interest \u2014 higher values can indicate more tactical trading versus stuck inventory."
+      },
+      {
+        "name": "Dominant Flow Moneyness",
+        "value": 3.3,
+        "direction": "neutral",
+        "explanation": "Delta-bucketed open interest and dollar volume \u2014 shows whether flow concentrates at the money or in wings.  Dominant call bucket atm; dominant put bucket atm (delta bands)."
       }
     ],
     "gamma": [
@@ -111,6 +141,30 @@
         "value": 1.0,
         "direction": "bullish",
         "explanation": "Net gamma is positive \u2014 dealers are more likely to stabilize moves (fade extremes) if this positioning persists."
+      },
+      {
+        "name": "Gamma Flip Strike (nearest expiry)",
+        "value": 0.0,
+        "direction": "neutral",
+        "explanation": "Strike where cumulative per-strike GEX (calls \u2212 puts, OI-weighted, \u00d7100\u00d7spot) crosses zero on the front expiry \u2014 a common \u201cflip\u201d narrative (SqueezeMetrics-style dealer gamma; Knuteson 2021, arXiv:2006.00975). No cumulative GEX sign change on the front expiry \u2014 flip strike unset."
+      },
+      {
+        "name": "Net Delta Exposure (DEX)",
+        "value": 117000.0,
+        "direction": "bullish",
+        "explanation": "Sum of delta \u00d7 open interest \u00d7 100 (calls + puts) \u2014 aggregate directional exposure in the chain (Lakonishok, Lee & Poteshman 2007; OCC/CBOE-style positioning summaries)."
+      },
+      {
+        "name": "Vanna Exposure",
+        "value": 0.0,
+        "direction": "neutral",
+        "explanation": "Net vanna exposure \u2014 when negative, rising IV forces dealers to sell delta, amplifying downside moves. When positive, IV spikes trigger buying. Classified regime: neutral."
+      },
+      {
+        "name": "Charm Exposure",
+        "value": 0.0,
+        "direction": "neutral",
+        "explanation": "OI-weighted charm (\u2202\u0394/\u2202T): positive net charm often means delta drifts up with time, so dealers may lean into selling at the open (overnight drift). Overnight delta drift: neutral."
       }
     ],
     "structure": [
@@ -130,7 +184,7 @@
         "name": "Implied Move (Straddle)",
         "value": 0.3529,
         "direction": "neutral",
-        "explanation": "ATM straddle mid / spot for the nearest expiration \u2014 a rough implied one-standard-deviation range proxy."
+        "explanation": "ATM straddle mid / spot for the nearest expiration \u2014 a rough implied move proxy; when DTE is available we also show Brenner & Subrahmanyam (1988) \u03c3 from the straddle and DTE-consistent daily/period moves. DTE=7, \u03c3_BS88\u22483.19% ann.; daily\u22480.2012%, horizon\u22480.5323% (see implied_move_detail)."
       }
     ]
   },
@@ -141,11 +195,22 @@
     "skew_25_delta": 1.0,
     "term_structure_slope": "flat",
     "near_term_atm_iv": 18.0,
-    "far_term_atm_iv": 0.0
+    "far_term_atm_iv": 0.0,
+    "skew_10_delta": 1.0,
+    "butterfly_25_delta": -0.5,
+    "skew_regime": "normal"
   },
   "max_pain": 590.0,
   "implied_move": 0.3529,
   "implied_move_absolute": 2.1,
+  "implied_move_detail": {
+    "raw_straddle_pct": 0.3529,
+    "raw_straddle_abs": 2.1,
+    "dte": 7,
+    "annualized_iv": 3.1937,
+    "daily_implied_move_pct": 0.2012,
+    "period_implied_move_pct": 0.5323
+  },
   "oi_clusters": [
     {
       "strike": 590.0,
@@ -160,20 +225,158 @@
       "open_interest": 15000.0
     }
   ],
+  "data_quality": 0.8535,
+  "dollar_metrics": {
+    "dollar_call_oi": 3150000.0,
+    "dollar_put_oi": 2835000.0,
+    "dollar_put_call_oi_ratio": 0.9,
+    "dollar_call_volume": 157500.0,
+    "dollar_put_volume": 141750.0,
+    "dollar_call_flow_share": 0.5263
+  },
+  "gamma_flip_strike": null,
+  "gex_profile": [
+    {
+      "strike": 590.0,
+      "gex_value": 3451000.0
+    },
+    {
+      "strike": 600.0,
+      "gex_value": 1309000.0
+    },
+    {
+      "strike": 580.0,
+      "gex_value": 1190000.0
+    }
+  ],
+  "top_positive_gex": [
+    {
+      "strike": 590.0,
+      "gex_value": 3451000.0
+    },
+    {
+      "strike": 600.0,
+      "gex_value": 1309000.0
+    },
+    {
+      "strike": 580.0,
+      "gex_value": 1190000.0
+    }
+  ],
+  "top_negative_gex": [],
+  "delta_exposure": {
+    "net_delta": 117000.0,
+    "dollar_delta": 69615000.0,
+    "call_delta_exposure": 1296000.0,
+    "put_delta_exposure": -1179000.0
+  },
+  "oi_clusters_enhanced": [
+    {
+      "strike": 590.0,
+      "call_oi": 12000.0,
+      "put_oi": 11000.0,
+      "total_oi": 23000.0,
+      "put_call_ratio": 0.9167
+    },
+    {
+      "strike": 580.0,
+      "call_oi": 10000.0,
+      "put_oi": 9000.0,
+      "total_oi": 19000.0,
+      "put_call_ratio": 0.9
+    },
+    {
+      "strike": 600.0,
+      "call_oi": 8000.0,
+      "put_oi": 7000.0,
+      "total_oi": 15000.0,
+      "put_call_ratio": 0.875
+    }
+  ],
+  "call_wall": 590.0,
+  "put_wall": 590.0,
+  "signal_agreement": "strong_bullish",
+  "vanna_exposure": {
+    "net_vanna": 0.0,
+    "call_vanna_exposure": 0.0,
+    "put_vanna_exposure": 0.0,
+    "vanna_flip_strike": null,
+    "regime": "neutral"
+  },
+  "vanna_profile": [],
+  "charm_exposure": {
+    "net_charm": 0.0,
+    "call_charm_exposure": 0.0,
+    "put_charm_exposure": 0.0,
+    "overnight_delta_drift": "neutral"
+  },
+  "mispricing": null,
+  "moneyness_summary": {
+    "buckets": [
+      {
+        "bucket": "deep_itm",
+        "call_oi": 0,
+        "put_oi": 0,
+        "call_volume": 0,
+        "put_volume": 0,
+        "dollar_call_volume": 0.0,
+        "dollar_put_volume": 0.0
+      },
+      {
+        "bucket": "itm",
+        "call_oi": 0,
+        "put_oi": 0,
+        "call_volume": 0,
+        "put_volume": 0,
+        "dollar_call_volume": 0.0,
+        "dollar_put_volume": 0.0
+      },
+      {
+        "bucket": "atm",
+        "call_oi": 22000,
+        "put_oi": 20000,
+        "call_volume": 1100,
+        "put_volume": 1000,
+        "dollar_call_volume": 115500.0,
+        "dollar_put_volume": 105000.0
+      },
+      {
+        "bucket": "otm",
+        "call_oi": 8000,
+        "put_oi": 7000,
+        "call_volume": 400,
+        "put_volume": 350,
+        "dollar_call_volume": 42000.0,
+        "dollar_put_volume": 36750.0
+      },
+      {
+        "bucket": "deep_otm",
+        "call_oi": 0,
+        "put_oi": 0,
+        "call_volume": 0,
+        "put_volume": 0,
+        "dollar_call_volume": 0.0,
+        "dollar_put_volume": 0.0
+      }
+    ],
+    "dominant_call_bucket": "atm",
+    "dominant_put_bucket": "atm"
+  },
+  "pin_risk": null,
   "scenarios": [
     {
       "label": "Bullish continuation",
-      "probability": 0.523,
+      "probability": 0.6505,
       "narrative": "Upside continuation if SPY holds above option-supported levels."
     },
     {
       "label": "Bearish unwind",
-      "probability": 0.2385,
+      "probability": 0.1748,
       "narrative": "Downside pressure if hedging demand rises and calls unwind in SPY."
     },
     {
       "label": "Range-bound",
-      "probability": 0.2385,
+      "probability": 0.1748,
       "narrative": "Mean-reverting regime likely if neither side gains flow dominance."
     }
   ]

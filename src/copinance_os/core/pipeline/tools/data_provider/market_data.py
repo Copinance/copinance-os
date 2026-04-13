@@ -469,6 +469,7 @@ class MarketDataOptionsPositioningTool(BaseDataProviderTool[MarketDataProvider])
                 symbol,
                 window,
                 financial_literacy=lit,
+                enrich_missing_greeks=True,
             )
             model = OptionsPositioningResult.model_validate(raw)
             return self._create_success_result(

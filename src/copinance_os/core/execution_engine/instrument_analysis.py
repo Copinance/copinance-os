@@ -339,6 +339,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 symbol,
                 pos_window,
                 financial_literacy=resolve_financial_literacy(context.get("financial_literacy")),
+                enrich_missing_greeks=True,
             )
             out["positioning"] = OptionsPositioningResult.model_validate(pos_raw).model_dump(
                 mode="json"

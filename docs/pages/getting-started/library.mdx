@@ -628,7 +628,7 @@ asyncio.run(follow_up_example())
 
 ## Options positioning context
 
-For **options-surface / positioning intelligence** (bias, IV/skew/term, flow-style signals, gamma regime, max pain, implied move, OI clusters) as a **single JSON payload** aligned with the Copinance screener API, use:
+For **options-surface / positioning intelligence** (bias, IV/skew/term, flow-style signals, gamma regime, GEX, vanna/charm exposure, mispricing vs BSM fair value, moneyness buckets, pin risk, max pain, implied move, OI clusters) as a **single JSON payload** aligned with the Copinance screener API, use:
 
 - **Import:** `from copinance_os.data.analytics.options.positioning import compute_options_positioning_context`
 - **Data:** `await compute_options_positioning_context(provider, symbol, window)` where `window` is `"near"` or `"mid"`, and `provider` is a **`MarketDataProvider`** (`get_quote`, `get_options_chain`). The usual choice is `container.market_data_provider()` from `get_container(...)`.
@@ -649,6 +649,8 @@ asyncio.run(main())
 ```
 
 Integrators with a non-`MarketDataProvider` source can adapt it with a small shim that implements `get_quote` / `get_options_chain` and register it only where your composition root allows.
+
+**Repository note:** [Options positioning — library integration](https://github.com/copinance/copinance-os/blob/main/docs/integration/options-positioning-library-integration.md) (metadata alignment, literacy, test paths).
 
 ---
 

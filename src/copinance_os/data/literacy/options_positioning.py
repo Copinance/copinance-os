@@ -3,9 +3,16 @@
 Used by ``copinance_os.data.analytics.options.positioning`` (``build_options_positioning_dict``).
 Intermediate strings match the historical default so fixtures stay stable when literacy is omitted.
 See ``copinance_os.domain.literacy`` for shared primitives and job-context normalization.
+
+Research touchpoints (methodology, not forecasts): Bollen & Whaley (2004); Pan & Poteshman (2006);
+SqueezeMetrics-style dealer gamma / Knuteson (2021, arXiv:2006.00975); Lakonishok, Lee & Poteshman
+(2007) and standard OCC-style delta exposure; Brenner & Subrahmanyam (1988); Carr & Wu (2009);
+Bates (2000).
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from copinance_os.domain.literacy import TieredCopy
 from copinance_os.domain.models.profile import FinancialLiteracy
@@ -70,6 +77,46 @@ _TC_GAMMA_TILT_EXPL = TieredCopy(
     ),
     intermediate="Positive gamma tilt can support stabilization and upside continuation.",
     advanced="Net gamma tilt from OI-weighted chain gammas; stabilization vs convexity amplifier read.",
+)
+
+_TC_DOLLAR_FLOW_NAME = TieredCopy(
+    beginner="Big-dollar share of today’s option trading that is calls",
+    intermediate="Dollar Call Flow Share",
+    advanced="Dollar-weighted call volume share",
+)
+_TC_DOLLAR_FLOW_EXPL = TieredCopy(
+    beginner=(
+        "Instead of counting trades, we weight each trade by about how much money moved "
+        "(price times size). That helps big trades count more than tiny ones."
+    ),
+    intermediate=(
+        "Dollar call volume ÷ total dollar volume — economic magnitude of flow, "
+        "not just contract counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+    ),
+    advanced=(
+        "Σ(mid·call vol·100) / Σ(mid·total vol·100); aligns with net buying pressure / "
+        "information-in-volume literature (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+    ),
+)
+
+_TC_DOLLAR_PC_OI_NAME = TieredCopy(
+    beginner="Put dollars vs call dollars still open",
+    intermediate="Dollar Put/Call Open Interest",
+    advanced="Dollar put OI / dollar call OI",
+)
+_TC_DOLLAR_PC_OI_EXPL = TieredCopy(
+    beginner=(
+        "This compares the dollar size of open put positions to open call positions. "
+        "It treats expensive contracts as more important than very cheap ones."
+    ),
+    intermediate=(
+        "Dollar-weighted put/call OI ratio — magnitude-weighted positioning vs simple counts "
+        "(Bollen & Whaley 2004; Pan & Poteshman 2006)."
+    ),
+    advanced=(
+        "Σ(mid·put OI·100) / Σ(mid·call OI·100); economic OI skew per classic option-volume "
+        "information studies (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+    ),
 )
 
 # --- Volatility ---
@@ -148,9 +195,13 @@ _TC_SKEW_OK = TieredCopy(
     ),
     intermediate=(
         "IV of the ~25-delta put minus the ~25-delta call (nearest expiry). "
-        "Positive skew often reflects downside protection demand."
+        "Positive skew often reflects downside protection demand. "
+        "Wing richness (butterfly) and 10Δ skew extend the surface read (Carr & Wu 2009; Bates 2000)."
     ),
-    advanced="25Δ risk-reversal skew (put IV − call IV, near); positive → downside protection bid.",
+    advanced=(
+        "25Δ risk-reversal skew (put IV − call IV, near); positive → downside protection bid. "
+        "Butterfly vs ATM isolates wing richness (Carr & Wu 2009); crash-skew narratives (Bates 2000)."
+    ),
 )
 _TC_TERM_NEED_TWO = TieredCopy(
     beginner="We need two dates with good data to compare expected swings over time.",
@@ -244,6 +295,47 @@ _TC_GAMMA_BAL = TieredCopy(
     advanced="Balanced net gamma: no dominant stabilization vs convexity regime.",
 )
 
+_TC_GAMMA_FLIP_NAME = TieredCopy(
+    beginner="Price level where net “speed-of-change” exposure from options flips sign",
+    intermediate="Gamma Flip Strike (nearest expiry)",
+    advanced="Gamma flip (dealer GEX zero-cross, near)",
+)
+_TC_GAMMA_FLIP_EXPL = TieredCopy(
+    beginner=(
+        "This is a price people watch from the options list: where hedging math suggests the "
+        "market’s push-and-pull from options might switch styles."
+    ),
+    intermediate=(
+        "Strike where cumulative per-strike GEX (calls − puts, OI-weighted, ×100×spot) crosses zero "
+        "on the front expiry — a common “flip” narrative (SqueezeMetrics-style dealer gamma; "
+        "Knuteson 2021, arXiv:2006.00975)."
+    ),
+    advanced=(
+        "Zero-cross of Σ_K (call γ·OI − put γ·OI)·100·S on ascending strikes; institutional "
+        "dealer-gamma flip read (cf. SqueezeMetrics; Knuteson 2021, arXiv:2006.00975)."
+    ),
+)
+
+_TC_NET_DELTA_NAME = TieredCopy(
+    beginner="Directional “push” implied by open options (very simplified)",
+    intermediate="Net Delta Exposure (DEX)",
+    advanced="Net delta × OI × 100 (chain)",
+)
+_TC_NET_DELTA_EXPL = TieredCopy(
+    beginner=(
+        "Delta is how much an option’s price might move when the stock moves a little. "
+        "Here we add that up across open contracts to get a rough directional picture."
+    ),
+    intermediate=(
+        "Sum of delta × open interest × 100 (calls + puts) — aggregate directional exposure "
+        "in the chain (Lakonishok, Lee & Poteshman 2007; OCC/CBOE-style positioning summaries)."
+    ),
+    advanced=(
+        "DEX: Σ δ·OI·100; dollar_delta = DEX·S. Standard positioning statistic "
+        "(Lakonishok, Lee & Poteshman 2007; exchange/OCC reporting analogues)."
+    ),
+)
+
 # --- Structure ---
 
 _TC_MAX_PAIN_NAME = TieredCopy(
@@ -289,10 +381,108 @@ _TC_IMPL_MOVE_EXPL = TieredCopy(
         "compare to the stock price to get a simple percent move people talk about."
     ),
     intermediate=(
-        "ATM straddle mid / spot for the nearest expiration — a rough implied one-standard-deviation "
-        "range proxy."
+        "ATM straddle mid / spot for the nearest expiration — a rough implied move proxy; "
+        "when DTE is available we also show Brenner & Subrahmanyam (1988) σ from the straddle "
+        "and DTE-consistent daily/period moves."
     ),
-    advanced="ATM straddle mid / spot (near): crude implied move proxy; not a realized vol forecast.",
+    advanced=(
+        "Raw straddle/spot plus Brenner–Subrahmanyam (1988) σ ≈ straddle / (0.798·S·√(T)); "
+        "daily = σ/√252, horizon = σ√(DTE/252). Crude; not a realized-vol forecast."
+    ),
+)
+
+_TC_VANNA_NAME = TieredCopy(
+    beginner="Vanna exposure (hedging vs swing expectations)",
+    intermediate="Vanna Exposure",
+    advanced="Net vanna (OI-weighted)",
+)
+_TC_VANNA_EXPL = TieredCopy(
+    beginner=(
+        "How sensitive overall option hedging is to changes in expected price swings. "
+        "If this is very negative, a spike in expected swings could push the stock down faster."
+    ),
+    intermediate=(
+        "Net vanna exposure — when negative, rising IV forces dealers to sell delta, "
+        "amplifying downside moves. When positive, IV spikes trigger buying."
+    ),
+    advanced=(
+        "Net vanna (∂²V/∂S∂σ × OI): short vanna → vol-up-spot-down dynamic; "
+        "regime from OI-weighted aggregate (Bergomi smile dynamics; dealer hedging flows)."
+    ),
+)
+
+_TC_CHARM_NAME = TieredCopy(
+    beginner="Overnight hedging drift (charm)",
+    intermediate="Charm Exposure",
+    advanced="Net charm (OI-weighted)",
+)
+_TC_CHARM_EXPL = TieredCopy(
+    beginner="How much the hedging balance shifts overnight just from time passing.",
+    intermediate=(
+        "OI-weighted charm (∂Δ/∂T): positive net charm often means delta drifts up with time, "
+        "so dealers may lean into selling at the open (overnight drift)."
+    ),
+    advanced=(
+        "Charm exposure: OI-weighted ∂Δ/∂T; positive → dealer delta accretion overnight → "
+        "selling pressure into the open (Taleb, Dynamic Hedging; dealer theta drift)."
+    ),
+)
+
+_TC_MISPRICING_NAME = TieredCopy(
+    beginner="Model vs market option prices",
+    intermediate="BSM Mispricing Sentiment",
+    advanced="BSM mid vs NPV (sentiment)",
+)
+_TC_MISPRICING_EXPL = TieredCopy(
+    beginner="Whether option prices look high or low versus a simple fair-value model.",
+    intermediate=(
+        "Average mid vs Black–Scholes NPV by side — persistent call richness can signal "
+        "demand not fully priced through IV alone."
+    ),
+    advanced=(
+        "BSM mid − NPV / NPV (%): systematic mispricing vs analytic European price "
+        "(De Fontnouvelle et al. 2003-style sentiment read; not a pure arb)."
+    ),
+)
+
+_TC_MONEYNESS_FLOW_NAME = TieredCopy(
+    beginner="Where trading clusters by moneyness",
+    intermediate="Dominant Flow Moneyness",
+    advanced="Delta-bucketed dominant flow",
+)
+_TC_MONEYNESS_FLOW_EXPL = TieredCopy(
+    beginner=(
+        "Where most of the option trading is happening — at the current price, above it, "
+        "or far above/below it."
+    ),
+    intermediate=(
+        "Delta-bucketed open interest and dollar volume — shows whether flow concentrates "
+        "at the money or in wings."
+    ),
+    advanced=(
+        "Delta-bucketed flow decomposition: dominant bucket flags speculative vs hedging "
+        "activity by moneyness (OCC-style surface splits; Lakonishok et al. 2007 context)."
+    ),
+)
+
+_TC_PIN_RISK_NAME = TieredCopy(
+    beginner="Expiry pin risk",
+    intermediate="Pin Risk",
+    advanced="Near-expiry pin (OI × P(ITM))",
+)
+_TC_PIN_RISK_EXPL = TieredCopy(
+    beginner=(
+        "When options are about to expire, the stock price sometimes gets ‘stuck’ near a price "
+        "where a lot of contracts are open. This measures that risk."
+    ),
+    intermediate=(
+        "Near-expiry pin risk from OI-weighted risk-neutral P(ITM) × strike concentration "
+        "versus recent volume."
+    ),
+    advanced=(
+        "Pin risk from OI × P(ITM) at high-OI strikes (QuantLib itmCashProbability); "
+        "Avellaneda–Lipkin (2003) dealer re-hedging / pinning mechanism."
+    ),
 )
 
 
@@ -570,5 +760,168 @@ def name_implied_move(lit: FinancialLiteracy) -> str:
     return _TC_IMPL_MOVE_NAME.pick(lit)
 
 
-def expl_implied_move(lit: FinancialLiteracy) -> str:
-    return _TC_IMPL_MOVE_EXPL.pick(lit)
+def expl_implied_move(
+    lit: FinancialLiteracy, implied_move_detail: dict[str, Any] | None = None
+) -> str:
+    base = _TC_IMPL_MOVE_EXPL.pick(lit)
+    if not implied_move_detail:
+        return base
+    dte = implied_move_detail.get("dte")
+    ann = implied_move_detail.get("annualized_iv")
+    daily = implied_move_detail.get("daily_implied_move_pct")
+    period = implied_move_detail.get("period_implied_move_pct")
+    if dte is None or ann is None:
+        return base
+    tail = TieredCopy(
+        beginner=(
+            f"For this slice: about {dte} calendar days to expiry; Brenner–Subrahmanyam-style σ "
+            f"≈ {ann:.2f}% annualized."
+        ),
+        intermediate=(
+            f"DTE={dte}, σ_BS88≈{ann:.2f}% ann.; daily≈{daily}%, horizon≈{period}% "
+            "(see implied_move_detail)."
+        ),
+        advanced=(
+            f"DTE={dte}; σ_BS88={ann:.4f}%; daily={daily}; period={period} (Brenner & Subrahmanyam 1988)."
+        ),
+    ).pick(lit)
+    return f"{base} {tail}"
+
+
+def name_dollar_call_flow_share(lit: FinancialLiteracy) -> str:
+    return _TC_DOLLAR_FLOW_NAME.pick(lit)
+
+
+def expl_dollar_call_flow_share(lit: FinancialLiteracy) -> str:
+    return _TC_DOLLAR_FLOW_EXPL.pick(lit)
+
+
+def name_dollar_put_call_oi(lit: FinancialLiteracy) -> str:
+    return _TC_DOLLAR_PC_OI_NAME.pick(lit)
+
+
+def expl_dollar_put_call_oi(lit: FinancialLiteracy) -> str:
+    return _TC_DOLLAR_PC_OI_EXPL.pick(lit)
+
+
+def name_gamma_flip_strike(lit: FinancialLiteracy) -> str:
+    return _TC_GAMMA_FLIP_NAME.pick(lit)
+
+
+def expl_gamma_flip_strike(
+    lit: FinancialLiteracy, gamma_flip_strike: float | None, spot: float
+) -> str:
+    base = _TC_GAMMA_FLIP_EXPL.pick(lit)
+    if gamma_flip_strike is None:
+        tail = TieredCopy(
+            beginner=" In this snapshot we did not find a clear flip level.",
+            intermediate=" No cumulative GEX sign change on the front expiry — flip strike unset.",
+            advanced=" No GEX zero-cross in sorted strikes (insufficient gamma/OI structure).",
+        ).pick(lit)
+        return f"{base}{tail}"
+    tail = TieredCopy(
+        beginner=f" Estimated flip near {gamma_flip_strike:.2f} vs spot about {spot:.2f}.",
+        intermediate=f" Interpolated flip ≈ {gamma_flip_strike:.2f} (spot {spot:.2f}).",
+        advanced=f" Flip≈{gamma_flip_strike:.4f} vs S={spot:.4f}.",
+    ).pick(lit)
+    return f"{base} {tail}"
+
+
+def name_net_delta_exposure(lit: FinancialLiteracy) -> str:
+    return _TC_NET_DELTA_NAME.pick(lit)
+
+
+def expl_net_delta_exposure(lit: FinancialLiteracy) -> str:
+    return _TC_NET_DELTA_EXPL.pick(lit)
+
+
+def name_vanna_exposure(lit: FinancialLiteracy) -> str:
+    return _TC_VANNA_NAME.pick(lit)
+
+
+def expl_vanna_exposure(lit: FinancialLiteracy, regime: str) -> str:
+    base = _TC_VANNA_EXPL.pick(lit)
+    tail = TieredCopy(
+        beginner=f" Regime here reads as {regime.replace('_', ' ')}.",
+        intermediate=f" Classified regime: {regime}.",
+        advanced=f" Regime={regime} (thresholded net vanna).",
+    ).pick(lit)
+    return f"{base}{tail}"
+
+
+def name_charm_exposure(lit: FinancialLiteracy) -> str:
+    return _TC_CHARM_NAME.pick(lit)
+
+
+def expl_charm_exposure(lit: FinancialLiteracy, drift: str) -> str:
+    base = _TC_CHARM_EXPL.pick(lit)
+    tail = TieredCopy(
+        beginner=f" Overnight drift label: {drift.replace('_', ' ')}.",
+        intermediate=f" Overnight delta drift: {drift}.",
+        advanced=f" Drift={drift}.",
+    ).pick(lit)
+    return f"{base}{tail}"
+
+
+def name_bsm_mispricing(lit: FinancialLiteracy) -> str:
+    return _TC_MISPRICING_NAME.pick(lit)
+
+
+def expl_bsm_mispricing(
+    lit: FinancialLiteracy, call_avg: float, put_avg: float, sentiment: str
+) -> str:
+    base = _TC_MISPRICING_EXPL.pick(lit)
+    tail = TieredCopy(
+        beginner=(
+            f" Calls are about {call_avg:.2f}% vs model on average; puts about {put_avg:.2f}%. "
+            f"Sentiment tag: {sentiment.replace('_', ' ')}."
+        ),
+        intermediate=(
+            f" Avg call mispricing {call_avg:.2f}%, put {put_avg:.2f}% — sentiment {sentiment}."
+        ),
+        advanced=f" call_avg={call_avg:.4f}% put_avg={put_avg:.4f}% sentiment={sentiment}.",
+    ).pick(lit)
+    return f"{base} {tail}"
+
+
+def name_dominant_flow_moneyness(lit: FinancialLiteracy) -> str:
+    return _TC_MONEYNESS_FLOW_NAME.pick(lit)
+
+
+def expl_dominant_flow_moneyness(
+    lit: FinancialLiteracy, dominant_call: str | None, dominant_put: str | None
+) -> str:
+    base = _TC_MONEYNESS_FLOW_EXPL.pick(lit)
+    dc = dominant_call or "n/a"
+    dp = dominant_put or "n/a"
+    tail = TieredCopy(
+        beginner=f" Most dollar call volume sits in the {dc} bucket; puts in {dp}.",
+        intermediate=f" Dominant call bucket {dc}; dominant put bucket {dp} (delta bands).",
+        advanced=f" dominant_call_bucket={dc} dominant_put_bucket={dp}.",
+    ).pick(lit)
+    return f"{base} {tail}"
+
+
+def name_pin_risk(lit: FinancialLiteracy) -> str:
+    return _TC_PIN_RISK_NAME.pick(lit)
+
+
+def expl_pin_risk(lit: FinancialLiteracy, pin_bundle: dict[str, Any]) -> str:
+    base = _TC_PIN_RISK_EXPL.pick(lit)
+    lvl = pin_bundle.get("pin_risk_level", "low")
+    mx = pin_bundle.get("max_pin_strike")
+    dte = pin_bundle.get("dte")
+    tail = TieredCopy(
+        beginner=(
+            f" Level {lvl}. "
+            f"{f'Focus strike about {mx}.' if mx is not None else 'No single focus strike stood out.'} "
+            f"{f'About {dte} days to expiry.' if dte is not None else ''}"
+        ),
+        intermediate=(
+            f" Pin risk {lvl}; max pin strike {mx}; DTE {dte}."
+            if mx is not None
+            else f" Pin risk {lvl}; DTE {dte}."
+        ),
+        advanced=f" pin_risk_level={lvl} max_pin_strike={mx} dte={dte}.",
+    ).pick(lit)
+    return f"{base} {tail}"

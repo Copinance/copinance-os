@@ -2,7 +2,7 @@
 
 Option Greeks in Copinance OS are estimated with **European Black–Scholes–Merton** using QuantLib's `AnalyticEuropeanEngine` (`copinance_os.data.analytics.options`). Payoffs are European; American exercise or dividends beyond a continuous yield are not modeled.
 
-**Aggregate chain analytics** (dealer-style positioning summary: bias, IV rank/skew/term, flow scores, gamma regime, max pain, implied move, OI clusters) live in the same package: **`copinance_os.data.analytics.options.positioning`** (`build_options_positioning_dict`, `compute_options_positioning_context`). Domain types: **`copinance_os.domain.models.options_positioning`**. These paths are separate from per-row QuantLib Greeks but reuse normalized **`OptionContract`** fields (including **`greeks`** when present).
+**Aggregate chain analytics** (dealer-style positioning summary: bias, IV rank/skew/term, flow scores, gamma regime, GEX profile, max pain, implied move, OI clusters, plus **vanna** / **charm** exposure, **mispricing** vs BSM fair value, **moneyness** buckets, and **pin risk**) live in the same package: **`copinance_os.data.analytics.options.positioning`** (`build_options_positioning_dict`, `compute_options_positioning_context`). Domain types: **`copinance_os.domain.models.options_positioning`**. These paths are separate from per-row QuantLib Greeks but reuse normalized **`OptionContract`** fields (including **`greeks`** when present).
 
 ---
 
@@ -15,8 +15,13 @@ Option Greeks in Copinance OS are estimated with **European Black–Scholes–Me
 | **Vega** | ≥ 0 | Largest near the money; tiny in the wings. |
 | **Theta** | typically < 0 | See [Theta caveat](#theta-caveat) — QuantLib's convention differs from "dollars per calendar day." |
 | **Rho** | — | Call rho typically positive; European put rho often negative. |
+| **Vanna** | — | ∂²V/∂S∂σ — optional; same BSM inputs as first-order Greeks. |
+| **Charm** | — | ∂Δ/∂T (calendar time) — optional; interpret alongside theta units. |
+| **Volga** | — | ∂²V/∂σ² — optional. |
 
-Greeks return `None` when: time to expiry ≤ 0, implied volatility ≤ 0, or spot ≤ 0. Surface `None` as unavailable, not zero.
+**NPV / ITM:** When estimation succeeds, contracts may also carry **theoretical_price** (BSM fair value) and **itm_probability** (risk-neutral ITM probability) on **`OptionGreeks`**, used for aggregate **mispricing** signals.
+
+Greeks return `None` when: time to expiry ≤ 0, implied volatility ≤ 0, or spot ≤ 0. Surface `None` as unavailable, not zero. Higher-order fields are omitted when the estimator cannot compute them for a row.
 
 ### Theta caveat
 
@@ -125,3 +130,4 @@ See [Architecture](../developer-guide/architecture) for layer rules.
 - [Configuration](../getting-started/configuration#option-greek-estimation-bsm)
 - [Examples — Options Session](../examples/options-session)
 - [Analysis Modes — Options Analysis](../user-guide/analysis-modes#options-analysis)
+- **Repository:** [options positioning — library integration notes](https://github.com/copinance/copinance-os/blob/main/docs/integration/options-positioning-library-integration.md) (I/O contracts, pitfalls, test paths)

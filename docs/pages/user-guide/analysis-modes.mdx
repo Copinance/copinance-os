@@ -30,7 +30,7 @@ What it does:
 2. Loads the option chain(s) for the selected expiration(s)—one chain per requested expiry, or the provider default when you omit expiries
 3. Summarizes open interest, volume, and implied volatility (per expiry when multiple)
 4. Highlights the at-the-money contract (per expiry when multiple)
-5. For **single-expiry** deterministic runs, computes **aggregate positioning** (bias, IV/skew/term, flow-style scores, gamma regime, max pain, implied move, OI clusters) and adds **`positioning`** to results (**snake_case**). Omitted when multiple expiries are requested in one job.
+5. For **single-expiry** deterministic runs, computes **aggregate positioning** (bias, IV/skew/term, flow-style scores, gamma regime, GEX, vanna/charm, mispricing, moneyness, pin risk, max pain, implied move, OI clusters) and adds **`positioning`** to results (**snake_case**). Omitted when multiple expiries are requested in one job.
 
 Example:
 

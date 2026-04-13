@@ -1,0 +1,580 @@
+{
+  "underlying_symbol": "SPY",
+  "expiration_date": "2026-04-17",
+  "available_expirations": [
+    "2026-04-17",
+    "2026-04-20"
+  ],
+  "underlying_price": "679.46",
+  "calls": [
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00666000",
+      "side": "call",
+      "strike": "666.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "15.79",
+      "bid": "15.67",
+      "ask": "15.84",
+      "volume": 124,
+      "open_interest": 6315,
+      "implied_volatility": "0.22901161621093752",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 19:59:10+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00667000",
+      "side": "call",
+      "strike": "667.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "14.6",
+      "bid": "14.72",
+      "ask": "15.08",
+      "volume": 113,
+      "open_interest": 2677,
+      "implied_volatility": "0.22901161621093752",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:06:11+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00668000",
+      "side": "call",
+      "strike": "668.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "13.77",
+      "bid": "13.88",
+      "ask": "14.28",
+      "volume": 4173,
+      "open_interest": 4043,
+      "implied_volatility": "0.22669230346679686",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:06:15+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00669000",
+      "side": "call",
+      "strike": "669.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "13.36",
+      "bid": "13.18",
+      "ask": "13.34",
+      "volume": 103,
+      "open_interest": 5247,
+      "implied_volatility": "0.21857470886230468",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 19:40:26+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00670000",
+      "side": "call",
+      "strike": "670.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "12.4",
+      "bid": "12.37",
+      "ask": "12.53",
+      "volume": 4671,
+      "open_interest": 23424,
+      "implied_volatility": "0.2150347052001953",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:10:02+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00671000",
+      "side": "call",
+      "strike": "671.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "11.38",
+      "bid": "11.48",
+      "ask": "11.86",
+      "volume": 557,
+      "open_interest": 3943,
+      "implied_volatility": "0.2160112579345703",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:07:50+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00672000",
+      "side": "call",
+      "strike": "672.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "10.87",
+      "bid": "10.71",
+      "ask": "11.04",
+      "volume": 1071,
+      "open_interest": 2860,
+      "implied_volatility": "0.21094539062499998",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:16+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00673000",
+      "side": "call",
+      "strike": "673.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "10.21",
+      "bid": "10.04",
+      "ask": "10.22",
+      "volume": 722,
+      "open_interest": 5223,
+      "implied_volatility": "0.20533021240234373",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:00:00+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00674000",
+      "side": "call",
+      "strike": "674.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "9.15",
+      "bid": "9.3",
+      "ask": "9.46",
+      "volume": 637,
+      "open_interest": 7350,
+      "implied_volatility": "0.20130193237304686",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:07:49+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00675000",
+      "side": "call",
+      "strike": "675.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "8.69",
+      "bid": "8.58",
+      "ask": "8.74",
+      "volume": 2206,
+      "open_interest": 19570,
+      "implied_volatility": "0.19788399780273438",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:10:33+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00676000",
+      "side": "call",
+      "strike": "676.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "7.99",
+      "bid": "7.88",
+      "ask": "8.05",
+      "volume": 296,
+      "open_interest": 8197,
+      "implied_volatility": "0.1948322705078125",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:13:17+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00677000",
+      "side": "call",
+      "strike": "677.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "7.24",
+      "bid": "7.19",
+      "ask": "7.37",
+      "volume": 1020,
+      "open_interest": 10595,
+      "implied_volatility": "0.19135330139160156",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:16+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00678000",
+      "side": "call",
+      "strike": "678.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "6.6",
+      "bid": "6.57",
+      "ask": "6.63",
+      "volume": 4092,
+      "open_interest": 7165,
+      "implied_volatility": "0.18524984680175777",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:10:32+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417C00679000",
+      "side": "call",
+      "strike": "679.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "5.98",
+      "bid": "5.95",
+      "ask": "5.98",
+      "volume": 3678,
+      "open_interest": 14211,
+      "implied_volatility": "0.18122156677246093",
+      "in_the_money": true,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:59+00:00"
+      }
+    }
+  ],
+  "puts": [
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00666000",
+      "side": "put",
+      "strike": "666.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "1.85",
+      "bid": "1.85",
+      "ask": "1.87",
+      "volume": 1888,
+      "open_interest": 4949,
+      "implied_volatility": "0.20691711059570309",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:34+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00667000",
+      "side": "put",
+      "strike": "667.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "2.04",
+      "bid": "2.01",
+      "ask": "2.03",
+      "volume": 2097,
+      "open_interest": 5551,
+      "implied_volatility": "0.204536763305664",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:21+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00668000",
+      "side": "put",
+      "strike": "668.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "2.21",
+      "bid": "2.17",
+      "ask": "2.2",
+      "volume": 1309,
+      "open_interest": 3961,
+      "implied_volatility": "0.20191227783203125",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:21+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00669000",
+      "side": "put",
+      "strike": "669.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "2.38",
+      "bid": "2.35",
+      "ask": "2.38",
+      "volume": 3299,
+      "open_interest": 12441,
+      "implied_volatility": "0.1992267578125",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:52+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00670000",
+      "side": "put",
+      "strike": "670.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "2.55",
+      "bid": "2.55",
+      "ask": "2.58",
+      "volume": 21739,
+      "open_interest": 46792,
+      "implied_volatility": "0.1966633068847656",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:50+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00671000",
+      "side": "put",
+      "strike": "671.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "2.81",
+      "bid": "2.76",
+      "ask": "2.79",
+      "volume": 3082,
+      "open_interest": 2509,
+      "implied_volatility": "0.19385571777343752",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:19+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00672000",
+      "side": "put",
+      "strike": "672.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "2.99",
+      "bid": "2.98",
+      "ask": "3.01",
+      "volume": 6777,
+      "open_interest": 3360,
+      "implied_volatility": "0.19080399047851562",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:55+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00673000",
+      "side": "put",
+      "strike": "673.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "3.32",
+      "bid": "3.22",
+      "ask": "3.25",
+      "volume": 1742,
+      "open_interest": 5582,
+      "implied_volatility": "0.18775226318359373",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:12:30+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00674000",
+      "side": "put",
+      "strike": "674.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "3.49",
+      "bid": "3.48",
+      "ask": "3.5",
+      "volume": 2053,
+      "open_interest": 4384,
+      "implied_volatility": "0.1844563977050781",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:55+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00675000",
+      "side": "put",
+      "strike": "675.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "3.77",
+      "bid": "3.76",
+      "ask": "3.79",
+      "volume": 22931,
+      "open_interest": 24647,
+      "implied_volatility": "0.18177087768554687",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:56+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00676000",
+      "side": "put",
+      "strike": "676.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "4.05",
+      "bid": "4.06",
+      "ask": "4.09",
+      "volume": 4886,
+      "open_interest": 4958,
+      "implied_volatility": "0.17865811584472657",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:50+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00677000",
+      "side": "put",
+      "strike": "677.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "4.4",
+      "bid": "4.38",
+      "ask": "4.41",
+      "volume": 6036,
+      "open_interest": 7416,
+      "implied_volatility": "0.17536225036621095",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:36+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00678000",
+      "side": "put",
+      "strike": "678.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "4.75",
+      "bid": "4.72",
+      "ask": "4.76",
+      "volume": 5622,
+      "open_interest": 3493,
+      "implied_volatility": "0.17224948852539065",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:57+00:00"
+      }
+    },
+    {
+      "underlying_symbol": "SPY",
+      "contract_symbol": "SPY260417P00679000",
+      "side": "put",
+      "strike": "679.0",
+      "expiration_date": "2026-04-17",
+      "last_price": "5.09",
+      "bid": "5.1",
+      "ask": "5.13",
+      "volume": 5579,
+      "open_interest": 2337,
+      "implied_volatility": "0.16895362304687503",
+      "in_the_money": false,
+      "currency": "USD",
+      "greeks": null,
+      "metadata": {
+        "provider": "yfinance",
+        "last_trade_date": "2026-04-10 20:14:42+00:00"
+      }
+    }
+  ],
+  "currency": "USD",
+  "metadata": {
+    "provider": "yfinance",
+    "snapshot_as_of": "2026-04-13",
+    "snapshot_target_expiration": "2026-04-17",
+    "snapshot_note": "Trimmed near-ATM SPY chain for options positioning integration tests"
+  }
+}
