@@ -193,6 +193,24 @@ class SignalCategoriesModel(ValueObject):
     structure: list[PositioningMetricModel] = Field(default_factory=list)
 
 
+class MethodologyReferenceModel(ValueObject):
+    id: str
+    title: str
+    url: str
+
+
+class MethodologyModel(ValueObject):
+    model_config = ConfigDict(populate_by_name=True)
+
+    version: str
+    computed_at: str = Field(..., alias="computedAt")
+    model_family: str = Field(..., alias="modelFamily")
+    assumptions: list[str]
+    limitations: list[str]
+    references: list[MethodologyReferenceModel]
+    data_inputs: dict[str, str] = Field(..., alias="dataInputs")
+
+
 class OptionsPositioningResult(ValueObject):
     """Full options-intelligence payload (internal snake_case; aliases for API JSON)."""
 
@@ -200,6 +218,7 @@ class OptionsPositioningResult(ValueObject):
 
     symbol: str
     window: PositioningWindow
+    methodology: MethodologyModel
     confidence: float = Field(..., ge=0, le=1)
     market_bias: PositioningBias = Field(..., alias="marketBias")
     bullish_probability: float = Field(..., ge=0, le=1, alias="bullishProbability")

@@ -200,6 +200,8 @@ def test_estimate_chain_sets_greeks_and_metadata() -> None:
     assert out.puts[0].greeks is not None
     assert out.metadata.get("option_greeks_model") == "quantlib_analytic_european_bsm"
     assert out.metadata.get("option_greeks_risk_free_rate") == "0.05"
+    assert out.metadata.get("option_greeks_methodology_version") == "quantlib_bsm_v2"
+    assert "European exercise" in str(out.metadata.get("option_greeks_assumptions"))
 
 
 @pytest.mark.unit

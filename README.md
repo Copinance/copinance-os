@@ -280,6 +280,7 @@ pytest --cov=copinance_os --cov-report=html  # explicit HTML report
   - **[Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/)** — Architecture, Extending, Testing, [API Reference](https://copinance.github.io/copinance-os/developer-guide/api-reference/) (ports and extension interfaces)
 - **[docs/README.md](docs/README.md)** — Build the docs site locally (Nextra)
 - **[docs/integration/options-positioning-library-integration.md](docs/integration/options-positioning-library-integration.md)** — Library notes for aggregate positioning and Greek enrichment (I/O contracts, pitfalls, tests)
+- **[docs/integration/llm-agent-features-integration-guide.md](docs/integration/llm-agent-features-integration-guide.md)** — LLM integration guide for tools, payload grounding, methodology rendering, and UI patterns
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** · **[GOVERNANCE.md](GOVERNANCE.md)** · **[CHANGELOG.md](CHANGELOG.md)**
 
 ---

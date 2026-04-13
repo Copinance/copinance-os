@@ -97,6 +97,9 @@ def test_build_options_positioning_dict_validates(toy_chain: tuple) -> None:
     model = OptionsPositioningResult.model_validate(raw)
     assert model.symbol == "SPY"
     assert model.window == "near"
+    assert model.methodology.version == "options_positioning_v2"
+    assert model.methodology.model_family == "aggregate_chain_heuristics_plus_bsm_enrichment"
+    assert model.methodology.references
     assert model.market_bias in ("bullish", "bearish", "neutral")
     assert model.signal_categories is not None
     assert len(model.signal_categories.positioning) == 6
@@ -160,6 +163,7 @@ def test_build_options_positioning_empty_chain() -> None:
     assert model.symbol == "ZZZZ"
     assert model.key_levels == []
     assert model.data_quality == 0.0
+    assert model.methodology.data_inputs.get("symbol") == "ZZZZ"
 
 
 @pytest.mark.unit

@@ -310,6 +310,19 @@ def estimate_bsm_greeks_for_options_chain(
     meta["option_greeks_risk_free_rate"] = str(risk_free_rate)
     meta["option_greeks_dividend_yield_assumption"] = str(dividend_yield)
     meta["option_greeks_as_of_date"] = eval_d.isoformat()
+    meta["option_greeks_methodology_version"] = "quantlib_bsm_v2"
+    meta["option_greeks_assumptions"] = (
+        "European exercise; Black-Scholes-Merton dynamics; "
+        "flat risk-free/dividend and constant implied volatility per contract."
+    )
+    meta["option_greeks_references"] = ",".join(
+        (
+            "REF_QUANTLIB_ANALYTIC_EUROPEAN",
+            "REF_BERGOMI_2005",
+            "REF_TALEB_1997",
+            "REF_CARR_WU_2009",
+        )
+    )
     return chain.model_copy(update={"calls": calls_out, "puts": puts_out, "metadata": meta})
 
 

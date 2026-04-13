@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any, Literal, cast
 
 from copinance_os.data.analytics.options.contract_numeric import contract_numeric
@@ -59,6 +59,34 @@ _BIAS_WEIGHTS: dict[str, float] = {
     "dollar_put_call_oi_ratio": -1.4,
     "net_delta": 1.2,
 }
+
+_POSITIONING_METHOD_REFERENCES: tuple[dict[str, str], ...] = (
+    {
+        "id": "REF_BERGOMI_2005",
+        "title": "Lorenzo Bergomi (2005), Smile Dynamics IV",
+        "url": "https://www.risk.net/derivatives/equity-derivatives/1510166/smile-dynamics",
+    },
+    {
+        "id": "REF_TALEB_1997",
+        "title": "Nassim Nicholas Taleb (1997), Dynamic Hedging",
+        "url": "https://onlinelibrary.wiley.com/doi/book/10.1002/9781119198665",
+    },
+    {
+        "id": "REF_CARR_WU_2009",
+        "title": "Carr and Wu (2009), Variance Risk Premiums",
+        "url": "https://doi.org/10.1093/rfs/hhp063",
+    },
+    {
+        "id": "REF_DE_FONTNOUVELLE_2003",
+        "title": "De Fontnouvelle et al. (2003), Option Mispricing",
+        "url": "https://www.nber.org/papers/w9333",
+    },
+    {
+        "id": "REF_AVELLANEDA_LIPKIN_2003",
+        "title": "Avellaneda and Lipkin (2003), Pin Risk and Probability Models",
+        "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=436260",
+    },
+)
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -1284,6 +1312,52 @@ def _compute_signal_agreement(
     return cast(SignalAgreement, f"{strength}_bearish")
 
 
+def _build_positioning_methodology(
+    *,
+    symbol: str,
+    window: Literal["near", "mid"],
+    ref_date: date,
+    nearest_exp: date | str | None,
+    second_exp: date | str | None,
+    data_quality: float,
+) -> dict[str, Any]:
+    def _exp_to_text(x: date | str | None) -> str | None:
+        if x is None:
+            return None
+        if isinstance(x, date):
+            return x.isoformat()
+        return str(x)
+
+    expiries = (
+        ",".join(x for x in (_exp_to_text(nearest_exp), _exp_to_text(second_exp)) if x) or "none"
+    )
+    return {
+        "version": "options_positioning_v2",
+        "computed_at": datetime(
+            ref_date.year, ref_date.month, ref_date.day, tzinfo=UTC
+        ).isoformat(),
+        "model_family": "aggregate_chain_heuristics_plus_bsm_enrichment",
+        "assumptions": [
+            "Per-contract Greeks use European BSM assumptions when enrichment is required.",
+            "Aggregate directional scores combine OI, volume, IV surface, and Greeks with fixed transparent weights.",
+            f"Positioning window '{window}' applies horizon damping to the aggregate bias score.",
+        ],
+        "limitations": [
+            "Positioning signals are heuristic aggregates and not execution advice.",
+            "Low liquidity or sparse strikes can reduce reliability for skew, pin, and flow metrics.",
+            "BSM-based mispricing and ITM probabilities depend on quoted implied volatility quality.",
+        ],
+        "references": list(_POSITIONING_METHOD_REFERENCES),
+        "data_inputs": {
+            "symbol": symbol,
+            "as_of_date": ref_date.isoformat(),
+            "window": window,
+            "expirations_used": expiries,
+            "data_quality": f"{data_quality:.4f}",
+        },
+    }
+
+
 def build_options_positioning_dict(
     chain: OptionsChain,
     calls: list[OptionContract],
@@ -1655,10 +1729,19 @@ def build_options_positioning_dict(
 
     cw = oi_enhanced_bundle["call_wall"]
     pw = oi_enhanced_bundle["put_wall"]
+    methodology = _build_positioning_methodology(
+        symbol=symbol,
+        window=window,
+        ref_date=ref_date,
+        nearest_exp=nearest_exp,
+        second_exp=second_exp,
+        data_quality=data_quality,
+    )
 
     return {
         "symbol": symbol,
         "window": window,
+        "methodology": methodology,
         "confidence": round(confidence, 4),
         "market_bias": bias,
         "bullish_probability": round(bullish_probability, 4),
