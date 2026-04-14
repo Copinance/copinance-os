@@ -1107,7 +1107,7 @@ class MacroRegimeIndicatorsTool(Tool):
                     interpretation["fed_balance_sheet_trillions"] = round(bs_size / 1000, 2)
 
                 if interpretation:
-                    out["interpretation"] = interpretation
+                    out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
 
                 logger.info("Successfully fetched advanced FRED indicators")
             except Exception as e:

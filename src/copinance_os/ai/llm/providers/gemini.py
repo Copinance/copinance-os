@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any, cast
 
 import structlog
+from typing_extensions import override
 
 try:
     import google.genai as genai
@@ -106,6 +107,7 @@ class GeminiProvider(LLMProvider):
                 api_key_provided=api_key is not None,
             )
 
+    @override
     async def generate_text(
         self,
         prompt: str,
@@ -161,6 +163,7 @@ class GeminiProvider(LLMProvider):
             logger.error("Gemini API call failed", error=str(e))
             raise
 
+    @override
     async def is_available(self) -> bool:
         """Check if Gemini provider is available and configured.
 
@@ -184,6 +187,7 @@ class GeminiProvider(LLMProvider):
             logger.debug("Gemini availability check failed", error=str(e))
             return False
 
+    @override
     def get_provider_name(self) -> str:
         """Get the name of the LLM provider.
 
@@ -192,6 +196,7 @@ class GeminiProvider(LLMProvider):
         """
         return "gemini"
 
+    @override
     def get_model_name(self) -> str | None:
         """Get the model name being used by this provider.
 
@@ -200,6 +205,7 @@ class GeminiProvider(LLMProvider):
         """
         return self._model_name
 
+    @override
     def supports_native_text_stream(self) -> bool:
         return (
             bool(GEMINI_AVAILABLE and self._api_key and self._client is not None)
@@ -628,6 +634,7 @@ class GeminiProvider(LLMProvider):
             "required": required,
         }
 
+    @override
     async def generate_with_tools(
         self,
         prompt: str,

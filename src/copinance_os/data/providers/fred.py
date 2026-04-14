@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 import structlog
+from typing_extensions import override
 
 from copinance_os.domain.models.macro import MacroDataPoint
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider
@@ -32,6 +33,7 @@ class FredMacroeconomicProvider(MacroeconomicDataProvider):
         self._timeout_seconds = timeout_seconds
         self._client: httpx.AsyncClient | None = None
 
+    @override
     def get_provider_name(self) -> str:
         return "fred"
 
@@ -44,6 +46,7 @@ class FredMacroeconomicProvider(MacroeconomicDataProvider):
             )
         return self._client
 
+    @override
     async def is_available(self) -> bool:
         if not self._api_key:
             logger.debug("FRED API key not set", has_api_key=False)
@@ -74,6 +77,7 @@ class FredMacroeconomicProvider(MacroeconomicDataProvider):
             )
             return False
 
+    @override
     async def get_time_series(
         self,
         series_id: str,

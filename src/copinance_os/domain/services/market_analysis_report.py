@@ -3,23 +3,17 @@
 from typing import Any
 
 from copinance_os.data.literacy import instrument_analysis as ia_lit
+from copinance_os.data.literacy import reports as reports_lit
+from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis_report import AnalysisReport
 from copinance_os.domain.models.methodology import envelope_from_text_methodology
 from copinance_os.domain.models.profile import FinancialLiteracy
-
-_DEFAULT_ASSUMPTIONS = (
-    "Macro and market series may be delayed; provider availability affects coverage.",
-    "Regime labels are model outputs, not forecasts.",
-)
-_DEFAULT_LIMITATIONS = (
-    "Not investment advice; for research and education only.",
-    "Does not include transaction costs, slippage, or portfolio constraints.",
-)
 
 
 def build_market_analysis_report(
     results: dict[str, Any], lit: FinancialLiteracy
 ) -> AnalysisReport | None:
+    resolved_lit = resolve_financial_literacy(lit)
     """Build a report envelope from ``market_analysis`` executor output, if applicable."""
     if results.get("execution_type") != "market_analysis":
         return None
@@ -30,7 +24,7 @@ def build_market_analysis_report(
     mri_ok = isinstance(mri, dict) and bool(mri.get("success"))
     macro_ok = isinstance(macro, dict) and bool(macro.get("success"))
 
-    summary = ia_lit.report_market_summary(idx, mri_ok, macro_ok, lit)
+    summary = ia_lit.report_market_summary(idx, mri_ok, macro_ok, resolved_lit)
 
     key_metrics: dict[str, Any] = {
         "market_index": idx,
@@ -44,8 +38,8 @@ def build_market_analysis_report(
     methodology = envelope_from_text_methodology(
         spec_id="market_analysis.deterministic",
         model_family="regime_indicators_and_macro_series",
-        assumptions=_DEFAULT_ASSUMPTIONS,
-        limitations=_DEFAULT_LIMITATIONS,
+        assumptions=reports_lit.report_assumptions(resolved_lit),
+        limitations=reports_lit.report_limitations(resolved_lit),
         data_inputs={
             "market_index": idx,
             "execution_mode": str(results.get("execution_mode") or ""),

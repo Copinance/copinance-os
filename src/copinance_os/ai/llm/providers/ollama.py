@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 import structlog
+from typing_extensions import override
 
 if TYPE_CHECKING:
     import httpx  # noqa: F401
@@ -105,6 +106,7 @@ class OllamaProvider(LLMProvider):
         else:
             logger.warning("httpx package is not installed, Ollama provider will not work")
 
+    @override
     def supports_native_text_stream(self) -> bool:
         return bool(HTTPX_AVAILABLE and self._client is not None) and (
             not self._disable_native_text_stream
@@ -146,6 +148,7 @@ class OllamaProvider(LLMProvider):
 
         return payload
 
+    @override
     async def generate_text(
         self,
         prompt: str,
@@ -278,6 +281,7 @@ class OllamaProvider(LLMProvider):
             logger.error("Unexpected error in Ollama provider", error=str(e))
             raise
 
+    @override
     async def is_available(self) -> bool:
         """Check if Ollama provider is available and configured.
 
@@ -299,6 +303,7 @@ class OllamaProvider(LLMProvider):
             logger.debug("Ollama availability check failed", error=str(e))
             return False
 
+    @override
     def get_provider_name(self) -> str:
         """Get the name of the LLM provider.
 
@@ -307,6 +312,7 @@ class OllamaProvider(LLMProvider):
         """
         return "ollama"
 
+    @override
     def get_model_name(self) -> str | None:
         """Get the model name being used by this provider.
 
@@ -488,6 +494,7 @@ class OllamaProvider(LLMProvider):
 
         return "".join(parts)
 
+    @override
     async def generate_with_tools(
         self,
         prompt: str,

@@ -62,7 +62,7 @@ def compute_pin_risk(
     if dte > config.max_dte:
         return None
 
-    total_vol = sum(contract_vol(c) for c in calls) + sum(contract_vol(p) for p in puts)
+    total_vol = sum(contract_vol(c) or 0 for c in calls) + sum(contract_vol(p) or 0 for p in puts)
 
     calls_by_k: dict[float, list[OptionContract]] = defaultdict(list)
     puts_by_k: dict[float, list[OptionContract]] = defaultdict(list)
@@ -78,7 +78,7 @@ def compute_pin_risk(
             if c.greeks is None or c.greeks.itm_probability is None:
                 continue
             oi = contract_oi(c)
-            if oi <= 0:
+            if oi is None or oi <= 0:
                 continue
             num += float(c.greeks.itm_probability) * oi
             den += oi
@@ -89,8 +89,12 @@ def compute_pin_risk(
     strikes_set = set(calls_by_k.keys()) | set(puts_by_k.keys())
     rows: list[tuple[float, int, float, float]] = []
     for k in strikes_set:
-        call_oi = sum(contract_oi(c) for c in calls_by_k.get(k, ()))
-        put_oi = sum(contract_oi(p) for p in puts_by_k.get(k, ()))
+        call_oi = sum(
+            oi for c in calls_by_k.get(k, ()) if (oi := contract_oi(c)) is not None and oi > 0
+        )
+        put_oi = sum(
+            oi for p in puts_by_k.get(k, ()) if (oi := contract_oi(p)) is not None and oi > 0
+        )
         total_oi = call_oi + put_oi
         if total_oi <= config.min_total_oi:
             continue

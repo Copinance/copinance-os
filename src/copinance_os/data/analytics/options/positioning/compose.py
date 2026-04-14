@@ -85,10 +85,10 @@ def compose_options_positioning_payload(
     moneyness_bundle = compute_moneyness_buckets(calls, puts, mc.moneyness)
     pin_bundle = compute_pin_risk(calls, puts, nearest_exp, underlying, ref_date, mc.pin_risk)
 
-    call_oi = sum(contract_oi(c) for c in calls)
-    put_oi = sum(contract_oi(p) for p in puts)
-    call_vol = sum(contract_vol(c) for c in calls)
-    put_vol = sum(contract_vol(p) for p in puts)
+    call_oi = sum(contract_oi(c) or 0 for c in calls)
+    put_oi = sum(contract_oi(p) or 0 for p in puts)
+    call_vol = sum(contract_vol(c) or 0 for c in calls)
+    put_vol = sum(contract_vol(p) or 0 for p in puts)
 
     total_oi = max(1, call_oi + put_oi)
     total_vol = max(1, call_vol + put_vol)
@@ -97,8 +97,20 @@ def compose_options_positioning_payload(
     put_call_oi_ratio = put_oi / max(1, call_oi)
     call_flow_ratio = call_vol / total_vol
 
-    weighted_gamma_calls = sum(numeric_greek(c, "gamma") * float(contract_oi(c)) for c in calls)
-    weighted_gamma_puts = sum(numeric_greek(p, "gamma") * float(contract_oi(p)) for p in puts)
+    weighted_gamma_calls = sum(
+        g * float(oi)
+        for c in calls
+        if (g := numeric_greek(c, "gamma")) is not None
+        and (oi := contract_oi(c)) is not None
+        and oi > 0
+    )
+    weighted_gamma_puts = sum(
+        g * float(oi)
+        for p in puts
+        if (g := numeric_greek(p, "gamma")) is not None
+        and (oi := contract_oi(p)) is not None
+        and oi > 0
+    )
     gamma_tilt = (weighted_gamma_calls - weighted_gamma_puts) / max(
         1.0, abs(weighted_gamma_calls) + abs(weighted_gamma_puts)
     )
@@ -136,7 +148,9 @@ def compose_options_positioning_payload(
 
     confidence *= 0.5 + 0.5 * data_quality
 
-    strikes = sorted({round(contract_strike(c), 2) for c in (*calls, *puts) if contract_oi(c) > 0})
+    strikes = sorted(
+        {round(contract_strike(c), 2) for c in (*calls, *puts) if (contract_oi(c) or 0) > 0}
+    )
     around_spot = sorted(strikes, key=lambda s: abs(s - underlying))[:3] if strikes else []
 
     dcf = dollar_metrics_dict["dollar_call_flow_share"]
@@ -195,11 +209,14 @@ def compose_options_positioning_payload(
         },
     ]
 
-    all_iv_samples = [
-        contract_iv_pct(c)
-        for c in (*calls, *puts)
-        if contract_iv_pct(c) > 0 and (contract_oi(c) + contract_vol(c)) > 0
-    ]
+    all_iv_samples: list[float] = []
+    for contract in (*calls, *puts):
+        iv_pct = contract_iv_pct(contract)
+        if iv_pct is None or iv_pct <= 0:
+            continue
+        if ((contract_oi(contract) or 0) + (contract_vol(contract) or 0)) <= 0:
+            continue
+        all_iv_samples.append(iv_pct)
 
     vol_sigs, vol_partial = compute_volatility_signals(
         calls, puts, nearest_exp, underlying, all_iv_samples, lit, mc.volatility

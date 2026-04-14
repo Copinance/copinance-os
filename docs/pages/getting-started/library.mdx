@@ -635,6 +635,10 @@ For **options-surface / positioning intelligence** (bias, IV/skew/term, flow-sty
 - **Data:** `await compute_options_positioning_context(provider, symbol, window)` where `window` is `"near"` or `"mid"`, and `provider` is a **`MarketDataProvider`** (`get_quote`, `get_options_chain`). The usual choice is `container.market_data_provider()` from `get_container(...)`.
 - **Direct builder:** `build_options_positioning(...)` for already-fetched chain/quote payloads.
 
+Behavior notes:
+- Missing Greeks/OI/volume inputs propagate as unavailable (`null`) and are skipped in aggregate math; no fallback `0.0` synthesis.
+- `build_options_positioning(...)` raises domain `ValidationError` when no contracts are available for the requested positioning window/expiry.
+
 ```python
 import asyncio
 from copinance_os.data.analytics.options.positioning import compute_options_positioning_context
@@ -716,6 +720,8 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 | Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, `include_prompt_in_results`, `stream` |
 
 **Ports for custom runners:** `AnalyzeInstrumentRunner` and `AnalyzeMarketRunner` in **`copinance_os.domain.ports.analysis_execution`** — each: `async def run(self, request: ...Request) -> RunJobResult`.
+
+**RunJobResult export shape:** machine consumers should treat `success`, `results`, `error_message`, `report`, and `report_exclusion_reason` as the stable top-level contract for analyze workflows.
 
 ### Profile use cases — `copinance_os.research.workflows.profile`
 

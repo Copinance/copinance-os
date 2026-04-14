@@ -38,10 +38,26 @@ def compute_dollar_metrics(
     puts: list[OptionContract],
     _config: DollarConfig = DEFAULT_DOLLAR_CONFIG,
 ) -> dict[str, float]:
-    dollar_call_oi = sum(contract_mid_price(c) * float(contract_oi(c)) * 100.0 for c in calls)
-    dollar_put_oi = sum(contract_mid_price(p) * float(contract_oi(p)) * 100.0 for p in puts)
-    dollar_call_vol = sum(contract_mid_price(c) * float(contract_vol(c)) * 100.0 for c in calls)
-    dollar_put_vol = sum(contract_mid_price(p) * float(contract_vol(p)) * 100.0 for p in puts)
+    dollar_call_oi = 0.0
+    dollar_put_oi = 0.0
+    dollar_call_vol = 0.0
+    dollar_put_vol = 0.0
+    for c in calls:
+        oi = contract_oi(c)
+        vol = contract_vol(c)
+        mid = contract_mid_price(c)
+        if oi is not None and oi > 0:
+            dollar_call_oi += mid * float(oi) * 100.0
+        if vol is not None and vol > 0:
+            dollar_call_vol += mid * float(vol) * 100.0
+    for p in puts:
+        oi = contract_oi(p)
+        vol = contract_vol(p)
+        mid = contract_mid_price(p)
+        if oi is not None and oi > 0:
+            dollar_put_oi += mid * float(oi) * 100.0
+        if vol is not None and vol > 0:
+            dollar_put_vol += mid * float(vol) * 100.0
     tot_dollar_vol = dollar_call_vol + dollar_put_vol
     return {
         "dollar_call_oi": dollar_call_oi,

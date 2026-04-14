@@ -57,8 +57,8 @@ def compute_implied_move(
     c_near = contracts_for_expiration(calls, nearest_exp)
     p_near = contracts_for_expiration(puts, nearest_exp)
     strikes = sorted(
-        {contract_strike(c) for c in c_near if contract_oi(c) + contract_vol(c) > 0}
-        & {contract_strike(p) for p in p_near if contract_oi(p) + contract_vol(p) > 0}
+        {contract_strike(c) for c in c_near if (contract_oi(c) or 0) + (contract_vol(c) or 0) > 0}
+        & {contract_strike(p) for p in p_near if (contract_oi(p) or 0) + (contract_vol(p) or 0) > 0}
     )
     atm = atm_strike(strikes, underlying)
     if atm is None:

@@ -29,6 +29,7 @@ from decimal import Decimal
 from typing import Any, cast
 
 import structlog
+from typing_extensions import override
 
 try:
     import pandas as pd  # type: ignore[import-untyped]
@@ -42,6 +43,7 @@ except ImportError:
     DataFrame = None  # type: ignore[misc, assignment]
     pd = None  # type: ignore[assignment]
 
+from copinance_os.domain.exceptions import DataProviderError, ValidationError
 from copinance_os.domain.models.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
@@ -99,7 +101,7 @@ def _select_options_expiration_string(
     if explicit_expiration is not None:
         return explicit_expiration
     if not available_expirations:
-        raise ValueError("available_expirations must not be empty")
+        raise ValidationError("available_expirations", "must not be empty")
     parsed = sorted({datetime.strptime(x, "%Y-%m-%d").date() for x in available_expirations})
     today = as_of if as_of is not None else date.today()
     for d in parsed:
@@ -159,6 +161,7 @@ class YFinanceMarketProvider(MarketDataProvider):
         self._provider_name = "yfinance"
         logger.info("Initialized yfinance market data provider")
 
+    @override
     async def is_available(self) -> bool:
         """Check if yfinance is available."""
         if not YFINANCE_AVAILABLE:
@@ -171,10 +174,12 @@ class YFinanceMarketProvider(MarketDataProvider):
             logger.warning("yfinance availability check failed", error=str(e))
             return False
 
+    @override
     def get_provider_name(self) -> str:
         """Get provider name."""
         return self._provider_name
 
+    @override
     async def get_quote(self, symbol: str) -> dict[str, Any]:
         """Get current quote for a symbol.
 
@@ -229,8 +234,11 @@ class YFinanceMarketProvider(MarketDataProvider):
 
         except Exception as e:
             logger.error("Failed to fetch quote", symbol=symbol, error=str(e))
-            raise ValueError(f"Failed to fetch quote for {symbol}: {str(e)}") from e
+            raise DataProviderError(
+                self._provider_name, "get_quote", f"Failed to fetch quote for {symbol}: {e}"
+            ) from e
 
+    @override
     async def get_historical_data(
         self,
         symbol: str,
@@ -299,8 +307,13 @@ class YFinanceMarketProvider(MarketDataProvider):
 
         except Exception as e:
             logger.error("Failed to fetch historical data", symbol=symbol, error=str(e))
-            raise ValueError(f"Failed to fetch historical data for {symbol}: {str(e)}") from e
+            raise DataProviderError(
+                self._provider_name,
+                "get_historical_data",
+                f"Failed to fetch historical data for {symbol}: {e}",
+            ) from e
 
+    @override
     async def get_intraday_data(
         self,
         symbol: str,
@@ -368,8 +381,13 @@ class YFinanceMarketProvider(MarketDataProvider):
 
         except Exception as e:
             logger.error("Failed to fetch intraday data", symbol=symbol, error=str(e))
-            raise ValueError(f"Failed to fetch intraday data for {symbol}: {str(e)}") from e
+            raise DataProviderError(
+                self._provider_name,
+                "get_intraday_data",
+                f"Failed to fetch intraday data for {symbol}: {e}",
+            ) from e
 
+    @override
     async def search_instruments(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         """Search for market instruments by symbol or name using yfinance Search.
 
@@ -422,6 +440,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             logger.warning("Failed to search market instruments", query=query, error=str(e))
             return []
 
+    @override
     async def get_options_chain(
         self,
         underlying_symbol: str,
@@ -438,15 +457,20 @@ class YFinanceMarketProvider(MarketDataProvider):
             available_expirations = await asyncio.to_thread(lambda: list(ticker.options))
 
             if not available_expirations:
-                raise ValueError(f"No listed options available for {underlying_symbol}")
+                raise DataProviderError(
+                    self._provider_name,
+                    "get_options_chain",
+                    f"No listed options available for {underlying_symbol}",
+                )
 
             selected_expiration = _select_options_expiration_string(
                 available_expirations,
                 expiration_date,
             )
             if selected_expiration not in available_expirations:
-                raise ValueError(
-                    f"Expiration {selected_expiration} is not available for {underlying_symbol}"
+                raise ValidationError(
+                    "expiration_date",
+                    f"Expiration {selected_expiration} is not available for {underlying_symbol}",
                 )
 
             option_chain = await asyncio.to_thread(
@@ -525,8 +549,10 @@ class YFinanceMarketProvider(MarketDataProvider):
                 underlying_symbol=underlying_symbol,
                 error=str(e),
             )
-            raise ValueError(
-                f"Failed to fetch options chain for {underlying_symbol}: {str(e)}"
+            raise DataProviderError(
+                self._provider_name,
+                "get_options_chain",
+                f"Failed to fetch options chain for {underlying_symbol}: {e}",
             ) from e
 
 
@@ -556,6 +582,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
             cache_ttl_seconds=cache_ttl_seconds,
         )
 
+    @override
     async def is_available(self) -> bool:
         """Check if yfinance is available."""
         if not YFINANCE_AVAILABLE:
@@ -567,10 +594,12 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
             logger.warning("yfinance availability check failed", error=str(e))
             return False
 
+    @override
     def get_provider_name(self) -> str:
         """Get provider name."""
         return self._provider_name
 
+    @override
     async def get_financial_statements(
         self,
         symbol: str,
@@ -605,7 +634,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
             }
 
             if statement_type not in statement_map:
-                raise ValueError(f"Invalid statement_type: {statement_type}")
+                raise ValidationError("statement_type", f"Invalid statement_type: {statement_type}")
 
             property_name = statement_map[statement_type]
 
@@ -658,8 +687,13 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 statement_type=statement_type,
                 error=str(e),
             )
-            raise ValueError(f"Failed to fetch {statement_type} for {symbol}: {str(e)}") from e
+            raise DataProviderError(
+                self._provider_name,
+                "get_financial_statements",
+                f"Failed to fetch {statement_type} for {symbol}: {e}",
+            ) from e
 
+    @override
     async def get_sec_filings(
         self,
         symbol: str,
@@ -682,6 +716,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
         # Return empty list - developers should use a dedicated SEC provider
         return []
 
+    @override
     async def get_earnings_transcripts(
         self,
         symbol: str,
@@ -700,6 +735,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
         )
         return []
 
+    @override
     async def get_esg_metrics(
         self,
         symbol: str,
@@ -735,6 +771,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 "error": "ESG data not available via yfinance",
             }
 
+    @override
     async def get_insider_trading(
         self,
         symbol: str,
@@ -1095,6 +1132,7 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
         self._cache[cache_key] = (fundamentals, datetime.now(UTC))
         logger.debug("Cached fundamentals", symbol=symbol, cache_key=cache_key)
 
+    @override
     async def get_detailed_fundamentals(
         self,
         symbol: str,
@@ -1147,9 +1185,11 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
 
             # Check if all statements are empty (invalid symbol)
             if income_df.empty and balance_df.empty and cashflow_df.empty:
-                raise ValueError(
+                raise DataProviderError(
+                    self._provider_name,
+                    "get_detailed_fundamentals",
                     f"Failed to fetch detailed fundamentals for {symbol}: "
-                    "No financial data found. Symbol may be invalid."
+                    "No financial data found. Symbol may be invalid.",
                 )
 
             # Parse income statements
@@ -1567,4 +1607,8 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
                 symbol=symbol,
                 error=str(e),
             )
-            raise ValueError(f"Failed to fetch detailed fundamentals for {symbol}: {str(e)}") from e
+            raise DataProviderError(
+                self._provider_name,
+                "get_detailed_fundamentals",
+                f"Failed to fetch detailed fundamentals for {symbol}: {e}",
+            ) from e

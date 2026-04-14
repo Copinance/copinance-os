@@ -72,15 +72,15 @@ _PHASE_DESCRIPTIONS = {
 }
 
 _TREND_REGIME = {
-    "bull": TieredCopy("uptrend", "bull", "bull"),
-    "bear": TieredCopy("downtrend", "bear", "bear"),
-    "neutral": TieredCopy("sideways", "neutral", "neutral"),
+    "bull": TieredCopy("uptrend", "bull", "bull regime"),
+    "bear": TieredCopy("downtrend", "bear", "bear regime"),
+    "neutral": TieredCopy("sideways", "neutral", "neutral regime"),
 }
 
 _VOL_REGIME = {
-    "high": TieredCopy("high volatility", "high", "high"),
-    "normal": TieredCopy("normal volatility", "normal", "normal"),
-    "low": TieredCopy("low volatility", "low", "low"),
+    "high": TieredCopy("high volatility", "high", "high volatility"),
+    "normal": TieredCopy("normal volatility", "normal", "normal volatility"),
+    "low": TieredCopy("low volatility", "low", "low volatility"),
 }
 
 

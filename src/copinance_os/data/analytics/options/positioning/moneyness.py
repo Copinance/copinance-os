@@ -82,8 +82,8 @@ def compute_moneyness_buckets(
         d = abs(float(contract.greeks.delta))
         bname = moneyness_bucket_name(d)
         row = acc[bname]
-        oi = contract_oi(contract)
-        vol = contract_vol(contract)
+        oi = contract_oi(contract) or 0
+        vol = contract_vol(contract) or 0
         mid = contract_mid_price(contract)
         dv = float(vol) * mid * 100.0
         if side == "call":

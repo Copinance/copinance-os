@@ -30,19 +30,6 @@ from copinance_os.domain.ports.tools import Tool
 logger = structlog.get_logger(__name__)
 
 
-# Placeholder for future statistical implementations
-# TODO: Implement statistical regime detection tools
-# Example structure:
-#
-# class HMMRegimeDetectionTool(BaseRegimeDetectionTool):
-#     """Tool for detecting regimes using Hidden Markov Models."""
-#     ...
-#
-# class HamiltonRegimeSwitchingTool(BaseRegimeDetectionTool):
-#     """Tool for detecting regimes using Hamilton's regime switching model."""
-#     ...
-
-
 def create_statistical_regime_tools(
     market_data_provider: MarketDataProvider,
 ) -> list[Tool]:
@@ -55,12 +42,10 @@ def create_statistical_regime_tools(
         List of statistical market regime detection tools
 
     Note:
-        Currently returns empty list. Implement statistical tools as needed:
-        - HMMRegimeDetectionTool
-        - HamiltonRegimeSwitchingTool
-        - BayesianRegimeDetectionTool
-        etc.
+        Statistical regime tools are intentionally not wired yet in production.
+        The deterministic rule-based tools remain the supported path until
+        statistical model selection and calibration are finalized.
     """
-    # TODO: Implement and return statistical tools
-    logger.info("Statistical regime tools not yet implemented")
+    _ = market_data_provider
+    logger.info("Statistical regime tools are intentionally disabled")
     return []

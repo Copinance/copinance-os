@@ -15,12 +15,19 @@ from copinance_os.data.analytics.options.positioning.contracts import (
 from copinance_os.domain.models.market import OptionContract
 from copinance_os.domain.models.methodology import MethodologySpec
 
+# Floor prevents unstable tiny-sample regime flips.
+DEFAULT_VANNA_REGIME_FLOOR = 5000.0
+# Relative threshold scales with gross OI-weighted vanna.
+DEFAULT_VANNA_REGIME_GROSS_FRACTION = 0.03
+# Keep only the most material strike exposures in output.
+DEFAULT_VANNA_PROFILE_TOP_K = 15
+
 
 @dataclass(frozen=True, slots=True)
 class VannaConfig:
-    vanna_regime_floor: float = 5000.0
-    vanna_regime_gross_frac: float = 0.03
-    profile_top_k: int = 15
+    vanna_regime_floor: float = DEFAULT_VANNA_REGIME_FLOOR
+    vanna_regime_gross_frac: float = DEFAULT_VANNA_REGIME_GROSS_FRACTION
+    profile_top_k: int = DEFAULT_VANNA_PROFILE_TOP_K
 
 
 DEFAULT_VANNA_CONFIG = VannaConfig()
@@ -50,9 +57,17 @@ def _vanna_regime_threshold(
 ) -> float:
     gross = 0.0
     for c in calls:
-        gross += abs(numeric_greek(c, "vanna")) * float(contract_oi(c))
+        vanna = numeric_greek(c, "vanna")
+        oi = contract_oi(c)
+        if vanna is None or oi is None or oi <= 0:
+            continue
+        gross += abs(vanna) * float(oi)
     for p in puts:
-        gross += abs(numeric_greek(p, "vanna")) * float(contract_oi(p))
+        vanna = numeric_greek(p, "vanna")
+        oi = contract_oi(p)
+        if vanna is None or oi is None or oi <= 0:
+            continue
+        gross += abs(vanna) * float(oi)
     return max(config.vanna_regime_floor, config.vanna_regime_gross_frac * gross * 100.0)
 
 
@@ -72,11 +87,15 @@ def compute_vanna_exposure(
     for c in contracts_for_expiration(calls, nearest_exp):
         v = numeric_greek(c, "vanna")
         oi = contract_oi(c)
+        if v is None or oi is None or oi <= 0:
+            continue
         strike_to_net[contract_strike(c)] += v * float(oi) * mult
         call_sum += v * float(oi) * 100.0
     for p in contracts_for_expiration(puts, nearest_exp):
         v = numeric_greek(p, "vanna")
         oi = contract_oi(p)
+        if v is None or oi is None or oi <= 0:
+            continue
         strike_to_net[contract_strike(p)] -= v * float(oi) * mult
         put_sum += v * float(oi) * 100.0
 

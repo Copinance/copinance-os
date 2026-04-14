@@ -8,7 +8,7 @@ from copinance_os.data.analytics.options.positioning.math import safe_float
 from copinance_os.domain.models.market import OptionContract, OptionsChain
 
 
-def numeric_greek(contract: OptionContract, name: str) -> float:
+def numeric_greek(contract: OptionContract, name: str) -> float | None:
     """Return a float from the contract or nested ``greeks``."""
     v = getattr(contract, name, None)
     if v is not None:
@@ -18,14 +18,14 @@ def numeric_greek(contract: OptionContract, name: str) -> float:
             pass
     g = contract.greeks
     if g is None:
-        return 0.0
+        return None
     v2 = getattr(g, name, None)
     if v2 is None:
-        return 0.0
+        return None
     try:
         return float(v2)
     except (TypeError, ValueError):
-        return 0.0
+        return None
 
 
 def contract_strike(c: OptionContract) -> float:
@@ -36,33 +36,33 @@ def contract_expiration_iso(c: OptionContract) -> str:
     return c.expiration_date.isoformat()
 
 
-def contract_oi(c: OptionContract) -> int:
+def contract_oi(c: OptionContract) -> int | None:
     v = c.open_interest
     if v is None:
-        return 0
+        return None
     try:
         return int(v)
     except (TypeError, ValueError):
-        return 0
+        return None
 
 
-def contract_vol(c: OptionContract) -> int:
+def contract_vol(c: OptionContract) -> int | None:
     v = c.volume
     if v is None:
-        return 0
+        return None
     try:
         return int(v)
     except (TypeError, ValueError):
-        return 0
+        return None
 
 
-def contract_iv_pct(c: OptionContract) -> float:
+def contract_iv_pct(c: OptionContract) -> float | None:
     raw = c.implied_volatility
     if raw is None:
-        return 0.0
+        return None
     iv = safe_float(raw)
     if iv <= 0:
-        return 0.0
+        return None
     if iv < 2.0:
         iv *= 100.0
     return iv

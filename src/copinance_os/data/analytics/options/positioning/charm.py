@@ -39,9 +39,17 @@ def _charm_drift_threshold(
 ) -> float:
     gross = 0.0
     for c in calls:
-        gross += abs(numeric_greek(c, "charm")) * float(contract_oi(c))
+        charm = numeric_greek(c, "charm")
+        oi = contract_oi(c)
+        if charm is None or oi is None or oi <= 0:
+            continue
+        gross += abs(charm) * float(oi)
     for p in puts:
-        gross += abs(numeric_greek(p, "charm")) * float(contract_oi(p))
+        charm = numeric_greek(p, "charm")
+        oi = contract_oi(p)
+        if charm is None or oi is None or oi <= 0:
+            continue
+        gross += abs(charm) * float(oi)
     return max(config.drift_floor, config.drift_gross_frac * gross * 100.0)
 
 
@@ -50,8 +58,20 @@ def compute_charm_exposure(
     puts: list[OptionContract],
     config: CharmConfig = DEFAULT_CHARM_CONFIG,
 ) -> dict[str, Any]:
-    call_sum = sum(numeric_greek(c, "charm") * float(contract_oi(c)) * 100.0 for c in calls)
-    put_sum = sum(numeric_greek(p, "charm") * float(contract_oi(p)) * 100.0 for p in puts)
+    call_sum = 0.0
+    for c in calls:
+        charm = numeric_greek(c, "charm")
+        oi = contract_oi(c)
+        if charm is None or oi is None or oi <= 0:
+            continue
+        call_sum += charm * float(oi) * 100.0
+    put_sum = 0.0
+    for p in puts:
+        charm = numeric_greek(p, "charm")
+        oi = contract_oi(p)
+        if charm is None or oi is None or oi <= 0:
+            continue
+        put_sum += charm * float(oi) * 100.0
     net_charm = call_sum + put_sum
     thr = _charm_drift_threshold(calls, puts, config)
     if net_charm > thr:

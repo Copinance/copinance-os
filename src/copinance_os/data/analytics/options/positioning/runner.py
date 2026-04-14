@@ -23,6 +23,7 @@ from copinance_os.data.analytics.options.positioning.methodology import (
     build_cross_cutting_positioning_specs,
     build_positioning_analysis_methodology,
 )
+from copinance_os.domain.exceptions import ValidationError
 from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.market import OptionContract, OptionsChain
 from copinance_os.domain.models.options_positioning import OptionsPositioningResult
@@ -59,6 +60,22 @@ def build_options_positioning(
         calls_work = list(chain_work.calls or [])
         puts_work = list(chain_work.puts or [])
 
+    sorted_exp = sorted_expirations(chain_work, calls_work, puts_work)
+    near_exps = nearest_expirations(sorted_exp, 2)
+    requested_exp = near_exps[0] if near_exps else None
+    if requested_exp is None:
+        raise ValidationError(
+            "expiration",
+            "No contracts available for requested expiration window.",
+        )
+    if not any(c.expiration_date.isoformat() == requested_exp for c in calls_work) and not any(
+        p.expiration_date.isoformat() == requested_exp for p in puts_work
+    ):
+        raise ValidationError(
+            "contracts",
+            f"Zero contracts found for requested expiration '{requested_exp}'.",
+        )
+
     payload = compose_options_positioning_payload(
         chain=chain_work,
         calls=calls_work,
@@ -71,8 +88,6 @@ def build_options_positioning(
         methodology=methodology,
     )
 
-    sorted_exp = sorted_expirations(chain_work, calls_work, puts_work)
-    near_exps = nearest_expirations(sorted_exp, 2)
     nearest_exp = near_exps[0] if near_exps else None
     second_exp = near_exps[1] if len(near_exps) > 1 else None
 

@@ -82,6 +82,12 @@ For **options positioning**, methodology is now **component-distributed** (no ba
 
 This contract intentionally avoids legacy compatibility wrappers or fallback response shapes. If a metric cannot be computed, it is returned as unavailable (`null`) rather than synthesized from fallback logic.
 
+For aggregate positioning, missing per-contract Greeks/OI/volume are skipped as unavailable inputs (not treated as zero), so dependent metrics remain `null` when there is insufficient data.
+
+CLI export path:
+- `copinance analyze --json positioning <SYMBOL> -w near|mid` exports `RunJobResult`, where `results` is the full `OptionsPositioningResult` payload.
+- Non-JSON analyze runs also persist the same structured payload under `.copinance/results/v2/`.
+
 ## Financial Literacy Personalization
 
 Deterministic narration is literacy-tiered across analysis surfaces:
@@ -152,4 +158,5 @@ See [Architecture](../developer-guide/architecture) for layer rules.
 - [Configuration](../getting-started/configuration#option-greek-estimation-bsm)
 - [Examples — Options Session](../examples/options-session)
 - [Analysis Modes — Options Analysis](../user-guide/analysis-modes#options-analysis)
-- **Repository:** [options positioning — library integration notes](https://github.com/copinance/copinance-os/blob/main/docs/integration/options-positioning-library-integration.md) (I/O contracts, pitfalls, test paths); [LLM agent integration guide](https://github.com/copinance/copinance-os/blob/main/docs/integration/llm-agent-features-integration-guide.md) (tool grounding + methodology UX)
+- **Library:** [Options positioning context](../getting-started/library#options-positioning-context) (I/O contracts and integration patterns)
+- **Developer guide:** [Agent progress & chat integration (clients)](../developer-guide/agent-progress-client-integration) (tool grounding + methodology UX patterns)

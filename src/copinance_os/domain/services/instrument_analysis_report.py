@@ -3,24 +3,17 @@
 from typing import Any
 
 from copinance_os.data.literacy import instrument_analysis as ia_lit
+from copinance_os.data.literacy import reports as reports_lit
 from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis_report import AnalysisReport
 from copinance_os.domain.models.methodology import envelope_from_text_methodology
 from copinance_os.domain.models.profile import FinancialLiteracy
 
-_DEFAULT_ASSUMPTIONS = (
-    "Market data may be delayed or incomplete; provider-dependent.",
-    "Ratios use latest reported fundamentals within the pipeline window.",
-)
-_DEFAULT_LIMITATIONS = (
-    "Not investment advice; for research and education only.",
-    "Does not model transaction costs, taxes, or liquidity.",
-)
-
 
 def build_instrument_analysis_report(
     results: dict[str, Any], lit: FinancialLiteracy
 ) -> AnalysisReport | None:
+    resolved_lit = resolve_financial_literacy(lit)
     """Build a report envelope from ``instrument_analysis`` executor output, if applicable."""
     if results.get("execution_type") != "instrument_analysis":
         return None
@@ -58,14 +51,13 @@ def build_instrument_analysis_report(
     methodology = envelope_from_text_methodology(
         spec_id="instrument_analysis.deterministic",
         model_family="deterministic_quote_fundamentals_pipeline",
-        assumptions=_DEFAULT_ASSUMPTIONS,
-        limitations=_DEFAULT_LIMITATIONS,
+        assumptions=reports_lit.report_assumptions(resolved_lit),
+        limitations=reports_lit.report_limitations(resolved_lit),
         data_inputs={"execution_mode": str(results.get("execution_mode") or "")},
     )
 
     return AnalysisReport(
-        summary=summary_text
-        or ia_lit.report_instrument_default_summary(resolve_financial_literacy(lit)),
+        summary=summary_text or ia_lit.report_instrument_default_summary(resolved_lit),
         key_metrics=key_metrics,
         methodology=methodology,
     )

@@ -51,14 +51,14 @@ def compute_flow_signals(
 ) -> list[dict[str, Any]]:
     flagged = 0
     for c in (*calls, *puts):
-        oi = max(1, contract_oi(c))
-        vol = contract_vol(c)
+        oi = max(1, contract_oi(c) or 0)
+        vol = contract_vol(c) or 0
         ratio = vol / oi
         if ratio > config.vol_oi_ratio_threshold and vol > config.unusual_vol_threshold:
             flagged += 1
 
-    chain_vol = sum(contract_vol(c) for c in calls) + sum(contract_vol(p) for p in puts)
-    chain_oi = sum(contract_oi(c) for c in calls) + sum(contract_oi(p) for p in puts)
+    chain_vol = sum(contract_vol(c) or 0 for c in calls) + sum(contract_vol(p) or 0 for p in puts)
+    chain_oi = sum(contract_oi(c) or 0 for c in calls) + sum(contract_oi(p) or 0 for p in puts)
     agg_ratio = chain_vol / max(1, chain_oi)
 
     unusual_score = min(
