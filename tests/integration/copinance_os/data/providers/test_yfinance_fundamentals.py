@@ -7,7 +7,11 @@ import pytest
 from copinance_os.data.providers.yfinance import (
     YFinanceFundamentalProvider,
 )
-from copinance_os.domain.exceptions import InvalidStockSymbolError, ValidationError
+from copinance_os.domain.exceptions import (
+    DataProviderError,
+    InvalidStockSymbolError,
+    ValidationError,
+)
 from copinance_os.domain.models.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
@@ -253,7 +257,7 @@ class TestYFinanceFundamentalProvider:
     @pytest.mark.asyncio
     async def test_invalid_symbol_handling(self, provider: YFinanceFundamentalProvider) -> None:
         """Test that invalid symbols are handled gracefully."""
-        with pytest.raises(ValueError, match="Failed to fetch detailed fundamentals"):
+        with pytest.raises(DataProviderError, match="Failed to fetch detailed fundamentals"):
             await provider.get_detailed_fundamentals(
                 symbol="INVALID_SYMBOL_XYZ123",
                 periods=1,

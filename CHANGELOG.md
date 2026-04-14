@@ -74,3 +74,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Options positioning tests**: Regenerated `tests/fixtures/options_positioning/toy_near.json` to match updated methodology reference metadata and keep golden-fixture regression assertions in sync.
 - **Fundamentals use case**: `GetStockFundamentalsUseCase` rejects **`periods < 1`** with **`ValidationError`** (**`periods must be at least 1`**) after the workflow refactor briefly allowed invalid counts to reach the provider.
+- **yfinance provider tests**: Updated unit and integration expectations to assert domain `DataProviderError` (instead of `ValueError`) for invalid-symbol and provider-failure paths, matching adapter exception contracts.
