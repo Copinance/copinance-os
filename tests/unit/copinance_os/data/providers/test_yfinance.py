@@ -11,6 +11,7 @@ from copinance_os.data.providers.yfinance import (
     YFinanceFundamentalProvider,
     YFinanceMarketProvider,
 )
+from copinance_os.domain.exceptions import DataProviderError
 from copinance_os.domain.models.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
@@ -183,7 +184,7 @@ class TestYFinanceMarketProvider:
             patch("asyncio.to_thread", new=AsyncMock(side_effect=Exception("API error"))),
         ):
             provider = YFinanceMarketProvider()
-            with pytest.raises(ValueError, match="Failed to fetch quote"):
+            with pytest.raises(DataProviderError, match="Failed to fetch quote"):
                 await provider.get_quote("AAPL")
             mock_logger.error.assert_called_once()
 
@@ -250,7 +251,7 @@ class TestYFinanceMarketProvider:
             provider = YFinanceMarketProvider()
             start_date = datetime(2024, 1, 1)
             end_date = datetime(2024, 1, 31)
-            with pytest.raises(ValueError, match="yfinance is not installed"):
+            with pytest.raises(DataProviderError, match="yfinance is not installed"):
                 await provider.get_historical_data("AAPL", start_date, end_date)
 
     @pytest.mark.asyncio
@@ -264,7 +265,7 @@ class TestYFinanceMarketProvider:
             provider = YFinanceMarketProvider()
             start_date = datetime(2024, 1, 1)
             end_date = datetime(2024, 1, 31)
-            with pytest.raises(ValueError, match="Failed to fetch historical data"):
+            with pytest.raises(DataProviderError, match="Failed to fetch historical data"):
                 await provider.get_historical_data("AAPL", start_date, end_date)
             mock_logger.error.assert_called_once()
 
@@ -306,7 +307,7 @@ class TestYFinanceMarketProvider:
         """Test get_intraday_data raises error when yfinance not available."""
         with patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", False):
             provider = YFinanceMarketProvider()
-            with pytest.raises(ValueError, match="yfinance is not installed"):
+            with pytest.raises(DataProviderError, match="yfinance is not installed"):
                 await provider.get_intraday_data("AAPL")
 
     @pytest.mark.asyncio
@@ -499,7 +500,7 @@ class TestYFinanceFundamentalProvider:
             patch("asyncio.to_thread", new=AsyncMock(return_value=mock_ticker)),
         ):
             provider = YFinanceFundamentalProvider()
-            with pytest.raises(ValueError, match="Invalid statement_type"):
+            with pytest.raises(DataProviderError, match="Invalid statement_type"):
                 await provider.get_financial_statements("AAPL", "invalid_type", "annual")
 
     @pytest.mark.asyncio
@@ -1062,7 +1063,7 @@ class TestYFinanceFundamentalProvider:
             ),
         ):
             provider = YFinanceFundamentalProvider()
-            with pytest.raises(ValueError, match="No financial data found"):
+            with pytest.raises(DataProviderError, match="No financial data found"):
                 await provider.get_detailed_fundamentals("INVALID", periods=1, period_type="annual")
 
     @pytest.mark.asyncio
@@ -1070,5 +1071,5 @@ class TestYFinanceFundamentalProvider:
         """Test get_detailed_fundamentals when yfinance not available."""
         with patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", False):
             provider = YFinanceFundamentalProvider()
-            with pytest.raises(ValueError, match="yfinance is not installed"):
+            with pytest.raises(DataProviderError, match="yfinance is not installed"):
                 await provider.get_detailed_fundamentals("AAPL", periods=1, period_type="annual")

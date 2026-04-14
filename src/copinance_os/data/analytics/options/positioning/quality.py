@@ -59,7 +59,7 @@ def compute_data_quality(
     n = len(contracts)
     greeks_ok = sum(1 for c in contracts if c.greeks is not None)
     greeks_coverage = greeks_ok / n
-    iv_ok = sum(1 for c in contracts if contract_iv_pct(c) > 0)
+    iv_ok = sum(1 for c in contracts if (contract_iv_pct(c) or 0.0) > 0)
     iv_coverage = iv_ok / n
 
     tight_vals: list[float] = []
@@ -71,14 +71,14 @@ def compute_data_quality(
             tight_vals.append(max(0.0, min(1.0, 1.0 - spread_ratio)))
     spread_tightness = sum(tight_vals) / len(tight_vals) if tight_vals else 0.0
 
-    total_oi = sum(contract_oi(c) for c in contracts)
+    total_oi = sum(contract_oi(c) or 0 for c in contracts)
     oi_depth = min(1.0, total_oi / max(1e-12, config.oi_depth_scale))
 
     active_strikes = len(
         {
             round(contract_strike(c), 6)
             for c in contracts
-            if contract_oi(c) > 0 or contract_vol(c) > 0
+            if (contract_oi(c) or 0) > 0 or (contract_vol(c) or 0) > 0
         }
     )
     strike_breadth = min(1.0, active_strikes / max(1e-12, config.strike_breadth_scale))

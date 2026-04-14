@@ -85,7 +85,11 @@ from copinance_os.domain.models.methodology import MethodologySpec
 
 @dataclass(frozen=True, slots=True)
 class BsmGreeksConfig:
-    """Reserved for future explicit Greek-engine tuning at the positioning bundle level."""
+    """Reserved for future explicit Greek-engine tuning at the positioning bundle level.
+
+    ``resolved_at_enrichment`` is intentionally descriptive metadata only: greek
+    calibration currently lives in the enrichment pipeline, not this bundle.
+    """
 
     note: str = "resolved_at_enrichment"
 

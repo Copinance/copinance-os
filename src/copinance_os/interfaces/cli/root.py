@@ -111,7 +111,9 @@ def _version_callback() -> None:
 _lazy_command(
     "analyze",
     "Run progressive analysis. Without a question it runs deterministic analysis; with a question it runs tool-using question-driven analysis. "
-    "Group options: --json (machine output), --stream (token stream during question-driven). Use: copinance analyze --help.",
+    "Subcommands: equity, options, positioning (deterministic-only), macro. "
+    "Group options: --json (machine output), --stream (token stream during question-driven). "
+    "Use: copinance analyze --help.",
     "copinance_os.interfaces.cli.commands.analyze",
     "analyze_app",
 )

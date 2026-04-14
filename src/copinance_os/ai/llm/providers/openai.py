@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
+from typing_extensions import override
 
 _AsyncOpenAI: type[Any] | None = None
 try:
@@ -194,6 +195,7 @@ class OpenAIProvider(LLMProvider):
         messages.append({"role": "user", "content": user_prompt})
         return messages
 
+    @override
     async def generate_text(
         self,
         prompt: str,
@@ -231,6 +233,7 @@ class OpenAIProvider(LLMProvider):
             logger.error("OpenAI API call failed", error=str(e))
             raise
 
+    @override
     async def is_available(self) -> bool:
         if not OPENAI_AVAILABLE or not self._api_key or self._client is None:
             return False
@@ -241,12 +244,15 @@ class OpenAIProvider(LLMProvider):
             logger.debug("OpenAI availability check failed", error=str(e))
             return False
 
+    @override
     def get_provider_name(self) -> str:
         return "openai"
 
+    @override
     def get_model_name(self) -> str | None:
         return self._model_name
 
+    @override
     def supports_native_text_stream(self) -> bool:
         return not self._disable_native_text_stream
 
@@ -387,6 +393,7 @@ class OpenAIProvider(LLMProvider):
         ordered = [merged[i] for i in sorted(merged.keys())]
         return "".join(content_parts).strip(), ordered, usage_out
 
+    @override
     async def generate_with_tools(
         self,
         prompt: str,

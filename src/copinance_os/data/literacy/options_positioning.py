@@ -774,11 +774,11 @@ def expl_implied_move(
         return base
     tail = TieredCopy(
         beginner=(
-            f"For this slice: about {dte} calendar days to expiry; Brenner–Subrahmanyam-style σ "
-            f"≈ {ann:.2f}% annualized."
+            f"For this slice: about {dte} calendar days to expiry; the implied annual swing "
+            f"is about {ann:.2f}%."
         ),
         intermediate=(
-            f"DTE={dte}, σ_BS88≈{ann:.2f}% ann.; daily≈{daily}%, horizon≈{period}% "
+            f"days to expiry (DTE)={dte}, σ_BS88≈{ann:.2f}% ann.; daily≈{daily}%, horizon≈{period}% "
             "(see implied_move_detail)."
         ),
         advanced=(

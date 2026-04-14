@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
+from typing_extensions import override
 
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
 from copinance_os.core.pipeline.tools.analysis.market_regime import (
@@ -67,6 +68,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
         self._macro_data_provider = macro_data_provider
         self._cache_manager = cache_manager
 
+    @override
     async def _execute_analysis(self, job: Job, context: dict[str, Any]) -> Any:
         if not self._market_data_provider:
             raise RuntimeError("MarketDataProvider not configured - required for macro analysis")
@@ -407,8 +409,10 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             error=None,
         )
 
+    @override
     async def validate(self, job: Job) -> bool:
         return job.execution_type == MARKET_DETERMINISTIC_TYPE and job.scope == JobScope.MARKET
 
+    @override
     def get_executor_id(self) -> str:
         return "market_analysis"

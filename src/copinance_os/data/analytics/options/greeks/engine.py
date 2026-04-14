@@ -99,6 +99,7 @@ def compute_european_bsm_greeks(
     expiration_date: date,
     evaluation_date: date,
     side: OptionSide,
+    _process_cache: dict[tuple[float, float, float, float], Any] | None = None,
 ) -> OptionGreeks | None:
     """Return analytic BSM Greeks, or ``None`` when inputs are invalid or QuantLib is unavailable."""
     if QuantLib is None:
@@ -138,7 +139,15 @@ def compute_european_bsm_greeks(
             QuantLib.BlackConstantVol(ql_eval, calendar, vol, day_count)
         )
 
-        process = QuantLib.BlackScholesMertonProcess(spot_handle, div_handle, rf_handle, vol_handle)
+        cache_key = (spot_f, r, q, vol)
+        if _process_cache is not None and cache_key in _process_cache:
+            process = _process_cache[cache_key]
+        else:
+            process = QuantLib.BlackScholesMertonProcess(
+                spot_handle, div_handle, rf_handle, vol_handle
+            )
+            if _process_cache is not None:
+                _process_cache[cache_key] = process
         engine = QuantLib.AnalyticEuropeanEngine(process)
         option.setPricingEngine(engine)
 
@@ -194,6 +203,7 @@ def _estimate_greeks_on_contract(
     dividend_yield: Decimal,
     evaluation_date: date,
     only_missing: bool = False,
+    process_cache: dict[tuple[float, float, float, float], Any] | None = None,
 ) -> tuple[OptionContract, bool]:
     if underlying_price is None or contract.implied_volatility is None:
         return contract, False
@@ -206,6 +216,7 @@ def _estimate_greeks_on_contract(
         expiration_date=contract.expiration_date,
         evaluation_date=evaluation_date,
         side=contract.side,
+        _process_cache=process_cache,
     )
     if fresh is None:
         return contract, False
@@ -231,6 +242,7 @@ def estimate_bsm_greeks_for_options_chain(
 
     eval_d = evaluation_date or date.today()
     added = False
+    process_cache: dict[tuple[float, float, float, float], Any] = {}
     calls_out: list[OptionContract] = []
     for c in chain.calls or []:
         if only_missing and c.greeks is not None and not _greeks_missing_higher_order(c.greeks):
@@ -243,6 +255,7 @@ def estimate_bsm_greeks_for_options_chain(
             dividend_yield=dividend_yield,
             evaluation_date=eval_d,
             only_missing=only_missing,
+            process_cache=process_cache,
         )
         if changed:
             added = True
@@ -260,6 +273,7 @@ def estimate_bsm_greeks_for_options_chain(
             dividend_yield=dividend_yield,
             evaluation_date=eval_d,
             only_missing=only_missing,
+            process_cache=process_cache,
         )
         if changed:
             added = True

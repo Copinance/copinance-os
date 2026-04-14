@@ -34,6 +34,7 @@ from typing import Any, cast
 import pandas as pd
 import structlog
 from edgar import Company, Fund, find_funds, set_identity
+from typing_extensions import override
 
 from copinance_os.data.cache import CacheManager
 from copinance_os.domain.models.fundamentals import StockFundamentals
@@ -1026,6 +1027,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
             logger.debug("edgartools identity configured")
         return ident
 
+    @override
     async def is_available(self) -> bool:
         try:
             if _resolve_identity(self._explicit_identity) is None:
@@ -1036,6 +1038,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
             logger.warning("edgartools availability check failed", error=str(e))
             return False
 
+    @override
     def get_provider_name(self) -> str:
         return self._provider_name
 
@@ -1048,6 +1051,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
         key = _cik_for_company(symbol)
         return Company(key)
 
+    @override
     async def get_financial_statements(
         self,
         symbol: str,
@@ -1103,6 +1107,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
             )
             raise ValueError(f"Failed to fetch financial statement for {symbol}: {e}") from e
 
+    @override
     async def get_sec_filings(
         self,
         symbol: str,
@@ -1230,6 +1235,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
             )
             return {"error": str(e)}
 
+    @override
     async def get_earnings_transcripts(
         self,
         symbol: str,
@@ -1241,10 +1247,12 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
         )
         return []
 
+    @override
     async def get_esg_metrics(self, symbol: str) -> dict[str, Any]:
         logger.warning("edgartools does not provide ESG metrics bundle", symbol=symbol)
         return {"error": "ESG metrics not available from edgartools", "symbol": symbol.upper()}
 
+    @override
     async def get_insider_trading(
         self,
         symbol: str,
@@ -1310,6 +1318,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
             logger.error("edgartools get_insider_trading failed", symbol=symbol, error=str(e))
             return []
 
+    @override
     async def get_detailed_fundamentals(
         self,
         symbol: str,

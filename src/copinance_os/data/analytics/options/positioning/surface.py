@@ -64,20 +64,28 @@ def compute_surface_signals(
         c_near = contracts_for_expiration(calls, nearest_exp)
         p_near = contracts_for_expiration(puts, nearest_exp)
         c_candidates = [
-            c for c in c_near if contract_iv_pct(c) > 0 and (contract_oi(c) + contract_vol(c)) > 0
+            c
+            for c in c_near
+            if (contract_iv_pct(c) or 0.0) > 0
+            and ((contract_oi(c) or 0) + (contract_vol(c) or 0)) > 0
         ]
         p_candidates = [
-            p for p in p_near if contract_iv_pct(p) > 0 and (contract_oi(p) + contract_vol(p)) > 0
+            p
+            for p in p_near
+            if (contract_iv_pct(p) or 0.0) > 0
+            and ((contract_oi(p) or 0) + (contract_vol(p) or 0)) > 0
         ]
         if c_candidates:
-            call_25 = min(c_candidates, key=lambda c: abs(numeric_greek(c, "delta") - 0.25))
-            call_iv = contract_iv_pct(call_25)
+            call_25 = min(
+                c_candidates, key=lambda c: abs((numeric_greek(c, "delta") or 0.0) - 0.25)
+            )
+            call_iv = contract_iv_pct(call_25) or 0.0
         else:
             call_25 = None
             call_iv = 0.0
         if p_candidates:
-            put_25 = min(p_candidates, key=lambda p: abs(numeric_greek(p, "delta") + 0.25))
-            put_iv = contract_iv_pct(put_25)
+            put_25 = min(p_candidates, key=lambda p: abs((numeric_greek(p, "delta") or 0.0) + 0.25))
+            put_iv = contract_iv_pct(put_25) or 0.0
         else:
             put_25 = None
             put_iv = 0.0
@@ -89,14 +97,16 @@ def compute_surface_signals(
         butterfly_25 = None
         skew_regime: Literal["steep_put", "normal", "call_skewed"] | None = None
         if c_candidates:
-            call_10 = min(c_candidates, key=lambda c: abs(numeric_greek(c, "delta") - 0.10))
-            call_10_iv = contract_iv_pct(call_10)
+            call_10 = min(
+                c_candidates, key=lambda c: abs((numeric_greek(c, "delta") or 0.0) - 0.10)
+            )
+            call_10_iv = contract_iv_pct(call_10) or 0.0
         else:
             call_10 = None
             call_10_iv = 0.0
         if p_candidates:
-            put_10 = min(p_candidates, key=lambda p: abs(numeric_greek(p, "delta") + 0.10))
-            put_10_iv = contract_iv_pct(put_10)
+            put_10 = min(p_candidates, key=lambda p: abs((numeric_greek(p, "delta") or 0.0) + 0.10))
+            put_10_iv = contract_iv_pct(put_10) or 0.0
         else:
             put_10 = None
             put_10_iv = 0.0
@@ -125,18 +135,21 @@ def compute_surface_signals(
             {
                 contract_strike(x)
                 for x in (*c2, *p2)
-                if contract_oi(x) + contract_vol(x) > 0 and contract_iv_pct(x) > 0
+                if ((contract_oi(x) or 0) + (contract_vol(x) or 0)) > 0
+                and (contract_iv_pct(x) or 0.0) > 0
             }
         )
         atm2 = atm_strike(strikes2, underlying)
         if atm2 is not None:
             ivs2: list[float] = []
             for c in c2:
-                if abs(contract_strike(c) - atm2) < 1e-6 and contract_iv_pct(c) > 0:
-                    ivs2.append(contract_iv_pct(c))
+                iv_pct = contract_iv_pct(c)
+                if abs(contract_strike(c) - atm2) < 1e-6 and (iv_pct or 0.0) > 0:
+                    ivs2.append(iv_pct or 0.0)
             for p in p2:
-                if abs(contract_strike(p) - atm2) < 1e-6 and contract_iv_pct(p) > 0:
-                    ivs2.append(contract_iv_pct(p))
+                iv_pct = contract_iv_pct(p)
+                if abs(contract_strike(p) - atm2) < 1e-6 and (iv_pct or 0.0) > 0:
+                    ivs2.append(iv_pct or 0.0)
             if ivs2:
                 far_atm_iv = sum(ivs2) / len(ivs2)
                 diff = far_atm_iv - near_atm_iv

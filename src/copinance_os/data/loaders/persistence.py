@@ -19,6 +19,7 @@ def get_persistence_root(base_path: Path | str = ".copinance") -> Path:
     """
     raw = Path(base_path) if base_path else Path(_DEFAULT_PERSISTENCE_ROOT)
     if str(raw).strip() in ("", "."):
+        # Keep all artifacts under a dedicated root to avoid polluting repo/project top level.
         raw = Path(_DEFAULT_PERSISTENCE_ROOT)
     raw.mkdir(parents=True, exist_ok=True)
     return raw

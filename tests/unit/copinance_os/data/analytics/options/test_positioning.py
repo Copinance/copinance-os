@@ -21,6 +21,7 @@ from copinance_os.data.analytics.options.positioning.mispricing import compute_m
 from copinance_os.data.analytics.options.positioning.moneyness import compute_moneyness_buckets
 from copinance_os.data.analytics.options.positioning.pin_risk import compute_pin_risk
 from copinance_os.data.analytics.options.positioning.vanna import compute_vanna_exposure
+from copinance_os.domain.exceptions import ValidationError
 from copinance_os.domain.models.market import OptionContract, OptionGreeks, OptionsChain, OptionSide
 from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 from copinance_os.domain.models.profile import FinancialLiteracy
@@ -185,6 +186,38 @@ def test_toy_near_matches_golden_fixture(toy_chain: tuple) -> None:
 
 
 @pytest.mark.unit
+def test_toy_near_missing_greeks_matches_golden_fixture(toy_chain: tuple) -> None:
+    chain, calls, puts = toy_chain
+    calls_missing = [
+        calls[0].model_copy(update={"greeks": None}),
+        calls[1],
+        calls[2].model_copy(update={"greeks": None}),
+    ]
+    puts_missing = [puts[0], puts[1].model_copy(update={"greeks": None}), puts[2]]
+    chain_missing = chain.model_copy(update={"calls": calls_missing, "puts": puts_missing})
+
+    fixture = (
+        Path(__file__).resolve().parents[5]
+        / "fixtures"
+        / "options_positioning"
+        / "toy_near_missing_greeks.json"
+    )
+    expected = json.loads(fixture.read_text(encoding="utf-8"))
+    raw_json = build_options_positioning(
+        chain=chain_missing,
+        calls=calls_missing,
+        puts=puts_missing,
+        quote={"current_price": 595.0},
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+    ).model_dump(mode="json")
+    raw_json["methodology"].pop("computed_at", None)
+    expected["methodology"].pop("computed_at", None)
+    assert raw_json == expected
+
+
+@pytest.mark.unit
 def test_build_options_positioning_empty_chain() -> None:
     exp = date(2026, 1, 16)
     chain = OptionsChain(
@@ -195,12 +228,8 @@ def test_build_options_positioning_empty_chain() -> None:
         calls=[],
         puts=[],
     )
-    raw = _build_pos_dict(chain, [], [], {}, "ZZZZ", "near", as_of_date=TOY_AS_OF)
-    model = OptionsPositioningResult.model_validate(raw)
-    assert model.symbol == "ZZZZ"
-    assert model.key_levels == []
-    assert model.data_quality == 0.0
-    assert model.methodology.data_inputs.get("symbol") == "ZZZZ"
+    with pytest.raises(ValidationError, match="No contracts available"):
+        _build_pos_dict(chain, [], [], {}, "ZZZZ", "near", as_of_date=TOY_AS_OF)
 
 
 @pytest.mark.unit

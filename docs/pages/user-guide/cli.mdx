@@ -76,6 +76,8 @@ copinance market --json fundamentals AAPL --periods 5
 
 Rich human output and saving results under `.copinance/results/v2/` still apply to **`analyze`** when `--json` is not used.
 
+For **`analyze positioning`**, `results` is the deterministic aggregate `OptionsPositioningResult` contract (snake_case fields), including category-level methodology specs plus component-level methodology on blocks such as `iv_metrics`, `delta_exposure`, `vanna_exposure`, `charm_exposure`, `moneyness_summary`, `pin_risk`, and `implied_move_detail`.
+
 ## Streaming question-driven output (`--stream`)
 
 Use **`--stream` on the `analyze` group** (before `equity`, `options`, or `macro`; not used for **`positioning`**, which is deterministic-only) or **at the root** before a natural-language question to print **LLM tokens to stdout** as they are generated during question-driven tool loops. **`--json` turns streaming off.** After the run, Rich still prints the same **Analysis** panel (markdown) so you always have a readable block for copy-paste, plus run metadata and the saved file path. Library-oriented streaming options (`LLMConfig`, providers) are described in [Using as a Library — LLM text streaming](../getting-started/library#llm-text-streaming-library--llmprovider).
@@ -351,6 +353,8 @@ copinance analyze options SPY --question "Compare term structure" -e 2026-06-20 
 
 Deterministic **only**: fetches quote + default full chain and prints the same aggregate **`positioning`** payload as the instrument executor (snake_case fields), including extended dealer-style blocks where data supports them. No `--question` / streaming.
 
+Unavailable data is explicit (`null`) rather than synthesized as fallback `0.0` values. If no contracts are available for the selected positioning window/expiry, the command fails with a validation error (no silent empty positioning payload).
+
 ```bash
 copinance analyze positioning SPY
 copinance analyze positioning SPY --window mid
@@ -361,6 +365,11 @@ copinance analyze --json positioning SPY -w near
 - **`--window` / `-w`**: `near` (default) or `mid` — horizon damping for the positioning score (see [Library — Options positioning context](../getting-started/library#options-positioning-context)).
 - **`--json`** (group, before `positioning`): machine **`RunJobResult`** JSON.
 - `--timeframe`, `--profile-id`, `--no-cache`, `--include-prompt`: same semantics as other **`analyze`** subcommands where applicable.
+
+**Output/export notes:**
+- `results` contains full deterministic positioning JSON (not a reduced summary object).
+- Missing/insufficient data is explicit (`null`) in JSON; values are not synthesized from fallback defaults.
+- If no contracts are available for the selected window, the command exits with validation error instead of exporting a silent empty payload.
 
 ### Macro + Market Regime
 

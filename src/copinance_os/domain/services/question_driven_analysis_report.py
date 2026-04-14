@@ -5,23 +5,17 @@ from __future__ import annotations
 from typing import Any
 
 from copinance_os.data.literacy import instrument_analysis as ia_lit
+from copinance_os.data.literacy import reports as reports_lit
+from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis_report import AnalysisReport
 from copinance_os.domain.models.methodology import envelope_from_text_methodology
 from copinance_os.domain.models.profile import FinancialLiteracy
-
-_DEFAULT_ASSUMPTIONS: tuple[str, ...] = (
-    "External data may be delayed or incomplete; tool availability depends on configuration.",
-    "Model output is explanatory; figures are provisional unless matched to tool results.",
-)
-_DEFAULT_LIMITATIONS: tuple[str, ...] = (
-    "Not investment advice; for research and education only.",
-    "LLM narrative is not a source of truth for prices, returns, Greeks, or ratios.",
-)
 
 
 def build_question_driven_analysis_report(
     results: dict[str, Any], lit: FinancialLiteracy
 ) -> AnalysisReport | None:
+    resolved_lit = resolve_financial_literacy(lit)
     """Build a report envelope from ``question_driven_analysis`` executor output, if applicable."""
     if results.get("execution_type") != "question_driven_analysis":
         return None
@@ -32,7 +26,7 @@ def build_question_driven_analysis_report(
     analysis = results.get("analysis")
 
     if status == "failed" or err:
-        summary = str(msg or err or ia_lit.report_question_driven_default(lit))
+        summary = str(msg or err or ia_lit.report_question_driven_default(resolved_lit))
         key_metrics: dict[str, Any] = {
             "status": status or "failed",
             "execution_mode": results.get("execution_mode"),
@@ -44,8 +38,8 @@ def build_question_driven_analysis_report(
         methodology = envelope_from_text_methodology(
             spec_id="question_driven_analysis.aborted",
             model_family="llm_tool_loop",
-            assumptions=_DEFAULT_ASSUMPTIONS,
-            limitations=_DEFAULT_LIMITATIONS,
+            assumptions=reports_lit.report_assumptions(resolved_lit),
+            limitations=reports_lit.report_limitations(resolved_lit),
             data_inputs={"status": "failed"},
         )
         return AnalysisReport(
@@ -61,7 +55,7 @@ def build_question_driven_analysis_report(
         summary_text = str(analysis)[:8000]
 
     if not summary_text:
-        summary_text = str(msg or ia_lit.report_question_driven_default(lit))
+        summary_text = str(msg or ia_lit.report_question_driven_default(resolved_lit))
 
     policy = results.get("numeric_grounding_policy")
     key_metrics = {
@@ -84,15 +78,15 @@ def build_question_driven_analysis_report(
     if results.get("llm_synthesis_error"):
         key_metrics["llm_synthesis_error"] = str(results["llm_synthesis_error"])[:2000]
 
-    assumptions = _DEFAULT_ASSUMPTIONS
+    assumptions: tuple[str, ...] = reports_lit.report_assumptions(resolved_lit)
     if policy:
-        assumptions = (*_DEFAULT_ASSUMPTIONS, str(policy))
+        assumptions = (*assumptions, str(policy))
 
-    limitations = _DEFAULT_LIMITATIONS
+    limitations: tuple[str, ...] = reports_lit.report_limitations(resolved_lit)
     if results.get("synthesis_status") == "partial":
         limitations = (
-            *_DEFAULT_LIMITATIONS,
-            ia_lit.report_question_driven_partial_limitation(lit),
+            *limitations,
+            ia_lit.report_question_driven_partial_limitation(resolved_lit),
         )
 
     methodology = envelope_from_text_methodology(

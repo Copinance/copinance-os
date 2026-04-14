@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import structlog
+from typing_extensions import override
 
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
 from copinance_os.data.analytics.options.positioning import build_options_positioning
@@ -73,6 +74,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         self._fundamentals_use_case = fundamentals_use_case
         self._cache_manager = cache_manager
 
+    @override
     async def _execute_analysis(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         if not job.instrument_symbol:
             raise ValueError("instrument_symbol is required for instrument analysis")
@@ -868,6 +870,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             return None
         return str(numerator / denominator)
 
+    @override
     async def validate(self, job: Job) -> bool:
         return (
             job.scope == JobScope.INSTRUMENT
@@ -875,5 +878,6 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             and bool(job.instrument_symbol)
         )
 
+    @override
     def get_executor_id(self) -> str:
         return "instrument_analysis"

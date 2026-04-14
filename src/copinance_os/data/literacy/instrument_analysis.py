@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copinance_os.data.literacy import reports as reports_lit
 from copinance_os.domain.literacy import TieredCopy
 from copinance_os.domain.models.profile import FinancialLiteracy
 
@@ -26,12 +27,12 @@ _EQ_LABEL_TREND = TieredCopy(
     advanced="Trend",
 )
 _EQ_LABEL_PE = TieredCopy(
-    beginner="Valuation (P/E)",
+    beginner="Valuation (price vs earnings)",
     intermediate="P/E Ratio",
     advanced="P/E",
 )
 _EQ_LABEL_ROE = TieredCopy(
-    beginner="Profitability (ROE)",
+    beginner="Profitability (return on equity)",
     intermediate="ROE",
     advanced="ROE",
 )
@@ -47,7 +48,7 @@ _OPTIONS_EXPIRATION = TieredCopy(
     advanced="Expiry",
 )
 _OPTIONS_CONTRACTS = TieredCopy(
-    beginner="Contracts analyzed",
+    beginner="Number of option contracts reviewed",
     intermediate="Contracts analyzed",
     advanced="Contracts analyzed",
 )
@@ -89,9 +90,9 @@ _ASSESS_LIQ_STRONG = TieredCopy(
 )
 
 _REPORT_INSTRUMENT_DONE = TieredCopy(
-    beginner="Instrument analysis finished.",
+    beginner="Stock snapshot is ready.",
     intermediate="Instrument analysis completed.",
-    advanced="Instrument analysis completed.",
+    advanced="Deterministic instrument pass completed.",
 )
 _REPORT_MARKET_TEMPLATE = TieredCopy(
     beginner=(
@@ -108,9 +109,9 @@ _REPORT_MARKET_TEMPLATE = TieredCopy(
     ),
 )
 _REPORT_QD_DONE = TieredCopy(
-    beginner="Question-based analysis finished.",
+    beginner="Answer from the research tools is ready.",
     intermediate="Question-driven analysis completed.",
-    advanced="Question-driven analysis completed.",
+    advanced="Question-driven tool-loop analysis completed.",
 )
 _REPORT_QD_NO_SUMMARY = TieredCopy(
     beginner="No final narrative was available; tool results are shown instead.",
@@ -205,3 +206,11 @@ def report_question_driven_default(lit: FinancialLiteracy) -> str:
 
 def report_question_driven_partial_limitation(lit: FinancialLiteracy) -> str:
     return _pick(_REPORT_QD_NO_SUMMARY, lit)
+
+
+def report_assumptions(lit: FinancialLiteracy) -> tuple[str, str]:
+    return reports_lit.report_assumptions(lit)
+
+
+def report_limitations(lit: FinancialLiteracy) -> tuple[str, str]:
+    return reports_lit.report_limitations(lit)

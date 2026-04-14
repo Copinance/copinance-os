@@ -8,10 +8,13 @@ from copinance_os.data.analytics.options.positioning.contracts import contract_o
 from copinance_os.domain.models.market import OptionContract
 from copinance_os.domain.models.methodology import MethodologySpec
 
+# OCC-listed equity options use a 100-share multiplier per contract.
+DEFAULT_CONTRACT_MULTIPLIER = 100.0
+
 
 @dataclass(frozen=True, slots=True)
 class DeltaConfig:
-    contract_multiplier: float = 100.0
+    contract_multiplier: float = DEFAULT_CONTRACT_MULTIPLIER
 
 
 DEFAULT_DELTA_CONFIG = DeltaConfig()
@@ -36,8 +39,20 @@ def compute_delta_exposure(
     config: DeltaConfig = DEFAULT_DELTA_CONFIG,
 ) -> dict[str, float]:
     m = config.contract_multiplier
-    call_dex = sum(numeric_greek(c, "delta") * float(contract_oi(c)) * m for c in calls)
-    put_dex = sum(numeric_greek(p, "delta") * float(contract_oi(p)) * m for p in puts)
+    call_dex = 0.0
+    for c in calls:
+        delta = numeric_greek(c, "delta")
+        oi = contract_oi(c)
+        if delta is None or oi is None or oi <= 0:
+            continue
+        call_dex += delta * float(oi) * m
+    put_dex = 0.0
+    for p in puts:
+        delta = numeric_greek(p, "delta")
+        oi = contract_oi(p)
+        if delta is None or oi is None or oi <= 0:
+            continue
+        put_dex += delta * float(oi) * m
     net_delta = call_dex + put_dex
     return {
         "net_delta": net_delta,

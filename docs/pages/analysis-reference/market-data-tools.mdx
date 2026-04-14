@@ -36,6 +36,10 @@ Methodology is component-distributed:
 
 No legacy compatibility response shape is emitted. Uncomputable components remain `null`/unavailable in output (no fallback synthesis).
 
+Missing per-contract Greeks/OI/volume are treated as unavailable and skipped in aggregates; they are never coerced to synthetic zeroes.
+
+If the selected positioning window has no contracts (for example, no usable expiry/contracts), the builder raises a domain `ValidationError` instead of returning a silent empty payload.
+
 Narrative labels that accompany deterministic analysis surfaces are literacy-tiered through `financial_literacy`; clients should use stable numeric/enum fields for logic and treat text as presentation-level copy.
 
 **Parameters:** `symbol` (required, underlying ticker); optional **`window`**: `near` (default) or `mid` — same horizon damping as the [Library — Options positioning context](../getting-started/library#options-positioning-context) helper.

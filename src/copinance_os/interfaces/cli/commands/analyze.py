@@ -253,7 +253,14 @@ async def analyze_positioning(
         help="Bypass data/tool cache reads and writes for this run",
     ),
 ) -> None:
-    """Deterministic aggregate options positioning (surface bias, IV, gamma, max pain, implied move)."""
+    """Deterministic aggregate options positioning only.
+
+    Returns the full ``OptionsPositioningResult`` payload (bias/probabilities, signal categories,
+    methodology envelope, GEX profile, vanna/charm, mispricing, moneyness, pin risk, and related
+    surface metrics). Missing inputs stay explicit as ``null`` in JSON output (never synthesized
+    as fallback ``0.0`` values). Empty windows/expiries fail with validation instead of returning
+    a silent empty payload.
+    """
     w = str(window).strip().lower()
     if w not in ("near", "mid"):
         raise typer.BadParameter("window must be 'near' or 'mid'")

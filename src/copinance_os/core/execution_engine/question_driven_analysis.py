@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
+from typing_extensions import override
 
 from copinance_os.ai.llm.policy import NUMERIC_GROUNDING_POLICY
 from copinance_os.ai.llm.resources import (
@@ -91,6 +92,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
         self._prompt_manager = prompt_manager or PromptManager()
         self._cache_manager = cache_manager
 
+    @override
     async def _execute_analysis(self, job: Job, context: dict[str, Any]) -> dict[str, Any]:
         """
         Execute a question-driven analysis using LLM with tools.
@@ -497,6 +499,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
 
         return results
 
+    @override
     async def validate(self, job: Job) -> bool:
         """Validate if this executor can handle the given job."""
         return job.execution_type in {
@@ -504,6 +507,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             MARKET_QUESTION_DRIVEN_TYPE,
         }
 
+    @override
     def get_executor_id(self) -> str:
         """Return the executor identifier."""
         return "question_driven_analysis"

@@ -47,6 +47,9 @@ coverage.xml
 # Test artifact when get_settings().get_storage_path() is unmocked
 .mock/
 
+# Hypothesis
+.hypothesis/
+
 # Type checking
 .mypy_cache/
 .dmypy.json

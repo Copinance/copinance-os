@@ -2,6 +2,8 @@
 
 An options research session: inspect the chain with BSM Greeks (including higher-order fields when valid), ask positioning questions, run deterministic options analysis, or fetch **aggregate positioning** only via **`copinance analyze positioning <SYMBOL>`** (see [CLI — Analyze aggregate options positioning](../user-guide/cli#analyze-aggregate-options-positioning)). The aggregate JSON includes GEX, vanna/charm, mispricing, moneyness, and pin-style metrics when the chain supports them. QuantLib must be installed (it is included in the default `make setup`).
 
+Unavailable aggregate inputs are represented as `null` (no fallback `0.0` synthesis). If the requested positioning window has no contracts, positioning raises a validation error instead of returning a silent empty payload.
+
 ## 1. View the options chain
 
 ```bash
@@ -54,13 +56,15 @@ copinance analyze options AAPL -e 2026-06-19 -e 2026-09-18
 
 Deterministic analysis saves a structured report to `.copinance/results/v2/` and prints a Rich panel (one analysis panel per expiry when multiple). No LLM required.
 
+For machine export, use `--json` and consume the top-level `RunJobResult` envelope (`success`, `results`, `error_message`, `report`, `report_exclusion_reason`).
+
 ## 4. Ask positioning questions
 
 Add `--question` to switch to question-driven mode. The LLM calls options chain tools and interprets the results:
 
 ```bash
 # Overall positioning
-copinance analyze options AAPL --question "How is the options market positioned — is there elevated put or call activity?"
+copinance analyze options AAPL --question "How is the options market positioned — is there elevated put or call act ivity?"
 
 # Specific expiry, specific side
 copinance analyze options AAPL \
@@ -76,6 +80,14 @@ copinance analyze --stream options AAPL --question "Summarize the implied volati
 # SPY macro options context
 copinance analyze options SPY --question "What does the put/call positioning on SPY suggest about market hedging activity?"
 ```
+
+If you only need aggregate deterministic positioning output (no LLM), prefer:
+
+```bash
+copinance analyze --json positioning SPY --window near > spy_positioning.json
+```
+
+This exports the full `OptionsPositioningResult` under `results`, preserves unavailable metrics as `null`, and fails loudly on empty windows instead of returning silent empty payloads.
 
 ## 5. Understand Greeks on a specific contract
 

@@ -180,6 +180,12 @@ copinance market --json history AAPL --start 2026-01-01 --end 2026-03-14
 copinance market --json options SPY
 ```
 
+Analyze/export contract (stable top-level keys):
+
+- `analyze --json ...` and root `copinance --json "..."` emit `RunJobResult` with `success`, `results`, `error_message`, `report`, and `report_exclusion_reason`.
+- Deterministic results are also persisted under `.copinance/results/v2/` (when not using memory storage), with the same structured methodology envelope used in JSON output.
+- `analyze positioning` emits the full aggregate `OptionsPositioningResult` under `results`, with uncomputable metrics preserved as `null` (no synthetic `0.0` fallback values).
+
 ### Shell completion
 
 ```bash
@@ -197,7 +203,7 @@ Open a new terminal after running the above. Tab completes subcommands and flags
 | `copinance "…"` | Natural-language research question (question-driven; full tool suite) |
 | `copinance analyze equity <SYMBOL>` | Equity analysis — deterministic or question-driven with `--question` |
 | `copinance analyze options <SYMBOL>` | Options chain snapshot analysis; BSM Greeks via QuantLib when configured (first- and higher-order Greeks on contracts when inputs are valid); repeat `-e` / `--expiration` for multiple expiries. Single-expiry deterministic runs also include a **`positioning`** block (aggregate surface metrics). |
-| `copinance analyze positioning <SYMBOL>` | Deterministic aggregate options positioning only (`--window` / `-w`: `near` or `mid`; default `near`); same payload shape as the instrument executor’s **`positioning`** |
+| `copinance analyze positioning <SYMBOL>` | Deterministic aggregate options positioning only (`--window` / `-w`: `near` or `mid`; default `near`); same payload shape as the instrument executor’s **`positioning`**. Missing inputs are surfaced as `null` (never synthesized as `0.0`), and empty/invalid positioning windows fail with a validation error rather than a silent empty payload. |
 | `copinance analyze macro` | Macro + market regime dashboard |
 | `copinance market search "…"` | Search instruments by name or symbol |
 | `copinance market quote <SYMBOL>` | Current quote |
@@ -281,8 +287,8 @@ pytest --cov=copinance_os --cov-report=html  # explicit HTML report
   - **[Examples](https://copinance.github.io/copinance-os/examples/)** — Equity Deep Dive, Macro Dashboard, Options Session
   - **[Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/)** — Architecture, Extending, Testing, [API Reference](https://copinance.github.io/copinance-os/developer-guide/api-reference/) (ports and extension interfaces)
 - **[docs/README.md](docs/README.md)** — Build the docs site locally (Nextra)
-- **[docs/integration/options-positioning-library-integration.md](docs/integration/options-positioning-library-integration.md)** — Library notes for aggregate positioning and Greek enrichment (I/O contracts, pitfalls, tests)
-- **[docs/integration/llm-agent-features-integration-guide.md](docs/integration/llm-agent-features-integration-guide.md)** — LLM integration guide for tools, payload grounding, methodology rendering, and UI patterns
+- **[Library — Options positioning context](https://copinance.github.io/copinance-os/getting-started/library#options-positioning-context)** — Library integration notes for aggregate positioning and Greek enrichment (I/O contracts, pitfalls, tests)
+- **[Developer Guide — Agent progress & chat integration (clients)](https://copinance.github.io/copinance-os/developer-guide/agent-progress-client-integration)** — LLM-facing integration guidance for progress events, payload grounding, methodology rendering, and UI patterns
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** · **[GOVERNANCE.md](GOVERNANCE.md)** · **[CHANGELOG.md](CHANGELOG.md)**
 
 ---

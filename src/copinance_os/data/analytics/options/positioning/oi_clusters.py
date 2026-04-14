@@ -45,9 +45,15 @@ def oi_clusters_by_strike(
         return []
     oi_by: dict[float, int] = defaultdict(int)
     for c in contracts_for_expiration(calls, nearest_exp):
-        oi_by[contract_strike(c)] += contract_oi(c)
+        oi = contract_oi(c)
+        if oi is None or oi <= 0:
+            continue
+        oi_by[contract_strike(c)] += oi
     for p in contracts_for_expiration(puts, nearest_exp):
-        oi_by[contract_strike(p)] += contract_oi(p)
+        oi = contract_oi(p)
+        if oi is None or oi <= 0:
+            continue
+        oi_by[contract_strike(p)] += oi
     ranked = sorted(oi_by.items(), key=lambda kv: kv[1], reverse=True)[:top_n]
     return [{"strike": float(k), "open_interest": float(v)} for k, v in ranked if v > 0]
 
@@ -63,9 +69,15 @@ def oi_clusters_enhanced(
     call_by: dict[float, int] = defaultdict(int)
     put_by: dict[float, int] = defaultdict(int)
     for c in contracts_for_expiration(calls, nearest_exp):
-        call_by[contract_strike(c)] += contract_oi(c)
+        oi = contract_oi(c)
+        if oi is None or oi <= 0:
+            continue
+        call_by[contract_strike(c)] += oi
     for p in contracts_for_expiration(puts, nearest_exp):
-        put_by[contract_strike(p)] += contract_oi(p)
+        oi = contract_oi(p)
+        if oi is None or oi <= 0:
+            continue
+        put_by[contract_strike(p)] += oi
     merged: dict[float, tuple[int, int]] = {}
     for k, v in call_by.items():
         merged[k] = (v, put_by.get(k, 0))
@@ -112,10 +124,14 @@ def compute_max_pain(
         for c in c_exp:
             k = contract_strike(c)
             oi = contract_oi(c)
+            if oi is None or oi <= 0:
+                continue
             total += max(0.0, spot - k) * oi * 100.0
         for p in p_exp:
             k = contract_strike(p)
             oi = contract_oi(p)
+            if oi is None or oi <= 0:
+                continue
             total += max(0.0, k - spot) * oi * 100.0
         return total
 

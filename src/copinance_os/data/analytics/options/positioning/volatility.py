@@ -80,7 +80,8 @@ def compute_volatility_signals(
         {
             contract_strike(x)
             for x in (*c_near, *p_near)
-            if contract_oi(x) + contract_vol(x) > 0 and contract_iv_pct(x) > 0
+            if ((contract_oi(x) or 0) + (contract_vol(x) or 0)) > 0
+            and (contract_iv_pct(x) or 0.0) > 0
         }
     )
     atm = atm_strike(strikes, underlying)
@@ -105,11 +106,13 @@ def compute_volatility_signals(
 
     atm_ivs: list[float] = []
     for c in c_near:
-        if abs(contract_strike(c) - atm) < 1e-6 and contract_iv_pct(c) > 0:
-            atm_ivs.append(contract_iv_pct(c))
+        iv_pct = contract_iv_pct(c)
+        if abs(contract_strike(c) - atm) < 1e-6 and (iv_pct or 0.0) > 0:
+            atm_ivs.append(iv_pct or 0.0)
     for p in p_near:
-        if abs(contract_strike(p) - atm) < 1e-6 and contract_iv_pct(p) > 0:
-            atm_ivs.append(contract_iv_pct(p))
+        iv_pct = contract_iv_pct(p)
+        if abs(contract_strike(p) - atm) < 1e-6 and (iv_pct or 0.0) > 0:
+            atm_ivs.append(iv_pct or 0.0)
     atm_iv = sum(atm_ivs) / len(atm_ivs) if atm_ivs else 0.0
 
     iv_rank = percentile_rank(atm_iv, all_iv_samples) if all_iv_samples else 0.5

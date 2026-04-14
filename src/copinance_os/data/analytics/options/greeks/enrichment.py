@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from typing_extensions import override
+
 from copinance_os.data.analytics.options.greeks.config import resolve_option_greek_assumptions
 from copinance_os.data.analytics.options.greeks.engine import (
     chain_effective_dividend_yield,
@@ -11,6 +13,7 @@ from copinance_os.data.analytics.options.greeks.engine import (
 )
 from copinance_os.domain.models.market import OptionsChain
 from copinance_os.domain.models.profile import AnalysisProfile
+from copinance_os.domain.ports.analytics import OptionsChainGreeksEstimator
 from copinance_os.infra.config import get_settings
 
 try:
@@ -42,12 +45,13 @@ def enrich_options_chain_missing_greeks(
     )
 
 
-class QuantLibBsmGreekEstimator:
+class QuantLibBsmGreekEstimator(OptionsChainGreeksEstimator):
     """QuantLib-backed ``OptionsChainGreeksEstimator`` (analytic European BSM)."""
 
     def __init__(self, profile: AnalysisProfile | None = None) -> None:
         self._profile = profile
 
+    @override
     def estimate(self, chain: OptionsChain) -> OptionsChain:
         risk_free, div_default = resolve_option_greek_assumptions(
             settings=get_settings(),

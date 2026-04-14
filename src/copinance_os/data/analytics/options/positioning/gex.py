@@ -17,13 +17,20 @@ from copinance_os.domain.literacy import FinancialLiteracy
 from copinance_os.domain.models.market import OptionContract
 from copinance_os.domain.models.methodology import MethodologySpec
 
+# Keep only the largest absolute strike contributions for compact reports.
+DEFAULT_GEX_PROFILE_TOP_K = 15
+DEFAULT_GEX_TOP_POSITIVE_K = 5
+DEFAULT_GEX_TOP_NEGATIVE_K = 5
+# Relative net/gross gamma threshold for regime assignment.
+DEFAULT_GAMMA_REGIME_THRESHOLD = 0.06
+
 
 @dataclass(frozen=True, slots=True)
 class GexConfig:
-    profile_top_k: int = 15
-    top_positive_k: int = 5
-    top_negative_k: int = 5
-    gamma_regime_threshold: float = 0.06
+    profile_top_k: int = DEFAULT_GEX_PROFILE_TOP_K
+    top_positive_k: int = DEFAULT_GEX_TOP_POSITIVE_K
+    top_negative_k: int = DEFAULT_GEX_TOP_NEGATIVE_K
+    gamma_regime_threshold: float = DEFAULT_GAMMA_REGIME_THRESHOLD
 
 
 DEFAULT_GEX_CONFIG = GexConfig()
@@ -63,10 +70,14 @@ def compute_gex_profile(
     for c in contracts_for_expiration(calls, nearest_exp):
         g = numeric_greek(c, "gamma")
         oi = contract_oi(c)
+        if g is None or oi is None or oi <= 0:
+            continue
         strike_to_net[contract_strike(c)] += g * float(oi) * mult
     for p in contracts_for_expiration(puts, nearest_exp):
         g = numeric_greek(p, "gamma")
         oi = contract_oi(p)
+        if g is None or oi is None or oi <= 0:
+            continue
         strike_to_net[contract_strike(p)] -= g * float(oi) * mult
 
     if not strike_to_net:
@@ -136,12 +147,16 @@ def compute_gamma_regime(
     for c in calls:
         g = numeric_greek(c, "gamma")
         oi = contract_oi(c)
+        if g is None or oi is None or oi <= 0:
+            continue
         contrib = g * oi * mult
         net += contrib
         gross += abs(contrib)
     for p in puts:
         g = numeric_greek(p, "gamma")
         oi = contract_oi(p)
+        if g is None or oi is None or oi <= 0:
+            continue
         contrib = g * oi * mult
         net -= contrib
         gross += abs(contrib)
