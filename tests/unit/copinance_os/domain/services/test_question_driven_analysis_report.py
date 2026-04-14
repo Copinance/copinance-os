@@ -2,6 +2,7 @@
 
 import pytest
 
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.services.question_driven_analysis_report import (
     build_question_driven_analysis_report,
 )
@@ -9,7 +10,12 @@ from copinance_os.domain.services.question_driven_analysis_report import (
 
 @pytest.mark.unit
 def test_wrong_execution_type_returns_none() -> None:
-    assert build_question_driven_analysis_report({"execution_type": "instrument_analysis"}) is None
+    assert (
+        build_question_driven_analysis_report(
+            {"execution_type": "instrument_analysis"}, FinancialLiteracy.INTERMEDIATE
+        )
+        is None
+    )
 
 
 @pytest.mark.unit
@@ -22,7 +28,8 @@ def test_success_envelope() -> None:
             "iterations": 1,
             "tools_used": ["a"],
             "tool_calls": [{"tool": "a"}],
-        }
+        },
+        FinancialLiteracy.INTERMEDIATE,
     )
     assert r is not None
     assert r.summary == "Narrative."
@@ -38,7 +45,8 @@ def test_partial_synthesis_adds_limitation() -> None:
             "status": "completed",
             "synthesis_status": "partial",
             "tool_calls": [],
-        }
+        },
+        FinancialLiteracy.INTERMEDIATE,
     )
     assert r is not None
     assert r.key_metrics.get("synthesis_status") == "partial"

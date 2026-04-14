@@ -16,12 +16,15 @@ from typing import Any
 import structlog
 
 from copinance_os.data.cache import CacheManager
+from copinance_os.data.literacy import market_regime as mr_lit
 from copinance_os.domain.indicators import (
     relative_strength_index,
     rolling_volatility_annualized_from_prices,
     simple_moving_average,
 )
+from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.market import MarketDataPoint
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
@@ -113,6 +116,10 @@ class MarketRegimeIndicatorsTool(Tool):
                         "type": "boolean",
                         "description": "Include sector rotation signals (default: true)",
                         "default": True,
+                    },
+                    "financial_literacy": {
+                        "type": "string",
+                        "description": "Literacy tier: beginner|intermediate|advanced",
                     },
                 },
                 "required": [],
@@ -216,6 +223,7 @@ class MarketRegimeIndicatorsTool(Tool):
             include_vix = validated.get("include_vix", True)
             include_market_breadth = validated.get("include_market_breadth", True)
             include_sector_rotation = validated.get("include_sector_rotation", True)
+            financial_literacy = resolve_financial_literacy(validated.get("financial_literacy"))
 
             # Calculate date range
             # Add extra buffer to ensure we have enough data for 200-day MA calculation
@@ -268,7 +276,7 @@ class MarketRegimeIndicatorsTool(Tool):
             # Fetch VIX data
             if include_vix:
                 try:
-                    vix_data = await self._fetch_vix_data(start_date, end_date)
+                    vix_data = await self._fetch_vix_data(start_date, end_date, financial_literacy)
                     results["vix"] = vix_data
                 except Exception as e:
                     logger.warning("Failed to fetch VIX data", error=str(e))
@@ -331,7 +339,12 @@ class MarketRegimeIndicatorsTool(Tool):
                 metadata={"error_type": type(e).__name__},
             )
 
-    async def _fetch_vix_data(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
+    async def _fetch_vix_data(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        financial_literacy: FinancialLiteracy,
+    ) -> dict[str, Any]:
         """Fetch VIX volatility index data.
 
         Args:
@@ -394,7 +407,7 @@ class MarketRegimeIndicatorsTool(Tool):
                 "recent_max_20d": round(recent_max, 2),
                 "recent_min_20d": round(recent_min, 2),
                 "regime": vix_regime,
-                "sentiment": vix_sentiment,
+                "sentiment": mr_lit.vix_sentiment_label(vix_sentiment, financial_literacy),
                 "data_points": len(vix_prices),
             }
 

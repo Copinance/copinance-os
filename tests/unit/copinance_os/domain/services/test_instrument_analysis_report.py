@@ -2,6 +2,7 @@
 
 import pytest
 
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.services.instrument_analysis_report import (
     build_instrument_analysis_report,
 )
@@ -22,7 +23,7 @@ def test_build_instrument_analysis_report_maps_payload() -> None:
             "metrics": {"valuation": {"pe_ratio": "12"}},
         },
     }
-    report = build_instrument_analysis_report(payload)
+    report = build_instrument_analysis_report(payload, FinancialLiteracy.INTERMEDIATE)
     assert report is not None
     assert "TestCo" in report.summary
     assert report.key_metrics.get("symbol") == "TEST"
@@ -34,7 +35,12 @@ def test_build_instrument_analysis_report_maps_payload() -> None:
 
 @pytest.mark.unit
 def test_build_instrument_analysis_report_non_instrument_returns_none() -> None:
-    assert build_instrument_analysis_report({"execution_type": "macro_analysis"}) is None
+    assert (
+        build_instrument_analysis_report(
+            {"execution_type": "macro_analysis"}, FinancialLiteracy.INTERMEDIATE
+        )
+        is None
+    )
 
 
 @pytest.mark.unit
@@ -56,7 +62,7 @@ def test_build_instrument_analysis_report_multi_expiration() -> None:
             },
         ],
     }
-    report = build_instrument_analysis_report(payload)
+    report = build_instrument_analysis_report(payload, FinancialLiteracy.INTERMEDIATE)
     assert report is not None
     assert report.key_metrics.get("multi_expiration") is True
     assert len(report.key_metrics.get("expirations") or []) == 2

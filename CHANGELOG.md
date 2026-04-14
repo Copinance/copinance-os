@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Financial literacy personalization (full deterministic surface)**: Instrument summaries, market regime labels, macro interpretation labels, and question-driven/report fallback narration now resolve by `financial_literacy` tier (`beginner`/`intermediate`/`advanced`) across executors, tools, and report builders; unavailable values remain explicit (`null`) with no legacy fallback synthesis.
 - **Options positioning methodology contract (breaking)**: Distributed methodology metadata to component-level sections (`signal_categories.*`, `iv_metrics`, `dollar_metrics`, `delta_exposure`, `vanna_exposure`, `charm_exposure`, `mispricing`, `moneyness_summary`, `pin_risk`, `implied_move_detail`) and reduced top-level `OptionsPositioningResult.methodology.specs` to cross-cutting specs only (Greeks when present, bias, data quality); removed legacy merge path and updated docs/fixtures/tests.
 - **Methodology references — options analytics**: Corrected QuantLib/BSM and bias-literature citations with accurate titles, publication details, and stable DOI/source links.
 - **Documentation — methodology terminology harmonization**: Standardized docs wording around the `AnalysisMethodology` envelope across options, reports, market-regime, CLI, and library guides. Terminology now consistently uses **methodology envelope**, **`specs`**, **`data_inputs`**, and **`greeks_methodology`** where applicable.

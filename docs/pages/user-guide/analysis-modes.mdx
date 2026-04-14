@@ -5,6 +5,7 @@ Copinance OS runs **deterministic** pipelines (fixed steps, structured JSON resu
 ## Deterministic Instrument Analysis
 
 Deterministic analysis follows a predefined pipeline with consistent steps.
+All deterministic narration is literacy-tiered (`beginner` / `intermediate` / `advanced`) using the run/profile `financial_literacy` context.
 
 ### Equity Analysis
 
@@ -80,6 +81,7 @@ copinance analyze macro --question "What is the current market sentiment?" --mar
 See [CLI Reference - Analyze](cli#analyze-commands) for all options. Use `--include-prompt` to include the rendered prompts in saved results for question-driven runs.
 
 **Structured reports:** When you use the library or orchestrator, **`RunJobResult.report`** is populated with an **`AnalysisReport`** (summary, key metrics, methodology envelope) for deterministic instrument/market runs and for **question-driven** runs, so outputs follow the same structure across modes. The methodology envelope is `AnalysisMethodology` with `specs` and `data_inputs`; assumptions and limitations are carried inside `specs[*]`. For question-driven success paths, **`key_metrics`** may include iteration counts, LLM provider/model, tool-call counts, numeric-grounding policy, and partial-synthesis flags when the executor provides them. Use **`--json`** on the `analyze` group to print the full **`RunJobResult`** as JSON from the CLI ([CLI — machine-readable output](cli#machine-readable-output---json)).
+If a metric is unavailable, outputs keep explicit unavailable values (`null`) instead of fallback narrative synthesis.
 
 ## Timeframes
 

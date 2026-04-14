@@ -5,6 +5,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.models.profile import FinancialLiteracy
+
+
+def _partial_header(lit: FinancialLiteracy) -> str:
+    if lit == FinancialLiteracy.BEGINNER:
+        return "**No plain-language model summary was produced.**"
+    if lit == FinancialLiteracy.ADVANCED:
+        return "**No model-authored synthesis was produced.**"
+    return "**No model-written summary was produced.**"
+
 
 def is_tool_call_json_text(text: str) -> bool:
     """True if *text* looks like the project's JSON tool-call shape (not a natural answer)."""
@@ -79,10 +90,12 @@ def build_partial_synthesis_message(
     reason: str,
     error_detail: str | None,
     tool_calls: list[dict[str, Any]],
+    financial_literacy: FinancialLiteracy | str | None = None,
 ) -> str:
     """Markdown-friendly message: explain the gap and show tool data."""
+    lit = resolve_financial_literacy(financial_literacy)
     parts = [
-        "**No model-written summary was produced.**",
+        _partial_header(lit),
         "",
         f"**Reason:** {reason}",
     ]

@@ -28,6 +28,8 @@
 
 Copinance OS treats **financial computation and research orchestration as first-class concerns**. Numbers, indicators, and regime logic live in a **deterministic domain layer** with explicit data contracts — not in prompt text. LLMs sit in an **explanation and question-driven layer**: they reason over tool outputs and narrative context, while prices, macro series, and filing-derived facts come from **providers and domain code** you can test and audit.
 
+Deterministic narration is now literacy-tiered across instrument summaries, market-regime labels, macro interpretation labels, and report-envelope fallback copy. Provide `financial_literacy` (`beginner` / `intermediate` / `advanced`) via profile or run context; uncomputable metrics stay `null` (no legacy fallback synthesis).
+
 <table align="center">
 <tr>
   <td align="center" width="33%">

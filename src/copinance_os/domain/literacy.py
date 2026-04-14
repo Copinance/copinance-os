@@ -9,11 +9,9 @@
 
 2. **Deterministic analytics (structured JSON)** — When numeric pipelines need human-readable
    ``name`` / ``explanation`` / ``narrative`` fields at multiple depths, colocate **tiered
-   strings** under ``data/literacy/`` (one module per feature, e.g. ``options_positioning.py`` for
-   ``data.analytics.options.positioning``). Use :class:`TieredCopy` and ``.pick(lit)`` so all three tiers stay
-   in sync. Only **options positioning** uses this pattern so far; other surfaces (equity/options
-   summaries in ``InstrumentAnalysisExecutor``, regime tool blurbs) are still single-tier and can
-   migrate incrementally.
+   strings** under ``data/literacy/`` (one module per feature). Use :class:`TieredCopy`
+   and ``.pick(lit)`` so all three tiers stay in sync across instrument, market, macro,
+   and options analysis surfaces.
 
 3. **LLM prompts** — Question-driven and similar flows pass a single string into templates (e.g.
    ``{financial_literacy}``). Use :func:`financial_literacy_prompt_value` so defaults and invalid

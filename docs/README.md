@@ -12,6 +12,7 @@ The docs track the `copinance_os` package:
 - **AI/LLM** — provider adapters (Gemini, OpenAI, Ollama), streaming, tool-calling loop
 - **Infra** — DI container, plugin loading, settings
 - **Interfaces/CLI** — `main` → `dispatch` (Typer vs natural-language root); `--json` and `--stream` flags; multi-turn conversation (library-only via `conversation_history`); **`analyze options`**: repeat `-e` / `--expiration` for multiple expiries (library: `expiration_dates` on `AnalyzeInstrumentRequest`); **`analyze positioning`** for deterministic aggregate surface metrics; library: optional **`positioning_window`** on `AnalyzeInstrumentRequest` for options runs
+- **Literacy-tiered narration** — deterministic instrument/market/macro/question-driven envelopes adapt text output by `financial_literacy` tier while preserving stable machine fields for integrations
 
 Deterministic finance stays in `data` and `domain`; LLMs explain and route, they do not replace pricing engines. The canonical package tree is in [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture#package-tree-source).
 

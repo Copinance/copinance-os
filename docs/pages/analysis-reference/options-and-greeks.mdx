@@ -82,6 +82,17 @@ For **options positioning**, methodology is now **component-distributed** (no ba
 
 This contract intentionally avoids legacy compatibility wrappers or fallback response shapes. If a metric cannot be computed, it is returned as unavailable (`null`) rather than synthesized from fallback logic.
 
+## Financial Literacy Personalization
+
+Deterministic narration is literacy-tiered across analysis surfaces:
+
+- Instrument analysis summaries (equity and options)
+- Market regime and cycle descriptions
+- Macro interpretation labels
+- Report-envelope fallback summaries for instrument/market/question-driven runs
+
+The active tier is resolved from `financial_literacy` (`beginner`, `intermediate`, `advanced`) using `resolve_financial_literacy`. If not provided, the deterministic default tier is `intermediate`.
+
 ### Provider inputs (optional)
 
 | Key | Meaning |

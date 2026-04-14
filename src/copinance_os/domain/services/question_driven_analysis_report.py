@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from copinance_os.data.literacy import instrument_analysis as ia_lit
 from copinance_os.domain.models.analysis_report import AnalysisReport
 from copinance_os.domain.models.methodology import envelope_from_text_methodology
+from copinance_os.domain.models.profile import FinancialLiteracy
 
 _DEFAULT_ASSUMPTIONS: tuple[str, ...] = (
     "External data may be delayed or incomplete; tool availability depends on configuration.",
@@ -17,7 +19,9 @@ _DEFAULT_LIMITATIONS: tuple[str, ...] = (
 )
 
 
-def build_question_driven_analysis_report(results: dict[str, Any]) -> AnalysisReport | None:
+def build_question_driven_analysis_report(
+    results: dict[str, Any], lit: FinancialLiteracy
+) -> AnalysisReport | None:
     """Build a report envelope from ``question_driven_analysis`` executor output, if applicable."""
     if results.get("execution_type") != "question_driven_analysis":
         return None
@@ -28,7 +32,7 @@ def build_question_driven_analysis_report(results: dict[str, Any]) -> AnalysisRe
     analysis = results.get("analysis")
 
     if status == "failed" or err:
-        summary = str(msg or err or "Question-driven analysis did not complete.")
+        summary = str(msg or err or ia_lit.report_question_driven_default(lit))
         key_metrics: dict[str, Any] = {
             "status": status or "failed",
             "execution_mode": results.get("execution_mode"),
@@ -57,7 +61,7 @@ def build_question_driven_analysis_report(results: dict[str, Any]) -> AnalysisRe
         summary_text = str(analysis)[:8000]
 
     if not summary_text:
-        summary_text = str(msg or "Question-driven analysis completed.")
+        summary_text = str(msg or ia_lit.report_question_driven_default(lit))
 
     policy = results.get("numeric_grounding_policy")
     key_metrics = {
@@ -88,7 +92,7 @@ def build_question_driven_analysis_report(results: dict[str, Any]) -> AnalysisRe
     if results.get("synthesis_status") == "partial":
         limitations = (
             *_DEFAULT_LIMITATIONS,
-            "Final LLM narrative was not available; summary below includes tool output formatted for display.",
+            ia_lit.report_question_driven_partial_limitation(lit),
         )
 
     methodology = envelope_from_text_methodology(

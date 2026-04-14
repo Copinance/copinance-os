@@ -2,6 +2,7 @@
 
 import pytest
 
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.services.run_job_analysis_report import build_run_job_analysis_report
 
 
@@ -12,7 +13,8 @@ def test_dispatch_instrument() -> None:
             "execution_type": "instrument_analysis",
             "summary": {"text": "x"},
             "analysis": {"symbol": "A", "timeframe": "mid_term"},
-        }
+        },
+        FinancialLiteracy.INTERMEDIATE,
     )
     assert r is not None
     assert r.summary == "x"
@@ -26,7 +28,8 @@ def test_dispatch_market() -> None:
             "market_index": "SPY",
             "market_regime_indicators": {"success": True},
             "macro_regime_indicators": {"success": True},
-        }
+        },
+        FinancialLiteracy.INTERMEDIATE,
     )
     assert r is not None
     assert "SPY" in r.summary
@@ -45,7 +48,8 @@ def test_dispatch_question_driven() -> None:
             "llm_provider": "test",
             "llm_model": "test-model",
             "numeric_grounding_policy": "policy text",
-        }
+        },
+        FinancialLiteracy.INTERMEDIATE,
     )
     assert r is not None
     assert "findings" in r.summary
@@ -60,7 +64,8 @@ def test_dispatch_question_driven_failed() -> None:
             "status": "failed",
             "error": "LLM analyzer not configured",
             "message": "LLM analyzer is required for question-driven analysis",
-        }
+        },
+        FinancialLiteracy.INTERMEDIATE,
     )
     assert r is not None
     assert "required" in r.summary.lower() or "LLM" in r.summary
@@ -68,4 +73,9 @@ def test_dispatch_question_driven_failed() -> None:
 
 @pytest.mark.unit
 def test_dispatch_unknown_executor_type() -> None:
-    assert build_run_job_analysis_report({"execution_type": "future_executor"}) is None
+    assert (
+        build_run_job_analysis_report(
+            {"execution_type": "future_executor"}, FinancialLiteracy.INTERMEDIATE
+        )
+        is None
+    )

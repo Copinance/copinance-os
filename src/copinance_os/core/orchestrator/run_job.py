@@ -19,6 +19,7 @@ from copinance_os.domain.exceptions import (
     ExecutorNotFoundError,
     RetryableExecutionError,
 )
+from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.job import Job, ReportExclusionReason, RunJobResult
 from copinance_os.domain.ports.analysis_execution import AnalysisExecutor, JobRunner
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
@@ -84,7 +85,8 @@ class DefaultJobRunner(JobRunner):
             for attempt in range(self._max_execute_retries + 1):
                 try:
                     results = await executor.execute(job, ctx)
-                    report = build_run_job_analysis_report(results) if results else None
+                    lit = resolve_financial_literacy(ctx.get("financial_literacy"))
+                    report = build_run_job_analysis_report(results, lit) if results else None
                     report_exclusion: ReportExclusionReason | None = None
                     if results and report is None:
                         et = results.get("execution_type")

@@ -21,6 +21,7 @@ from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators im
     create_macro_regime_indicators_tool,
 )
 from copinance_os.data.cache import CacheManager
+from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.models.market import MarketDataPoint
@@ -96,6 +97,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
 
         use_cache = not bool(context.get("no_cache"))
         cache_manager = self._cache_manager if use_cache else None
+        lit = resolve_financial_literacy(context.get("financial_literacy"))
 
         # Market regime indicators (VIX, breadth, rotation)
         market_indicators_tool = create_market_regime_indicators_tool(
@@ -108,6 +110,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_vix=include_vix,
             include_market_breadth=include_market_breadth,
             include_sector_rotation=include_sector_rotation,
+            financial_literacy=lit.value,
         )
 
         # Construct typed market regime indicators result
@@ -210,6 +213,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
                     symbol=market_index,
                     lookback_days=lookback_days,
                     historical_data=regime_historical_data,
+                    financial_literacy=lit.value,
                 )
                 regime_detection_data[tool_name] = ToolResult(
                     success=tool_result.success,
@@ -324,6 +328,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_consumer=include_consumer,
             include_global=include_global,
             include_advanced=include_advanced,
+            financial_literacy=lit.value,
         )
 
         # Construct typed macro regime indicators result

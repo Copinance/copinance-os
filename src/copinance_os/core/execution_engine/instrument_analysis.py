@@ -10,6 +10,7 @@ import structlog
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
 from copinance_os.data.analytics.options.positioning import build_options_positioning
 from copinance_os.data.cache import CacheManager
+from copinance_os.data.literacy import instrument_analysis as ia_lit
 from copinance_os.data.schemas.market_data_conversions import (
     coerce_sorted_market_data_points,
     price_series_from_market_data_points,
@@ -32,6 +33,7 @@ from copinance_os.domain.models.market_requests import (
     GetQuoteRequest,
     GetQuoteResponse,
 )
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.ports.use_cases import UseCase
 from copinance_os.infra.error_handler import flatten_exception_message
 
@@ -78,16 +80,20 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         symbol = job.instrument_symbol.upper()
         market_type = job.market_type or MarketType.EQUITY
         use_cache = not bool(context.get("no_cache"))
+        lit = resolve_financial_literacy(context.get("financial_literacy"))
 
         if market_type == MarketType.OPTIONS:
-            return await self._execute_options_analysis(symbol, job.timeframe, context, use_cache)
-        return await self._execute_equity_analysis(symbol, job.timeframe, use_cache)
+            return await self._execute_options_analysis(
+                symbol, job.timeframe, context, use_cache, lit
+            )
+        return await self._execute_equity_analysis(symbol, job.timeframe, use_cache, lit)
 
     async def _execute_equity_analysis(
         self,
         symbol: str,
         timeframe: JobTimeframe,
         use_cache: bool,
+        lit: FinancialLiteracy,
     ) -> dict[str, Any]:
         instrument = await self._get_instrument_info(symbol)
         quote = await self._get_market_quote(symbol, use_cache=use_cache)
@@ -99,6 +105,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             historical_data,
             fundamentals,
             timeframe,
+            lit,
         )
 
         return {
@@ -115,6 +122,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 quote,
                 analysis,
                 timeframe,
+                lit,
             ),
         }
 
@@ -189,6 +197,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         side: OptionSide,
         quote: dict[str, Any],
         options_chain: OptionsChain,
+        lit: FinancialLiteracy,
     ) -> dict[str, Any]:
         if side == OptionSide.CALL:
             selected_contracts = options_chain.calls
@@ -297,7 +306,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         return {
             "options_chain": options_chain_payload,
             "analysis": analysis,
-            "summary": self._generate_options_summary(symbol, analysis),
+            "summary": self._generate_options_summary(symbol, analysis, lit),
         }
 
     async def _execute_options_analysis(
@@ -306,6 +315,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         timeframe: JobTimeframe,
         context: dict[str, Any],
         use_cache: bool,
+        lit: FinancialLiteracy,
     ) -> dict[str, Any]:
         requested_side = context.get("option_side", OptionSide.ALL.value)
         side = OptionSide(requested_side)
@@ -318,7 +328,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 symbol, expirations_to_fetch[0], use_cache=use_cache
             )
             payload = self._build_options_slice_payload(
-                symbol, timeframe, side, quote, options_chain
+                symbol, timeframe, side, quote, options_chain, lit
             )
             out: dict[str, Any] = {
                 "execution_type": "instrument_analysis",
@@ -337,7 +347,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 quote=quote,
                 symbol=symbol,
                 window=pos_window,
-                financial_literacy=resolve_financial_literacy(context.get("financial_literacy")),
+                financial_literacy=lit,
                 enrich_missing_greeks=True,
             )
             out["positioning"] = pos.model_dump(mode="json")
@@ -345,7 +355,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
 
         async def _one(exp: str | None) -> dict[str, Any]:
             chain = await self._get_options_chain(symbol, exp, use_cache=use_cache)
-            return self._build_options_slice_payload(symbol, timeframe, side, quote, chain)
+            return self._build_options_slice_payload(symbol, timeframe, side, quote, chain, lit)
 
         try:
             async with asyncio.TaskGroup() as tg:
@@ -719,6 +729,7 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         historical_data: dict[str, Any],
         fundamentals: dict[str, Any],
         timeframe: JobTimeframe,
+        lit: FinancialLiteracy,
     ) -> dict[str, Any]:
         analysis: dict[str, Any] = {
             "symbol": symbol,
@@ -772,17 +783,17 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             if period_high > period_low:
                 price_position = (current_price - period_low) / (period_high - period_low)
                 if price_position > 0.8:
-                    assessments.append("Trading near the upper end of the selected range")
+                    assessments.append(ia_lit.assessment_upper_range(lit))
                 elif price_position < 0.2:
-                    assessments.append("Trading near the lower end of the selected range")
+                    assessments.append(ia_lit.assessment_lower_range(lit))
 
         current_ratio = fundamentals.get("ratios", {}).get("current_ratio")
         if current_ratio:
             current_ratio_value = float(current_ratio)
             if current_ratio_value < 1.0:
-                assessments.append("Liquidity is tight based on the current ratio")
+                assessments.append(ia_lit.assessment_liquidity_tight(lit))
             elif current_ratio_value > 2.0:
-                assessments.append("Liquidity looks strong based on the current ratio")
+                assessments.append(ia_lit.assessment_liquidity_strong(lit))
 
         return analysis
 
@@ -792,25 +803,27 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
         quote: dict[str, Any],
         analysis: dict[str, Any],
         timeframe: JobTimeframe,
+        lit: FinancialLiteracy,
     ) -> dict[str, Any]:
         summary_parts = []
         if instrument.get("name"):
-            summary_parts.append(f"Instrument: {instrument['name']}")
+            summary_parts.append(f"{ia_lit.equity_label_instrument(lit)}: {instrument['name']}")
         if instrument.get("sector"):
-            summary_parts.append(f"Sector: {instrument['sector']}")
+            summary_parts.append(f"{ia_lit.equity_label_sector(lit)}: {instrument['sector']}")
         if quote.get("current_price"):
-            summary_parts.append(f"Current Price: {quote['current_price']}")
+            summary_parts.append(f"{ia_lit.equity_label_price(lit)}: {quote['current_price']}")
         if analysis.get("trends", {}).get("price_trend"):
             trend = analysis["trends"]["price_trend"]
             summary_parts.append(
-                f"Price Trend ({timeframe.value}): {trend['direction']} {trend['magnitude']:.2f}%"
+                f"{ia_lit.equity_label_trend(lit)} ({timeframe.value}): "
+                f"{trend['direction']} {trend['magnitude']:.2f}%"
             )
         pe_ratio = analysis.get("metrics", {}).get("valuation", {}).get("pe_ratio")
         if pe_ratio:
-            summary_parts.append(f"P/E Ratio: {pe_ratio}")
+            summary_parts.append(f"{ia_lit.equity_label_pe(lit)}: {pe_ratio}")
         roe = analysis.get("metrics", {}).get("profitability", {}).get("roe")
         if roe:
-            summary_parts.append(f"ROE: {roe}%")
+            summary_parts.append(f"{ia_lit.equity_label_roe(lit)}: {roe}%")
         for assessment in analysis.get("assessments", []):
             summary_parts.append(f"- {assessment}")
 
@@ -820,22 +833,29 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
             "analysis_date": datetime.now(UTC).isoformat(),
         }
 
-    def _generate_options_summary(self, symbol: str, analysis: dict[str, Any]) -> dict[str, Any]:
+    def _generate_options_summary(
+        self,
+        symbol: str,
+        analysis: dict[str, Any],
+        lit: FinancialLiteracy,
+    ) -> dict[str, Any]:
         metrics = analysis["metrics"]
         summary_parts = [
-            f"Options snapshot for {symbol}",
-            f"Expiration: {analysis['expiration_date']}",
-            f"Contracts analyzed: {analysis['contracts_analyzed']}",
+            ia_lit.options_header(symbol, lit),
+            f"{ia_lit.options_label_expiration(lit)}: {analysis['expiration_date']}",
+            f"{ia_lit.options_label_contracts(lit)}: {analysis['contracts_analyzed']}",
         ]
         if metrics.get("underlying_price"):
-            summary_parts.append(f"Underlying Price: {metrics['underlying_price']}")
+            summary_parts.append(
+                f"{ia_lit.options_label_underlying(lit)}: {metrics['underlying_price']}"
+            )
         if metrics.get("put_call_open_interest_ratio"):
             summary_parts.append(
-                f"Put/Call Open Interest Ratio: {metrics['put_call_open_interest_ratio']}"
+                f"{ia_lit.options_label_put_call_oi(lit)}: {metrics['put_call_open_interest_ratio']}"
             )
         if metrics.get("average_implied_volatility"):
             summary_parts.append(
-                f"Average Implied Volatility: {metrics['average_implied_volatility']}"
+                f"{ia_lit.options_label_avg_iv(lit)}: {metrics['average_implied_volatility']}"
             )
         return {
             "text": "\n".join(summary_parts),

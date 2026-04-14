@@ -6,6 +6,6 @@ Each module here pairs with an engine elsewhere (for example ``options_positioni
 
 from __future__ import annotations
 
-from . import options_positioning
+from . import instrument_analysis, macro_indicators, market_regime, options_positioning
 
-__all__ = ["options_positioning"]
+__all__ = ["instrument_analysis", "macro_indicators", "market_regime", "options_positioning"]

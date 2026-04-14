@@ -2,8 +2,11 @@
 
 from typing import Any
 
+from copinance_os.data.literacy import instrument_analysis as ia_lit
+from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis_report import AnalysisReport
 from copinance_os.domain.models.methodology import envelope_from_text_methodology
+from copinance_os.domain.models.profile import FinancialLiteracy
 
 _DEFAULT_ASSUMPTIONS = (
     "Market data may be delayed or incomplete; provider-dependent.",
@@ -15,7 +18,9 @@ _DEFAULT_LIMITATIONS = (
 )
 
 
-def build_instrument_analysis_report(results: dict[str, Any]) -> AnalysisReport | None:
+def build_instrument_analysis_report(
+    results: dict[str, Any], lit: FinancialLiteracy
+) -> AnalysisReport | None:
     """Build a report envelope from ``instrument_analysis`` executor output, if applicable."""
     if results.get("execution_type") != "instrument_analysis":
         return None
@@ -59,7 +64,8 @@ def build_instrument_analysis_report(results: dict[str, Any]) -> AnalysisReport 
     )
 
     return AnalysisReport(
-        summary=summary_text or "Instrument analysis completed.",
+        summary=summary_text
+        or ia_lit.report_instrument_default_summary(resolve_financial_literacy(lit)),
         key_metrics=key_metrics,
         methodology=methodology,
     )

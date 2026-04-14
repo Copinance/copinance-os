@@ -6,6 +6,7 @@ Two complementary analysis layers describe market conditions:
 - **Macro indicators** aggregate observable economic series — rates, credit, labor, housing, manufacturing, consumer, global — into structured signals. 47+ series via FRED (with yfinance fallbacks).
 
 Both are used together in `copinance analyze macro` and are available to the LLM in question-driven runs. Regime labels and macro signals are **heuristic** contextual inputs — treat them as backdrop, not as forecasts.
+Deterministic regime/macro narration is literacy-tiered (`financial_literacy`) while numeric fields remain unchanged.
 
 ---
 
@@ -30,6 +31,7 @@ Classifies the instrument as **bull**, **bear**, or **neutral** using moving ave
 | `methodology` | `AnalysisMethodology` envelope (`specs` + `data_inputs`; trend spec id: `market_regime.detect_trend`) |
 
 **Parameters:** `symbol` (required), `lookback_days` (default 200), `short_ma_period` (default 50), `long_ma_period` (default 200).
+Optional context parameter: `financial_literacy` (`beginner` / `intermediate` / `advanced`) for tiered display labels.
 
 ```python
 from copinance_os.core.pipeline.tools.analysis import MarketRegimeDetectTrendTool
@@ -54,6 +56,7 @@ Classifies realized volatility as **high**, **normal**, or **low** relative to t
 | `mean_volatility` | Historical mean over the lookback |
 
 **Parameters:** `symbol` (required), `lookback_days` (default 252), `volatility_window` (default 20).
+Optional context parameter: `financial_literacy` (`beginner` / `intermediate` / `advanced`) for tiered display labels.
 
 ### `detect_market_cycles`
 

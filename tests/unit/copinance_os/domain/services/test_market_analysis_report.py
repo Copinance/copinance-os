@@ -2,6 +2,7 @@
 
 import pytest
 
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.services.market_analysis_report import build_market_analysis_report
 
 
@@ -14,7 +15,7 @@ def test_build_market_analysis_report() -> None:
         "market_regime_indicators": {"success": True},
         "macro_regime_indicators": {"success": False},
     }
-    r = build_market_analysis_report(payload)
+    r = build_market_analysis_report(payload, FinancialLiteracy.INTERMEDIATE)
     assert r is not None
     assert "QQQ" in r.summary
     assert r.key_metrics.get("market_regime_indicators_success") is True
@@ -22,4 +23,9 @@ def test_build_market_analysis_report() -> None:
 
 @pytest.mark.unit
 def test_build_market_analysis_report_wrong_type() -> None:
-    assert build_market_analysis_report({"execution_type": "instrument_analysis"}) is None
+    assert (
+        build_market_analysis_report(
+            {"execution_type": "instrument_analysis"}, FinancialLiteracy.INTERMEDIATE
+        )
+        is None
+    )

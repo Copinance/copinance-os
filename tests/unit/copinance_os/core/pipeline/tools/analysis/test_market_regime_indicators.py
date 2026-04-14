@@ -263,7 +263,9 @@ class TestMarketRegimeIndicatorsTool:
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=sample_vix_data)
 
         tool = MarketRegimeIndicatorsTool(mock_market_data_provider)
-        vix_data = await tool._fetch_vix_data(datetime(2024, 1, 1), datetime(2024, 1, 10))
+        vix_data = await tool._fetch_vix_data(
+            datetime(2024, 1, 1), datetime(2024, 1, 10), "intermediate"
+        )
 
         assert vix_data["available"] is True
         assert "current_vix" in vix_data
@@ -281,7 +283,9 @@ class TestMarketRegimeIndicatorsTool:
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=[])
 
         tool = MarketRegimeIndicatorsTool(mock_market_data_provider)
-        vix_data = await tool._fetch_vix_data(datetime(2024, 1, 1), datetime(2024, 1, 10))
+        vix_data = await tool._fetch_vix_data(
+            datetime(2024, 1, 1), datetime(2024, 1, 10), "intermediate"
+        )
 
         assert vix_data["available"] is False
         assert "error" in vix_data
@@ -308,7 +312,9 @@ class TestMarketRegimeIndicatorsTool:
         mock_market_data_provider.get_historical_data = AsyncMock(return_value=high_vix_data)
 
         tool = MarketRegimeIndicatorsTool(mock_market_data_provider)
-        vix_data = await tool._fetch_vix_data(datetime(2024, 1, 1), datetime(2024, 1, 20))
+        vix_data = await tool._fetch_vix_data(
+            datetime(2024, 1, 1), datetime(2024, 1, 20), "intermediate"
+        )
 
         assert vix_data["available"] is True
         assert vix_data["regime"] in ["high", "very_high"]

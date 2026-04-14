@@ -2,8 +2,10 @@
 
 from typing import Any
 
+from copinance_os.data.literacy import instrument_analysis as ia_lit
 from copinance_os.domain.models.analysis_report import AnalysisReport
 from copinance_os.domain.models.methodology import envelope_from_text_methodology
+from copinance_os.domain.models.profile import FinancialLiteracy
 
 _DEFAULT_ASSUMPTIONS = (
     "Macro and market series may be delayed; provider availability affects coverage.",
@@ -15,7 +17,9 @@ _DEFAULT_LIMITATIONS = (
 )
 
 
-def build_market_analysis_report(results: dict[str, Any]) -> AnalysisReport | None:
+def build_market_analysis_report(
+    results: dict[str, Any], lit: FinancialLiteracy
+) -> AnalysisReport | None:
     """Build a report envelope from ``market_analysis`` executor output, if applicable."""
     if results.get("execution_type") != "market_analysis":
         return None
@@ -26,11 +30,7 @@ def build_market_analysis_report(results: dict[str, Any]) -> AnalysisReport | No
     mri_ok = isinstance(mri, dict) and bool(mri.get("success"))
     macro_ok = isinstance(macro, dict) and bool(macro.get("success"))
 
-    summary = (
-        f"Deterministic market and macro regime snapshot for {idx}. "
-        f"Market indicators: {'ok' if mri_ok else 'incomplete'}; "
-        f"macro block: {'ok' if macro_ok else 'incomplete'}."
-    )
+    summary = ia_lit.report_market_summary(idx, mri_ok, macro_ok, lit)
 
     key_metrics: dict[str, Any] = {
         "market_index": idx,

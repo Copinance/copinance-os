@@ -13,6 +13,9 @@ from typing import Any, cast
 import structlog
 
 from copinance_os.data.cache import CacheManager
+from copinance_os.data.literacy import macro_indicators as macro_lit
+from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
@@ -44,6 +47,16 @@ class MacroRegimeIndicatorsTool(Tool):
         self._macro_provider = macro_data_provider
         self._market_provider = market_data_provider
         self._cache_manager = cache_manager
+        self._financial_literacy: FinancialLiteracy = resolve_financial_literacy(None)
+
+    def _apply_literacy_to_interpretation(self, interpretation: dict[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        for key, value in interpretation.items():
+            if isinstance(value, str):
+                out[key] = macro_lit.interpret_label(value, self._financial_literacy)
+            else:
+                out[key] = value
+        return out
 
     async def _get_block_cached(
         self, block_name: str, start_date: datetime, end_date: datetime
@@ -160,6 +173,10 @@ class MacroRegimeIndicatorsTool(Tool):
                         "description": "Include advanced economic indicators (default: true)",
                         "default": True,
                     },
+                    "financial_literacy": {
+                        "type": "string",
+                        "description": "Literacy tier: beginner|intermediate|advanced",
+                    },
                 },
                 "required": [],
             },
@@ -182,6 +199,9 @@ class MacroRegimeIndicatorsTool(Tool):
             include_consumer = bool(validated.get("include_consumer", True))
             include_global = bool(validated.get("include_global", True))
             include_advanced = bool(validated.get("include_advanced", True))
+            self._financial_literacy = resolve_financial_literacy(
+                validated.get("financial_literacy")
+            )
 
             end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=lookback_days + 30)
@@ -326,7 +346,7 @@ class MacroRegimeIndicatorsTool(Tool):
                     )
 
                 if interpretation:
-                    out["interpretation"] = interpretation
+                    out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
                 logger.info("Successfully fetched rates from FRED", series_count=len(fred_series))
                 await self._set_block_cached("rates", start_date, end_date, out)
                 return out
@@ -469,7 +489,7 @@ class MacroRegimeIndicatorsTool(Tool):
                     )
 
                 if interpretation:
-                    out["interpretation"] = interpretation
+                    out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
                 logger.info("Successfully fetched credit spreads from FRED")
                 await self._set_block_cached("credit", start_date, end_date, out)
                 return out
@@ -555,6 +575,9 @@ class MacroRegimeIndicatorsTool(Tool):
                             ),
                             "wti_change_20d_pct": round(pct, 2),
                         }
+                        out["interpretation"] = self._apply_literacy_to_interpretation(
+                            out["interpretation"]
+                        )
                 logger.info("Successfully fetched commodities from FRED")
                 await self._set_block_cached("commodities", start_date, end_date, out)
                 return out
@@ -651,7 +674,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = interpretation
+                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
 
             logger.info("Successfully fetched labor market indicators from FRED")
             await self._set_block_cached("labor", start_date, end_date, out)
@@ -728,7 +751,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = interpretation
+                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
 
             logger.info("Successfully fetched housing indicators from FRED")
             await self._set_block_cached("housing", start_date, end_date, out)
@@ -813,7 +836,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = interpretation
+                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
 
             logger.info("Successfully fetched manufacturing indicators from FRED")
             await self._set_block_cached("manufacturing", start_date, end_date, out)
@@ -927,7 +950,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 interpretation["saving_rate_current"] = round(save_rate, 1)
 
             if interpretation:
-                out["interpretation"] = interpretation
+                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
 
             logger.info("Successfully fetched consumer indicators from FRED")
             await self._set_block_cached("consumer", start_date, end_date, out)
@@ -1027,7 +1050,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = interpretation
+                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
 
             logger.info("Successfully fetched global indicators")
             await self._set_block_cached("global", start_date, end_date, out)
