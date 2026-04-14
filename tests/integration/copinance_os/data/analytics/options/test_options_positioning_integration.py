@@ -21,19 +21,17 @@ import statistics
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
 
 import pytest
 
-from copinance_os.data.analytics.options.constants import DEFAULT_RISK_FREE_RATE
-from copinance_os.data.analytics.options.positioning import build_options_positioning_dict
-from copinance_os.data.analytics.options.quantlib_bsm_greeks import (
+from copinance_os.data.analytics.options.greeks import (
+    DEFAULT_RISK_FREE_RATE,
     compute_european_bsm_greeks,
     enrich_options_chain_missing_greeks,
 )
+from copinance_os.data.analytics.options.positioning import build_options_positioning
 from copinance_os.data.providers.yfinance import YFinanceMarketProvider
 from copinance_os.domain.models.market import OptionContract, OptionsChain, OptionSide
-from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 
 pytest.importorskip("QuantLib")
 
@@ -88,17 +86,16 @@ class TestOptionsPositioningSnapshotIntegration:
         assert spot > 100.0
 
         quote = {"current_price": spot}
-        raw = build_options_positioning_dict(
-            chain,
-            calls,
-            puts,
-            quote,
-            chain.underlying_symbol,
-            "near",
+        model = build_options_positioning(
+            chain=chain,
+            calls=calls,
+            puts=puts,
+            quote=quote,
+            symbol=chain.underlying_symbol,
+            window="near",
             as_of_date=as_of,
             enrich_missing_greeks=True,
         )
-        model = OptionsPositioningResult.model_validate(raw)
         assert model.symbol == "SPY"
         assert model.window == "near"
         assert model.data_quality is not None and model.data_quality > 0.3
@@ -109,6 +106,9 @@ class TestOptionsPositioningSnapshotIntegration:
         assert model.iv_metrics is not None
         assert model.signal_categories is not None
         assert model.regime in ("positive_gamma", "negative_gamma", "neutral")
+        spec_ids = {s.id for s in model.methodology.specs}
+        assert "options.positioning.bias" in spec_ids
+        assert "options.greeks.quantlib_bsm_european" in spec_ids
 
     def test_enriched_greeks_self_consistent_with_recompute(self) -> None:
         chain, as_of = _load_snapshot_chain()
@@ -204,16 +204,16 @@ class TestOptionsPositioningSnapshotIntegration:
         chain, as_of = _load_snapshot_chain()
         dte = (chain.expiration_date - as_of).days
         assert 1 <= dte <= 5, "fixture should keep DTE in 1..5 for pin-risk coverage"
-        raw = build_options_positioning_dict(
-            chain,
-            list(chain.calls or []),
-            list(chain.puts or []),
-            {"current_price": float(chain.underlying_price or 0)},
-            "SPY",
-            "near",
+        raw = build_options_positioning(
+            chain=chain,
+            calls=list(chain.calls or []),
+            puts=list(chain.puts or []),
+            quote={"current_price": float(chain.underlying_price or 0)},
+            symbol="SPY",
+            window="near",
             as_of_date=as_of,
             enrich_missing_greeks=True,
-        )
+        ).model_dump(mode="python")
         pr = raw.get("pin_risk")
         assert pr is not None
         assert pr["pin_risk_level"] in ("low", "moderate", "high")
@@ -241,17 +241,16 @@ class TestYFinanceOptionsPositioningLiveIntegration:
             pytest.skip("no underlying price on live chain")
 
         as_of = date.today()
-        raw: dict[str, Any] = build_options_positioning_dict(
-            chain,
-            calls,
-            puts,
-            {"current_price": spot},
-            "SPY",
-            "near",
+        model = build_options_positioning(
+            chain=chain,
+            calls=calls,
+            puts=puts,
+            quote={"current_price": spot},
+            symbol="SPY",
+            window="near",
             as_of_date=as_of,
             enrich_missing_greeks=True,
         )
-        model = OptionsPositioningResult.model_validate(raw)
         assert model.delta_exposure is not None
         assert model.gex_profile is not None
         assert model.vanna_exposure is not None

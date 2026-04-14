@@ -3,11 +3,8 @@
 from typing import Any
 
 from copinance_os.domain.models.analysis_report import AnalysisReport
+from copinance_os.domain.models.methodology import envelope_from_text_methodology
 
-_DEFAULT_METHODOLOGY = (
-    "Deterministic instrument analysis: quote, historical price statistics, "
-    "and fundamentals-derived ratios when available."
-)
 _DEFAULT_ASSUMPTIONS = (
     "Market data may be delayed or incomplete; provider-dependent.",
     "Ratios use latest reported fundamentals within the pipeline window.",
@@ -53,10 +50,16 @@ def build_instrument_analysis_report(results: dict[str, Any]) -> AnalysisReport 
         if metrics:
             key_metrics["metrics"] = metrics
 
+    methodology = envelope_from_text_methodology(
+        spec_id="instrument_analysis.deterministic",
+        model_family="deterministic_quote_fundamentals_pipeline",
+        assumptions=_DEFAULT_ASSUMPTIONS,
+        limitations=_DEFAULT_LIMITATIONS,
+        data_inputs={"execution_mode": str(results.get("execution_mode") or "")},
+    )
+
     return AnalysisReport(
         summary=summary_text or "Instrument analysis completed.",
         key_metrics=key_metrics,
-        methodology=_DEFAULT_METHODOLOGY,
-        assumptions=list(_DEFAULT_ASSUMPTIONS),
-        limitations=list(_DEFAULT_LIMITATIONS),
+        methodology=methodology,
     )

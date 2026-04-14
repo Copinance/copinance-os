@@ -4,12 +4,12 @@ from decimal import Decimal
 
 import pytest
 
-from copinance_os.data.analytics.options.assumptions import (
+from copinance_os.data.analytics.options.greeks.config import (
+    DEFAULT_RISK_FREE_RATE,
     PROFILE_PREF_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT,
     PROFILE_PREF_OPTION_GREEKS_RISK_FREE_RATE,
     resolve_option_greek_assumptions,
 )
-from copinance_os.data.analytics.options.constants import DEFAULT_RISK_FREE_RATE
 from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.infra.config import Settings
 

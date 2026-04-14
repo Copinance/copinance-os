@@ -7,16 +7,46 @@ import math
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, Literal
 
 import pytest
 
-import copinance_os.data.analytics.options.positioning as positioning_mod
-from copinance_os.data.analytics.options.positioning import build_options_positioning_dict
+from copinance_os.data.analytics.options.positioning import (
+    DEFAULT_POSITIONING_METHODOLOGY,
+    build_options_positioning,
+)
+from copinance_os.data.analytics.options.positioning.bias import DEFAULT_BIAS_CONFIG, BiasConfig
+from copinance_os.data.analytics.options.positioning.charm import compute_charm_exposure
+from copinance_os.data.analytics.options.positioning.mispricing import compute_mispricing
+from copinance_os.data.analytics.options.positioning.moneyness import compute_moneyness_buckets
+from copinance_os.data.analytics.options.positioning.pin_risk import compute_pin_risk
+from copinance_os.data.analytics.options.positioning.vanna import compute_vanna_exposure
 from copinance_os.domain.models.market import OptionContract, OptionGreeks, OptionsChain, OptionSide
 from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 from copinance_os.domain.models.profile import FinancialLiteracy
 
 TOY_AS_OF = date(2026, 1, 9)
+
+
+def _build_pos_dict(
+    chain: OptionsChain,
+    calls: list[OptionContract],
+    puts: list[OptionContract],
+    quote: dict[str, Any],
+    symbol: str,
+    window: Literal["near", "mid"],
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Test helper: mirror legacy dict return for fixture / JSON comparisons."""
+    return build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol=symbol,
+        window=window,
+        **kwargs,
+    ).model_dump(mode="python")
 
 
 def _gc(strike: float, oi: int, vol: int, iv: float, delta: float, gamma: float) -> OptionContract:
@@ -88,18 +118,16 @@ def toy_chain() -> tuple[OptionsChain, list[OptionContract], list[OptionContract
 
 
 @pytest.mark.unit
-def test_build_options_positioning_dict_validates(toy_chain: tuple) -> None:
+def test__build_pos_dict_validates(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
     quote = {"current_price": 595.0}
-    raw = build_options_positioning_dict(
-        chain, calls, puts, quote, "SPY", "near", as_of_date=TOY_AS_OF
-    )
+    raw = _build_pos_dict(chain, calls, puts, quote, "SPY", "near", as_of_date=TOY_AS_OF)
     model = OptionsPositioningResult.model_validate(raw)
     assert model.symbol == "SPY"
     assert model.window == "near"
-    assert model.methodology.version == "options_positioning_v2"
-    assert model.methodology.model_family == "aggregate_chain_heuristics_plus_bsm_enrichment"
-    assert model.methodology.references
+    assert model.methodology.version == "analysis_methodology_v1"
+    assert any(s.id.startswith("options.positioning") for s in model.methodology.specs)
+    assert model.methodology.specs
     assert model.market_bias in ("bullish", "bearish", "neutral")
     assert model.signal_categories is not None
     assert len(model.signal_categories.positioning) == 6
@@ -115,10 +143,8 @@ def test_build_options_positioning_dict_validates(toy_chain: tuple) -> None:
 def test_financial_literacy_beginner_changes_analyst_summary(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
     quote = {"current_price": 595.0}
-    raw_default = build_options_positioning_dict(
-        chain, calls, puts, quote, "SPY", "near", as_of_date=TOY_AS_OF
-    )
-    raw_beginner = build_options_positioning_dict(
+    raw_default = _build_pos_dict(chain, calls, puts, quote, "SPY", "near", as_of_date=TOY_AS_OF)
+    raw_beginner = _build_pos_dict(
         chain,
         calls,
         puts,
@@ -137,14 +163,22 @@ def test_financial_literacy_beginner_changes_analyst_summary(toy_chain: tuple) -
 def test_toy_near_matches_golden_fixture(toy_chain: tuple) -> None:
     """Regression guard: toy chain output must match checked-in JSON."""
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
-        chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
-    )
     fixture = (
         Path(__file__).resolve().parents[5] / "fixtures" / "options_positioning" / "toy_near.json"
     )
     expected = json.loads(fixture.read_text(encoding="utf-8"))
-    assert raw == expected
+    raw_json = build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote={"current_price": 595.0},
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+    ).model_dump(mode="json")
+    raw_json["methodology"].pop("computed_at", None)
+    expected["methodology"].pop("computed_at", None)
+    assert raw_json == expected
 
 
 @pytest.mark.unit
@@ -158,7 +192,7 @@ def test_build_options_positioning_empty_chain() -> None:
         calls=[],
         puts=[],
     )
-    raw = build_options_positioning_dict(chain, [], [], {}, "ZZZZ", "near", as_of_date=TOY_AS_OF)
+    raw = _build_pos_dict(chain, [], [], {}, "ZZZZ", "near", as_of_date=TOY_AS_OF)
     model = OptionsPositioningResult.model_validate(raw)
     assert model.symbol == "ZZZZ"
     assert model.key_levels == []
@@ -169,12 +203,12 @@ def test_build_options_positioning_empty_chain() -> None:
 @pytest.mark.unit
 def test_data_quality_low_without_greeks(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    full_dq = build_options_positioning_dict(
+    full_dq = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )["data_quality"]
     calls_ng = [OptionContract.model_validate(c.model_dump() | {"greeks": None}) for c in calls]
     puts_ng = [OptionContract.model_validate(p.model_dump() | {"greeks": None}) for p in puts]
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls_ng, puts_ng, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     assert raw["data_quality"] is not None
@@ -184,7 +218,7 @@ def test_data_quality_low_without_greeks(toy_chain: tuple) -> None:
 @pytest.mark.unit
 def test_dollar_metrics_mid_prices(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     dm = raw["dollar_metrics"]
@@ -224,7 +258,7 @@ def test_dollar_metrics_uses_last_price_when_no_bid_ask() -> None:
         calls=[c],
         puts=[],
     )
-    raw = build_options_positioning_dict(chain, [c], [], {"current_price": 100.0}, "X", "near")
+    raw = _build_pos_dict(chain, [c], [], {"current_price": 100.0}, "X", "near")
     assert raw["dollar_metrics"]["dollar_call_oi"] == pytest.approx(2.5 * 100 * 100.0)
 
 
@@ -253,14 +287,14 @@ def test_dollar_metrics_zero_prices_no_crash() -> None:
         calls=[c],
         puts=[],
     )
-    raw = build_options_positioning_dict(chain, [c], [], {"current_price": 100.0}, "X", "near")
+    raw = _build_pos_dict(chain, [c], [], {"current_price": 100.0}, "X", "near")
     assert raw["dollar_metrics"]["dollar_call_oi"] == 0.0
 
 
 @pytest.mark.unit
 def test_gex_per_strike_matches_toy(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     by_k = {x["strike"]: x["gex_value"] for x in raw["gex_profile"]}
@@ -333,7 +367,7 @@ def test_gamma_flip_interpolated() -> None:
         calls=calls,
         puts=puts,
     )
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": spot}, "GF", "near", as_of_date=date(2026, 3, 1)
     )
     flip = raw["gamma_flip_strike"]
@@ -365,7 +399,7 @@ def test_gex_profile_empty_without_greeks() -> None:
         calls=[c],
         puts=[],
     )
-    raw = build_options_positioning_dict(chain, [c], [], {"current_price": 50.0}, "NG", "near")
+    raw = _build_pos_dict(chain, [c], [], {"current_price": 50.0}, "NG", "near")
     assert raw["gex_profile"] == []
     assert raw["top_positive_gex"] == []
 
@@ -373,7 +407,7 @@ def test_gex_profile_empty_without_greeks() -> None:
 @pytest.mark.unit
 def test_delta_exposure_toy(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     dex = raw["delta_exposure"]
@@ -405,14 +439,14 @@ def test_delta_exposure_zero_without_greeks() -> None:
         calls=[c],
         puts=[],
     )
-    raw = build_options_positioning_dict(chain, [c], [], {"current_price": 10.0}, "Z", "near")
+    raw = _build_pos_dict(chain, [c], [], {"current_price": 10.0}, "Z", "near")
     assert raw["delta_exposure"]["net_delta"] == 0.0
 
 
 @pytest.mark.unit
 def test_oi_clusters_enhanced_walls(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     assert raw["call_wall"] == 590.0
@@ -425,7 +459,7 @@ def test_oi_clusters_enhanced_walls(toy_chain: tuple) -> None:
 @pytest.mark.unit
 def test_brenner_subrahmanyam_implied_move(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     detail = raw["implied_move_detail"]
@@ -482,7 +516,7 @@ def test_implied_move_detail_none_without_straddle() -> None:
         calls=[c],
         puts=[p],
     )
-    raw = build_options_positioning_dict(chain, [c], [p], {"current_price": 100.0}, "Q", "near")
+    raw = _build_pos_dict(chain, [c], [p], {"current_price": 100.0}, "Q", "near")
     assert raw["implied_move_detail"] is None
 
 
@@ -535,7 +569,7 @@ def test_implied_move_dte_one_day() -> None:
         calls=[c],
         puts=[p],
     )
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain,
         [c],
         [p],
@@ -588,7 +622,7 @@ def test_skew_regime_classification(skew25: float, expected_regime: str) -> None
         calls=calls,
         puts=puts,
     )
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 100.0}, "SK", "near", as_of_date=date(2026, 8, 1)
     )
     assert raw["iv_metrics"]["skew_regime"] == expected_regime
@@ -637,7 +671,7 @@ def test_butterfly_positive_when_wings_rich() -> None:
         calls=calls,
         puts=puts,
     )
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 100.0}, "BF", "near", as_of_date=date(2026, 8, 15)
     )
     assert raw["iv_metrics"]["butterfly_25_delta"] == pytest.approx(6.0, rel=1e-6)
@@ -678,7 +712,7 @@ def test_skew_10_delta_computed() -> None:
         calls=calls,
         puts=puts,
     )
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 100.0}, "T10", "near", as_of_date=date(2026, 9, 15)
     )
     assert raw["iv_metrics"]["skew_10_delta"] == pytest.approx(4.0, rel=1e-6)
@@ -686,9 +720,9 @@ def test_skew_10_delta_computed() -> None:
 
 @pytest.mark.unit
 def test_bias_weight_constants_exposed() -> None:
-    assert positioning_mod._BIAS_WEIGHTS["call_oi_ratio"] == pytest.approx(1.8)
-    assert positioning_mod._BIAS_WEIGHTS["net_delta"] == pytest.approx(1.2)
-    assert "dollar_put_call_oi_ratio" in positioning_mod._BIAS_RANGES
+    assert DEFAULT_BIAS_CONFIG.weights["call_oi_ratio"] == pytest.approx(1.8)
+    assert DEFAULT_BIAS_CONFIG.weights["net_delta"] == pytest.approx(1.2)
+    assert "dollar_put_call_oi_ratio" in DEFAULT_BIAS_CONFIG.ranges
 
 
 @pytest.mark.unit
@@ -710,10 +744,10 @@ def test_dollar_weighting_changes_bias_vs_zero_mids(toy_chain: tuple) -> None:
 
     calls_z = [zero_mid_call(c) for c in calls]
     puts_z = [zero_mid_put(p) for p in puts]
-    with_mid = build_options_positioning_dict(
+    with_mid = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
-    zero_mid = build_options_positioning_dict(
+    zero_mid = _build_pos_dict(
         chain, calls_z, puts_z, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     assert zero_mid["dollar_metrics"]["dollar_call_volume"] == 0.0
@@ -725,12 +759,12 @@ def test_dollar_weighting_changes_bias_vs_zero_mids(toy_chain: tuple) -> None:
 @pytest.mark.unit
 def test_data_quality_modulates_confidence(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    full = build_options_positioning_dict(
+    full = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     calls_ng = [OptionContract.model_validate(c.model_dump() | {"greeks": None}) for c in calls]
     puts_ng = [OptionContract.model_validate(p.model_dump() | {"greeks": None}) for p in puts]
-    low_dq = build_options_positioning_dict(
+    low_dq = _build_pos_dict(
         chain, calls_ng, puts_ng, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     assert full["data_quality"] > low_dq["data_quality"]
@@ -740,7 +774,7 @@ def test_data_quality_modulates_confidence(toy_chain: tuple) -> None:
 @pytest.mark.unit
 def test_signal_agreement_strong_bullish_on_toy(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
     assert raw["signal_agreement"] == "strong_bullish"
@@ -773,7 +807,7 @@ def test_enrich_missing_greeks_fills_dex_when_quantlib_installed() -> None:
         puts=[],
     )
     as_of = date(2026, 3, 28)
-    without = build_options_positioning_dict(
+    without = _build_pos_dict(
         chain,
         [c],
         [],
@@ -783,7 +817,7 @@ def test_enrich_missing_greeks_fills_dex_when_quantlib_installed() -> None:
         as_of_date=as_of,
         enrich_missing_greeks=False,
     )
-    with_enrich = build_options_positioning_dict(
+    with_enrich = _build_pos_dict(
         chain,
         [c],
         [],
@@ -848,7 +882,7 @@ def test_vanna_exposure_computation() -> None:
     puts = [
         _contract_v(strike=100, side=OptionSide.PUT, oi=500, delta=-0.5, gamma=0.01, vanna=0.002),
     ]
-    bundle = positioning_mod._compute_vanna_exposure(calls, puts, exp.isoformat(), 100.0)
+    bundle = compute_vanna_exposure(calls, puts, exp.isoformat(), 100.0)
     vex = bundle["vanna_exposure"]
     assert vex is not None
     # call: 0.002 * 1000 * 100 = 200; put: 0.002 * 500 * 100 = 100; net = 100
@@ -868,7 +902,7 @@ def test_vanna_flip_strike() -> None:
     puts = [
         _contract_v(strike=101, side=OptionSide.PUT, oi=1000, delta=-0.5, gamma=0.01, vanna=0.002),
     ]
-    bundle = positioning_mod._compute_vanna_exposure(calls, puts, exp_s, 100.0)
+    bundle = compute_vanna_exposure(calls, puts, exp_s, 100.0)
     assert bundle["vanna_exposure"]["vanna_flip_strike"] is not None
 
 
@@ -877,7 +911,7 @@ def test_vanna_exposure_no_vanna_on_contracts() -> None:
     exp = date(2026, 3, 20)
     c = _contract_v(strike=100, side=OptionSide.CALL, oi=1000, delta=0.5, gamma=0.01, vanna=None)
     p = _contract_v(strike=100, side=OptionSide.PUT, oi=1000, delta=-0.5, gamma=0.01, vanna=None)
-    bundle = positioning_mod._compute_vanna_exposure([c], [p], exp.isoformat(), 50.0)
+    bundle = compute_vanna_exposure([c], [p], exp.isoformat(), 50.0)
     assert bundle["vanna_exposure"]["net_vanna"] == 0.0
     assert bundle["vanna_profile"] == []
 
@@ -896,7 +930,7 @@ def test_charm_exposure_aggregate_and_drift() -> None:
         ),
     ]
     puts: list[OptionContract] = []
-    ch = positioning_mod._compute_charm_exposure(calls, puts)["charm_exposure"]
+    ch = compute_charm_exposure(calls, puts)["charm_exposure"]
     assert ch["net_charm"] == pytest.approx(20.0, rel=1e-6)
     assert ch["overnight_delta_drift"] == "selling_pressure"
 
@@ -912,7 +946,7 @@ def test_charm_neutral_when_flat() -> None:
         charm=0.0,
         exp=date(2026, 4, 1),
     )
-    ch = positioning_mod._compute_charm_exposure([c], [])["charm_exposure"]
+    ch = compute_charm_exposure([c], [])["charm_exposure"]
     assert ch["overnight_delta_drift"] == "neutral"
 
 
@@ -946,7 +980,7 @@ def test_mispricing_detects_call_demand() -> None:
     puts[0] = OptionContract.model_validate(
         puts[0].model_dump() | {"bid": Decimal("0.85"), "ask": Decimal("0.9")}
     )
-    mp = positioning_mod._compute_mispricing(calls, puts)
+    mp = compute_mispricing(calls, puts)
     assert mp is not None
     assert mp["mispricing"]["sentiment"] == "call_demand"
 
@@ -978,7 +1012,7 @@ def test_mispricing_neutral_when_fair() -> None:
     p = OptionContract.model_validate(
         p.model_dump() | {"bid": Decimal("2.0"), "ask": Decimal("2.0")}
     )
-    mp = positioning_mod._compute_mispricing([c], [p])
+    mp = compute_mispricing([c], [p])
     assert mp is not None
     assert mp["mispricing"]["sentiment"] == "neutral"
 
@@ -994,7 +1028,7 @@ def test_mispricing_none_without_theoretical_prices() -> None:
         theo=None,
         exp=date(2026, 5, 1),
     )
-    assert positioning_mod._compute_mispricing([c], []) is None
+    assert compute_mispricing([c], []) is None
 
 
 @pytest.mark.unit
@@ -1031,7 +1065,7 @@ def test_moneyness_bucketing_and_dominant() -> None:
             vol=10,
         ),
     ]
-    ms = positioning_mod._compute_moneyness_buckets(calls, puts)["moneyness_summary"]
+    ms = compute_moneyness_buckets(calls, puts)["moneyness_summary"]
     assert ms["dominant_call_bucket"] == "deep_otm"
     by = {b["bucket"]: b for b in ms["buckets"]}
     assert by["deep_otm"]["call_volume"] == 5000
@@ -1053,7 +1087,7 @@ def test_moneyness_skips_contracts_without_greeks() -> None:
         ).model_dump()
         | {"greeks": None}
     )
-    ms = positioning_mod._compute_moneyness_buckets([c], [])["moneyness_summary"]
+    ms = compute_moneyness_buckets([c], [])["moneyness_summary"]
     assert sum(b["call_oi"] for b in ms["buckets"]) == 0
 
 
@@ -1069,9 +1103,7 @@ def test_pin_risk_none_when_dte_long() -> None:
         itm_p=Decimal("0.5"),
         exp=exp,
     )
-    assert (
-        positioning_mod._compute_pin_risk([c], [], exp.isoformat(), 100.0, date(2026, 1, 1)) is None
-    )
+    assert compute_pin_risk([c], [], exp.isoformat(), 100.0, date(2026, 1, 1)) is None
 
 
 @pytest.mark.unit
@@ -1100,13 +1132,44 @@ def test_pin_risk_finds_max_strike() -> None:
             vol=100,
         ),
     ]
-    pin = positioning_mod._compute_pin_risk(calls, [], exp.isoformat(), 100.0, as_of)
+    pin = compute_pin_risk(calls, [], exp.isoformat(), 100.0, as_of)
     assert pin is not None
     assert pin["max_pin_strike"] == 100.0
     assert pin["dte"] == 2
 
 
 @pytest.mark.unit
+def test_methodology_bias_override_mid_window_changes_score(toy_chain: tuple) -> None:
+    chain, calls, puts = toy_chain
+    quote = {"current_price": 595.0}
+    base = build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol="SPY",
+        window="mid",
+        as_of_date=TOY_AS_OF,
+        methodology=DEFAULT_POSITIONING_METHODOLOGY,
+    )
+    tuned = build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol="SPY",
+        window="mid",
+        as_of_date=TOY_AS_OF,
+        methodology=DEFAULT_POSITIONING_METHODOLOGY.with_overrides(
+            bias=BiasConfig(mid_window_damping=0.5)
+        ),
+    )
+    assert tuned.bullish_probability != base.bullish_probability
+    bias_specs = [s for s in tuned.methodology.specs if s.id == "options.positioning.bias"]
+    assert bias_specs
+    assert bias_specs[0].parameters.get("mid_window_damping") == "0.5"
+
+
 def test_build_options_positioning_includes_new_sections() -> None:
     exp = date(2026, 3, 20)
     calls = [
@@ -1121,7 +1184,7 @@ def test_build_options_positioning_includes_new_sections() -> None:
         calls=calls,
         puts=puts,
     )
-    raw = build_options_positioning_dict(
+    raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 100.0}, "Z", "near", as_of_date=date(2026, 3, 1)
     )
     model = OptionsPositioningResult.model_validate(raw)

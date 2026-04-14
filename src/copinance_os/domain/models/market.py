@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from copinance_os.domain.models.base import ValueObject
+from copinance_os.domain.models.methodology import AnalysisMethodology
 
 
 class MarketType(StrEnum):
@@ -99,3 +100,7 @@ class OptionsChain(ValueObject):
     puts: list[OptionContract] = Field(default_factory=list, description="Put contracts")
     currency: str | None = Field(None, description="Currency")
     metadata: dict[str, str] = Field(default_factory=dict, description="Additional metadata")
+    greeks_methodology: AnalysisMethodology | None = Field(
+        default=None,
+        description="Structured methodology for last BSM Greek enrichment pass, if any",
+    )

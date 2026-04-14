@@ -27,9 +27,9 @@ def test_build_instrument_analysis_report_maps_payload() -> None:
     assert "TestCo" in report.summary
     assert report.key_metrics.get("symbol") == "TEST"
     assert report.key_metrics.get("metrics", {}).get("valuation", {}).get("pe_ratio") == "12"
-    assert report.methodology
-    assert report.assumptions
-    assert report.limitations
+    assert report.methodology.version == "analysis_methodology_v1"
+    assert report.methodology.specs[0].assumptions
+    assert report.methodology.specs[0].limitations
 
 
 @pytest.mark.unit

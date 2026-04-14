@@ -20,7 +20,7 @@ get_options_chain(underlying_symbol, expiration_date=None) -> OptionsChain
 
 Each call returns one **`OptionsChain`** for a single selected expiry (or the provider default when `expiration_date` is omitted). The LLM-facing **`get_options_chain`** tool in [Market data tools](../analysis-reference/market-data-tools#get_options_chain) can pass **`expiration_dates`** and performs multiple provider calls when needed.
 
-The question-driven registry also exposes **`get_options_positioning`** ([market data tools](../analysis-reference/market-data-tools#get_options_positioning)): quote + default full chain, then aggregate surface metrics from **`data.analytics.options.positioning`** (including GEX, vanna/charm, mispricing, moneyness, pin risk when computable) plus a required **`methodology`** object for transparent client rendering.
+The question-driven registry also exposes **`get_options_positioning`** ([market data tools](../analysis-reference/market-data-tools#get_options_positioning)): quote + default full chain, then aggregate surface metrics from **`data.analytics.options.positioning`** (including GEX, vanna/charm, mispricing, moneyness, pin risk when computable) plus a required methodology envelope (`AnalysisMethodology`: `version`, `computed_at`, `specs`, `data_inputs`) for transparent client rendering.
 
 The default container exposes a composed `MarketDataProvider` (`OptionAnalyticsMarketDataProvider`) that fetches chains and then runs BSM Greek estimation (first- and higher-order fields on **`OptionGreeks`** when inputs are valid). Vendor-only adapters live under `copinance_os.data.providers`.
 

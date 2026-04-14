@@ -1,12 +1,15 @@
-"""Market assumptions for option Greek estimation (config + profile preferences)."""
+"""BSM Greek estimation defaults and profile-driven assumption resolution."""
+
+from __future__ import annotations
 
 from decimal import Decimal
+from typing import Final
 
-from copinance_os.data.analytics.options.constants import DEFAULT_RISK_FREE_RATE
 from copinance_os.domain.models.profile import AnalysisProfile
 from copinance_os.infra.config import Settings
 
-# AnalysisProfile.preferences keys (optional overrides for Greek estimation)
+DEFAULT_RISK_FREE_RATE: Final[Decimal] = Decimal("0.045")
+
 PROFILE_PREF_OPTION_GREEKS_RISK_FREE_RATE = "option_greeks_risk_free_rate"
 PROFILE_PREF_OPTION_GREEKS_DIVIDEND_YIELD_DEFAULT = "option_greeks_dividend_yield_default"
 
@@ -22,7 +25,7 @@ def resolve_option_greek_assumptions(
     then :class:`Settings`, then built-in defaults.
 
     ``dividend_yield_default`` is used only when the options chain metadata has no
-    ``dividend_yield`` entry (see developer guide: options chain metadata).
+    ``dividend_yield`` entry.
     """
     rf_pref = (
         profile.preferences.get(PROFILE_PREF_OPTION_GREEKS_RISK_FREE_RATE)

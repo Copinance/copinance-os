@@ -2,52 +2,265 @@
   "symbol": "SPY",
   "window": "near",
   "methodology": {
-    "version": "options_positioning_v2",
-    "computed_at": "2026-01-09T00:00:00+00:00",
-    "model_family": "aggregate_chain_heuristics_plus_bsm_enrichment",
-    "assumptions": [
-      "Per-contract Greeks use European BSM assumptions when enrichment is required.",
-      "Aggregate directional scores combine OI, volume, IV surface, and Greeks with fixed transparent weights.",
-      "Positioning window 'near' applies horizon damping to the aggregate bias score."
-    ],
-    "limitations": [
-      "Positioning signals are heuristic aggregates and not execution advice.",
-      "Low liquidity or sparse strikes can reduce reliability for skew, pin, and flow metrics.",
-      "BSM-based mispricing and ITM probabilities depend on quoted implied volatility quality."
-    ],
-    "references": [
+    "version": "analysis_methodology_v1",
+    "computed_at": "2026-04-14T05:40:19.083096+00:00",
+    "specs": [
       {
-        "id": "REF_BERGOMI_2005",
-        "title": "Lorenzo Bergomi (2005), Smile Dynamics IV",
-        "url": "https://www.risk.net/derivatives/equity-derivatives/1510166/smile-dynamics"
+        "id": "options.positioning.data_quality",
+        "version": "v1",
+        "model_family": "coverage_and_microstructure_composite",
+        "assumptions": [
+          "Weights sum to 1.0; each sub-score in [0,1]."
+        ],
+        "limitations": [
+          "Heuristic blend; not a liquidity guarantee."
+        ],
+        "references": [],
+        "parameters": {
+          "weight_greeks": "0.3",
+          "weight_iv": "0.2",
+          "weight_spread": "0.2",
+          "weight_oi": "0.15",
+          "weight_strike_breadth": "0.15"
+        }
       },
       {
-        "id": "REF_TALEB_1997",
-        "title": "Nassim Nicholas Taleb (1997), Dynamic Hedging",
-        "url": "https://onlinelibrary.wiley.com/doi/book/10.1002/9781119198665"
+        "id": "options.positioning.dollar_metrics",
+        "version": "v1",
+        "model_family": "mid_times_leg_oi_volume",
+        "assumptions": [
+          "100 multiplier per standard equity option contract."
+        ],
+        "limitations": [
+          "Mids can be stale; wide spreads distort dollar notionals."
+        ],
+        "references": [],
+        "parameters": {}
       },
       {
-        "id": "REF_CARR_WU_2009",
-        "title": "Carr and Wu (2009), Variance Risk Premiums",
-        "url": "https://doi.org/10.1093/rfs/hhp063"
+        "id": "options.positioning.delta_exposure",
+        "version": "v1",
+        "model_family": "oi_weighted_delta_shares",
+        "assumptions": [
+          "Delta taken from vendor or BSM-enriched ``OptionGreeks``."
+        ],
+        "limitations": [
+          "Net delta is a notional exposure snapshot, not a hedge recommendation."
+        ],
+        "references": [],
+        "parameters": {
+          "contract_multiplier": "100.0"
+        }
       },
       {
-        "id": "REF_DE_FONTNOUVELLE_2003",
-        "title": "De Fontnouvelle et al. (2003), Option Mispricing",
-        "url": "https://www.nber.org/papers/w9333"
+        "id": "options.positioning.gex",
+        "version": "v1",
+        "model_family": "dealer_gamma_exposure",
+        "assumptions": [
+          "Nearest listed expiry only; OI-weighted gamma with spot scaling."
+        ],
+        "limitations": [
+          "Dealer positioning is inferred heuristically from public chain data."
+        ],
+        "references": [],
+        "parameters": {
+          "profile_top_k": "15",
+          "gamma_regime_threshold": "0.06"
+        }
       },
       {
-        "id": "REF_AVELLANEDA_LIPKIN_2003",
-        "title": "Avellaneda and Lipkin (2003), Pin Risk and Probability Models",
-        "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=436260"
+        "id": "options.positioning.vanna",
+        "version": "v1",
+        "model_family": "oi_weighted_vanna_surface",
+        "assumptions": [
+          "Call minus put vanna at nearest expiry; flip via cumulative strike ladder."
+        ],
+        "limitations": [
+          "Public chain vanna is model-dependent (BSM here)."
+        ],
+        "references": [],
+        "parameters": {
+          "vanna_regime_floor": "5000.0",
+          "vanna_regime_gross_frac": "0.03"
+        }
+      },
+      {
+        "id": "options.positioning.charm",
+        "version": "v1",
+        "model_family": "oi_weighted_charm_aggregate",
+        "assumptions": [
+          "Calendar-time charm from BSM when ``greeks.charm`` is populated."
+        ],
+        "limitations": [
+          "Overnight drift label is a coarse heuristic vs path-dependent reality."
+        ],
+        "references": [],
+        "parameters": {
+          "drift_gross_frac": "0.02",
+          "drift_floor": "1e-06"
+        }
+      },
+      {
+        "id": "options.positioning.mispricing",
+        "version": "v1",
+        "model_family": "mid_vs_bsm_npv",
+        "assumptions": [
+          "Uses ``greeks.theoretical_price`` when present."
+        ],
+        "limitations": [
+          "Ignores borrow, discrete dividends, and microstructure beyond mid."
+        ],
+        "references": [],
+        "parameters": {
+          "demand_threshold_pct": "2.0",
+          "peer_cap_pct": "1.0"
+        }
+      },
+      {
+        "id": "options.positioning.moneyness",
+        "version": "v1",
+        "model_family": "delta_bucket_surface",
+        "assumptions": [
+          "Buckets use absolute delta from ``OptionGreeks`` when present."
+        ],
+        "limitations": [
+          "Vendor delta may differ from model-implied delta."
+        ],
+        "references": [],
+        "parameters": {}
+      },
+      {
+        "id": "options.positioning.pin_risk",
+        "version": "v1",
+        "model_family": "short_dated_oi_times_itm_probability",
+        "assumptions": [
+          "Uses ``greeks.itm_probability`` when populated."
+        ],
+        "limitations": [
+          "Exercise dynamics and borrow are not modeled."
+        ],
+        "references": [],
+        "parameters": {
+          "max_dte": "5",
+          "min_total_oi": "1000"
+        }
+      },
+      {
+        "id": "options.positioning.volatility",
+        "version": "v1",
+        "model_family": "atm_iv_and_iv_rank",
+        "assumptions": [
+          "IV rank is empirical percentile within the current chain cross-section."
+        ],
+        "limitations": [
+          "Single-snapshot rank is not a long-horizon implied-vol history."
+        ],
+        "references": [],
+        "parameters": {
+          "iv_rank_bearish": "0.72",
+          "iv_rank_bullish": "0.35"
+        }
+      },
+      {
+        "id": "options.positioning.surface",
+        "version": "v1",
+        "model_family": "delta_slice_skew_and_term_slope",
+        "assumptions": [
+          "25-delta IVs chosen by nearest delta match on the near slice."
+        ],
+        "limitations": [
+          "Two-point term structure is coarse vs a full surface."
+        ],
+        "references": [],
+        "parameters": {
+          "skew_steep_put": "3.0",
+          "term_contango": "0.75"
+        }
+      },
+      {
+        "id": "options.positioning.flow",
+        "version": "v1",
+        "model_family": "unusual_volume_heuristic",
+        "assumptions": [
+          "High volume vs OI on the same line is flagged as unusual activity."
+        ],
+        "limitations": [
+          "Does not separate opening vs closing; provider volume can be noisy."
+        ],
+        "references": [],
+        "parameters": {
+          "vol_oi_ratio_threshold": "2.0",
+          "unusual_vol_threshold": "500"
+        }
+      },
+      {
+        "id": "options.positioning.implied_move",
+        "version": "v1",
+        "model_family": "atm_straddle_brenner_subrahmanyam",
+        "assumptions": [
+          "European-style straddle on matched ATM call/put mids."
+        ],
+        "limitations": [
+          "Ignores skew/smile beyond the chosen ATM pair."
+        ],
+        "references": [],
+        "parameters": {
+          "straddle_ann_factor": "0.798",
+          "trading_days_per_year": "252.0"
+        }
+      },
+      {
+        "id": "options.positioning.oi_clusters",
+        "version": "v1",
+        "model_family": "strike_oi_ranking_and_max_pain",
+        "assumptions": [
+          "Max pain minimizes total intrinsic value weighted by OI at one expiry."
+        ],
+        "limitations": [
+          "Max pain is a static snapshot heuristic."
+        ],
+        "references": [],
+        "parameters": {
+          "top_n": "8"
+        }
+      },
+      {
+        "id": "options.positioning.bias",
+        "version": "v1",
+        "model_family": "weighted_sigmoid_bias",
+        "assumptions": [
+          "Fixed transparent weights across OI/flow/Greek tilts."
+        ],
+        "limitations": [
+          "Heuristic; not execution advice."
+        ],
+        "references": [
+          {
+            "id": "REF_BOLLEN_WHALEY_2004",
+            "title": "Bollen and Whaley (2004), Does Net Buying Pressure Affect the Shape of Implied Volatility Functions?",
+            "url": "https://doi.org/10.1111/j.1540-6261.2004.00663.x"
+          },
+          {
+            "id": "REF_PAN_POTESHMAN_2006",
+            "title": "Pan and Poteshman (2006), The Information in Option Volume for Future Stock Prices",
+            "url": "https://doi.org/10.1093/rfs/hhj021"
+          }
+        ],
+        "parameters": {
+          "weights": "{'call_oi_ratio': 1.8, 'call_flow_share': 1.6, 'gamma_tilt': 1.4, 'put_call_oi_ratio': -1.2, 'dollar_put_call_oi_ratio': -1.4, 'net_delta': 1.2}",
+          "ranges": "{'call_oi_ratio': (0.35, 0.65), 'call_flow_share': (0.35, 0.65), 'gamma_tilt': (-0.4, 0.4), 'put_call_oi_ratio': (0.7, 1.6), 'dollar_put_call_oi_ratio': (0.7, 1.6), 'net_delta': (-500000.0, 500000.0)}",
+          "mid_window_damping": "0.8"
+        }
       }
     ],
     "data_inputs": {
       "symbol": "SPY",
       "as_of_date": "2026-01-09",
       "window": "near",
+      "financial_literacy": "intermediate",
       "expirations_used": "2026-01-16",
-      "data_quality": "0.8535"
+      "data_quality": "0.8535",
+      "enrich_missing_greeks": "False"
     }
   },
   "confidence": 0.6028,
@@ -60,43 +273,22 @@
     600.0,
     580.0
   ],
-  "analyst_summary": "For SPY, the aggregate options surface leans bullish — more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 60% for the next 1-2 weeks horizon.",
-  "signals": [
+  "analyst_summary": "For SPY, the aggregate options surface leans bullish \u2014 more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 60% for the next 1-2 weeks horizon.",
+  "scenarios": [
     {
-      "name": "Call Open Interest Share",
-      "value": 0.526,
-      "direction": "bullish",
-      "explanation": "A larger share of call OI points to aggregate upside interest in the chain — sometimes consistent with sizable call interest, but not exclusive to any one player."
+      "label": "Bullish continuation",
+      "probability": 0.6505,
+      "narrative": "Upside continuation if SPY holds above option-supported levels."
     },
     {
-      "name": "Put/Call OI Ratio",
-      "value": 0.9,
-      "direction": "bullish",
-      "explanation": "Elevated put/call OI can indicate hedging pressure or defensive positioning."
+      "label": "Bearish unwind",
+      "probability": 0.1748,
+      "narrative": "Downside pressure if hedging demand rises and calls unwind in SPY."
     },
     {
-      "name": "Intraday Options Flow (Calls Share)",
-      "value": 0.526,
-      "direction": "neutral",
-      "explanation": "Call-heavy volume relative to puts may indicate bullish tactical flow."
-    },
-    {
-      "name": "Gamma Tilt",
-      "value": 0.088,
-      "direction": "bullish",
-      "explanation": "Positive gamma tilt can support stabilization and upside continuation."
-    },
-    {
-      "name": "Dollar Call Flow Share",
-      "value": 0.5263,
-      "direction": "neutral",
-      "explanation": "Dollar call volume ÷ total dollar volume — economic magnitude of flow, not just contract counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
-    },
-    {
-      "name": "Dollar Put/Call Open Interest",
-      "value": 0.9,
-      "direction": "bullish",
-      "explanation": "Dollar-weighted put/call OI ratio — magnitude-weighted positioning vs simple counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+      "label": "Range-bound",
+      "probability": 0.1748,
+      "narrative": "Mean-reverting regime likely if neither side gains flow dominance."
     }
   ],
   "signal_categories": {
@@ -105,7 +297,7 @@
         "name": "Call Open Interest Share",
         "value": 0.526,
         "direction": "bullish",
-        "explanation": "A larger share of call OI points to aggregate upside interest in the chain — sometimes consistent with sizable call interest, but not exclusive to any one player."
+        "explanation": "A larger share of call OI points to aggregate upside interest in the chain \u2014 sometimes consistent with sizable call interest, but not exclusive to any one player."
       },
       {
         "name": "Put/Call OI Ratio",
@@ -129,27 +321,27 @@
         "name": "Dollar Call Flow Share",
         "value": 0.5263,
         "direction": "neutral",
-        "explanation": "Dollar call volume ÷ total dollar volume — economic magnitude of flow, not just contract counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+        "explanation": "Dollar call volume \u00f7 total dollar volume \u2014 economic magnitude of flow, not just contract counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
       },
       {
         "name": "Dollar Put/Call Open Interest",
         "value": 0.9,
         "direction": "bullish",
-        "explanation": "Dollar-weighted put/call OI ratio — magnitude-weighted positioning vs simple counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
+        "explanation": "Dollar-weighted put/call OI ratio \u2014 magnitude-weighted positioning vs simple counts (Bollen & Whaley 2004; Pan & Poteshman 2006)."
       }
     ],
     "volatility": [
       {
-        "name": "ATM Implied Volatility · IV Rank",
+        "name": "ATM Implied Volatility \u00b7 IV Rank",
         "value": 18.0,
         "direction": "bullish",
-        "explanation": "ATM IV is 18.00% (percentage points). Intra-chain IV rank 33% — how that ATM print ranks versus all implied volatilities in this snapshot."
+        "explanation": "ATM IV is 18.00% (percentage points). Intra-chain IV rank 33% \u2014 how that ATM print ranks versus all implied volatilities in this snapshot."
       },
       {
         "name": "25-Delta Skew",
         "value": 1.0,
         "direction": "neutral",
-        "explanation": "IV of the ~25-delta put minus the ~25-delta call (nearest expiry). Positive skew often reflects downside protection demand. Wing richness (butterfly) and 10Δ skew extend the surface read (Carr & Wu 2009; Bates 2000)."
+        "explanation": "IV of the ~25-delta put minus the ~25-delta call (nearest expiry). Positive skew often reflects downside protection demand. Wing richness (butterfly) and 10\u0394 skew extend the surface read (Carr & Wu 2009; Bates 2000)."
       },
       {
         "name": "Term Structure",
@@ -163,19 +355,19 @@
         "name": "Unusual Activity Score",
         "value": 0.0,
         "direction": "neutral",
-        "explanation": "Counts strikes where volume is elevated versus open interest (ratio > 2, volume > 500), scaled into a 0–100-style intensity score."
+        "explanation": "Counts strikes where volume is elevated versus open interest (ratio > 2, volume > 500), scaled into a 0\u2013100-style intensity score."
       },
       {
         "name": "Aggregate Volume / OI",
         "value": 0.05,
         "direction": "bearish",
-        "explanation": "Total options volume divided by total open interest — higher values can indicate more tactical trading versus stuck inventory."
+        "explanation": "Total options volume divided by total open interest \u2014 higher values can indicate more tactical trading versus stuck inventory."
       },
       {
         "name": "Dominant Flow Moneyness",
         "value": 3.3,
         "direction": "neutral",
-        "explanation": "Delta-bucketed open interest and dollar volume — shows whether flow concentrates at the money or in wings.  Dominant call bucket atm; dominant put bucket atm (delta bands)."
+        "explanation": "Delta-bucketed open interest and dollar volume \u2014 shows whether flow concentrates at the money or in wings.  Dominant call bucket atm; dominant put bucket atm (delta bands)."
       }
     ],
     "gamma": [
@@ -183,37 +375,37 @@
         "name": "Net Gamma Exposure",
         "value": 5950000.0,
         "direction": "bullish",
-        "explanation": "Sum of gamma × OI × 100 × spot for calls minus puts — a coarse dealer-gamma proxy."
+        "explanation": "Sum of gamma \u00d7 OI \u00d7 100 \u00d7 spot for calls minus puts \u2014 a coarse dealer-gamma proxy."
       },
       {
         "name": "Gamma Regime",
         "value": 1.0,
         "direction": "bullish",
-        "explanation": "Net gamma is positive — dealers are more likely to stabilize moves (fade extremes) if this positioning persists."
+        "explanation": "Net gamma is positive \u2014 dealers are more likely to stabilize moves (fade extremes) if this positioning persists."
       },
       {
         "name": "Gamma Flip Strike (nearest expiry)",
         "value": 0.0,
         "direction": "neutral",
-        "explanation": "Strike where cumulative per-strike GEX (calls − puts, OI-weighted, ×100×spot) crosses zero on the front expiry — a common “flip” narrative (SqueezeMetrics-style dealer gamma; Knuteson 2021, arXiv:2006.00975). No cumulative GEX sign change on the front expiry — flip strike unset."
+        "explanation": "Strike where cumulative per-strike GEX (calls \u2212 puts, OI-weighted, \u00d7100\u00d7spot) crosses zero on the front expiry \u2014 a common \u201cflip\u201d narrative (SqueezeMetrics-style dealer gamma; Knuteson 2021, arXiv:2006.00975). No cumulative GEX sign change on the front expiry \u2014 flip strike unset."
       },
       {
         "name": "Net Delta Exposure (DEX)",
         "value": 117000.0,
         "direction": "bullish",
-        "explanation": "Sum of delta × open interest × 100 (calls + puts) — aggregate directional exposure in the chain (Lakonishok, Lee & Poteshman 2007; OCC/CBOE-style positioning summaries)."
+        "explanation": "Sum of delta \u00d7 open interest \u00d7 100 (calls + puts) \u2014 aggregate directional exposure in the chain (Lakonishok, Lee & Poteshman 2007; OCC/CBOE-style positioning summaries)."
       },
       {
         "name": "Vanna Exposure",
         "value": 0.0,
         "direction": "neutral",
-        "explanation": "Net vanna exposure — when negative, rising IV forces dealers to sell delta, amplifying downside moves. When positive, IV spikes trigger buying. Classified regime: neutral."
+        "explanation": "Net vanna exposure \u2014 when negative, rising IV forces dealers to sell delta, amplifying downside moves. When positive, IV spikes trigger buying. Classified regime: neutral."
       },
       {
         "name": "Charm Exposure",
         "value": 0.0,
         "direction": "neutral",
-        "explanation": "OI-weighted charm (∂Δ/∂T): positive net charm often means delta drifts up with time, so dealers may lean into selling at the open (overnight drift). Overnight delta drift: neutral."
+        "explanation": "OI-weighted charm (\u2202\u0394/\u2202T): positive net charm often means delta drifts up with time, so dealers may lean into selling at the open (overnight drift). Overnight delta drift: neutral."
       }
     ],
     "structure": [
@@ -221,24 +413,24 @@
         "name": "Max Pain Strike",
         "value": 590.0,
         "direction": "neutral",
-        "explanation": "Strike that minimizes total intrinsic value paid to option holders at expiration (nearest expiry only) — a common magnet narrative, not a forecast."
+        "explanation": "Strike that minimizes total intrinsic value paid to option holders at expiration (nearest expiry only) \u2014 a common magnet narrative, not a forecast."
       },
       {
         "name": "Strike Magnets (OI)",
         "value": 3.0,
         "direction": "neutral",
-        "explanation": "Largest open-interest strikes in the nearest expiration — where inventory tends to cluster."
+        "explanation": "Largest open-interest strikes in the nearest expiration \u2014 where inventory tends to cluster."
       },
       {
         "name": "Implied Move (Straddle)",
         "value": 0.3529,
         "direction": "neutral",
-        "explanation": "ATM straddle mid / spot for the nearest expiration — a rough implied move proxy; when DTE is available we also show Brenner & Subrahmanyam (1988) σ from the straddle and DTE-consistent daily/period moves. DTE=7, σ_BS88≈3.19% ann.; daily≈0.2012%, horizon≈0.5323% (see implied_move_detail)."
+        "explanation": "ATM straddle mid / spot for the nearest expiration \u2014 a rough implied move proxy; when DTE is available we also show Brenner & Subrahmanyam (1988) \u03c3 from the straddle and DTE-consistent daily/period moves. DTE=7, \u03c3_BS88\u22483.19% ann.; daily\u22480.2012%, horizon\u22480.5323% (see implied_move_detail)."
       }
     ]
   },
   "regime": "positive_gamma",
-  "regime_explanation": "Net gamma is positive — dealers are more likely to stabilize moves (fade extremes) if this positioning persists.",
+  "regime_explanation": "Net gamma is positive \u2014 dealers are more likely to stabilize moves (fade extremes) if this positioning persists.",
   "iv_metrics": {
     "atm_iv": 18.0,
     "skew_25_delta": 1.0,
@@ -250,16 +442,6 @@
     "skew_regime": "normal"
   },
   "max_pain": 590.0,
-  "implied_move": 0.3529,
-  "implied_move_absolute": 2.1,
-  "implied_move_detail": {
-    "raw_straddle_pct": 0.3529,
-    "raw_straddle_abs": 2.1,
-    "dte": 7,
-    "annualized_iv": 3.1937,
-    "daily_implied_move_pct": 0.2012,
-    "period_implied_move_pct": 0.5323
-  },
   "oi_clusters": [
     {
       "strike": 590.0,
@@ -344,6 +526,14 @@
   ],
   "call_wall": 590.0,
   "put_wall": 590.0,
+  "implied_move_detail": {
+    "raw_straddle_pct": 0.3529,
+    "raw_straddle_abs": 2.1,
+    "dte": 7,
+    "annualized_iv": 3.1937,
+    "daily_implied_move_pct": 0.2012,
+    "period_implied_move_pct": 0.5323
+  },
   "signal_agreement": "strong_bullish",
   "vanna_exposure": {
     "net_vanna": 0.0,
@@ -411,22 +601,5 @@
     "dominant_call_bucket": "atm",
     "dominant_put_bucket": "atm"
   },
-  "pin_risk": null,
-  "scenarios": [
-    {
-      "label": "Bullish continuation",
-      "probability": 0.6505,
-      "narrative": "Upside continuation if SPY holds above option-supported levels."
-    },
-    {
-      "label": "Bearish unwind",
-      "probability": 0.1748,
-      "narrative": "Downside pressure if hedging demand rises and calls unwind in SPY."
-    },
-    {
-      "label": "Range-bound",
-      "probability": 0.1748,
-      "narrative": "Mean-reverting regime likely if neither side gains flow dominance."
-    }
-  ]
+  "pin_risk": null
 }

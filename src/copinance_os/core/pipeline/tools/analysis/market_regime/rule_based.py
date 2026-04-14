@@ -70,6 +70,7 @@ from copinance_os.domain.indicators import (
     rolling_volatility_annualized_from_prices,
     simple_moving_average,
 )
+from copinance_os.domain.models.methodology import MethodologySpec, analysis_methodology_single_spec
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
@@ -400,6 +401,34 @@ class MarketRegimeDetectTrendTool(Tool):
             original_long_ma = validated.get("long_ma_period", 200)
             parameters_adjusted = short_ma != original_short_ma or long_ma != original_long_ma
 
+            spec = MethodologySpec(
+                id="market_regime.detect_market_trend",
+                version="v1",
+                model_family="log_returns_with_volatility_scaling",
+                assumptions=(
+                    "Log-returns r_t=ln(P_t/P_{t-1}) with volatility-scaled momentum vs MA structure "
+                    "(Faber-style).",
+                ),
+                limitations=("Snapshot classifier; not a forecast of future returns.",),
+                references=(),
+                parameters={
+                    "short_ma_period_used": str(short_ma),
+                    "long_ma_period_used": str(long_ma),
+                    "parameters_adjusted": str(parameters_adjusted),
+                    "regime": regime,
+                    "confidence_bucket": str(confidence),
+                },
+            )
+            methodology_payload = analysis_methodology_single_spec(
+                spec=spec,
+                data_inputs={
+                    "symbol": symbol,
+                    "lookback_days": str(lookback_days),
+                    "detector": "detect_market_trend",
+                },
+                computed_at=datetime.now(UTC),
+            ).model_dump(mode="json")
+
             result = {
                 "symbol": symbol,
                 "regime": regime,
@@ -430,7 +459,7 @@ class MarketRegimeDetectTrendTool(Tool):
                 "parameters_adjusted": parameters_adjusted,
                 "short_ma_period_used": short_ma,
                 "long_ma_period_used": long_ma,
-                "methodology": "log_returns_with_volatility_scaling",
+                "methodology": methodology_payload,
             }
 
             if parameters_adjusted:

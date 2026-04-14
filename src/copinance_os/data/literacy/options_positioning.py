@@ -1,6 +1,6 @@
 """Tiered narratives for aggregate options positioning.
 
-Used by ``copinance_os.data.analytics.options.positioning`` (``build_options_positioning_dict``).
+Used by ``copinance_os.data.analytics.options.positioning`` (``build_options_positioning``).
 Intermediate strings match the historical default so fixtures stay stable when literacy is omitted.
 See ``copinance_os.domain.literacy`` for shared primitives and job-context normalization.
 

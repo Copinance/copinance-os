@@ -6,6 +6,7 @@ import math
 from collections.abc import Sequence
 
 from copinance_os.domain.backtest.models import SimpleBacktestConfig, SimpleBacktestResult
+from copinance_os.domain.models.methodology import MethodologySpec, analysis_methodology_single_spec
 
 
 def run_simple_long_only_backtest(
@@ -79,17 +80,28 @@ def run_simple_long_only_backtest(
         if std > 0:
             sharpe = (mean_r / std) * math.sqrt(float(config.trading_days_per_year))
 
-    methodology = (
-        "Long-only backtest: weight decided after each close earns the next bar simple return; "
-        "turnover charges apply to allocation changes."
+    spec = MethodologySpec(
+        id="backtest.simple_long_only",
+        version="v1",
+        model_family="long_only_next_bar_return",
+        assumptions=(
+            "Weights are taken as given (caller must enforce no lookahead).",
+            "Fractional shares, no borrow, no dividends; friction is proportional to turnover.",
+        ),
+        limitations=(
+            "Does not model path-dependent orders, market impact beyond slippage bps, or survivorship.",
+        ),
+        references=(),
+        parameters={
+            "commission_bps": str(config.commission_bps),
+            "slippage_bps": str(config.slippage_bps),
+            "trading_days_per_year": str(config.trading_days_per_year),
+        },
     )
-    assumptions = [
-        "Weights are taken as given (caller must enforce no lookahead).",
-        "Fractional shares, no borrow, no dividends; friction is proportional to turnover.",
-    ]
-    limitations = [
-        "Does not model path-dependent orders, market impact beyond slippage bps, or survivorship.",
-    ]
+    methodology = analysis_methodology_single_spec(
+        spec=spec,
+        data_inputs={"bars": str(n)},
+    )
 
     return SimpleBacktestResult(
         equity_curve=equity,
@@ -98,8 +110,6 @@ def run_simple_long_only_backtest(
         max_drawdown=max_dd,
         sharpe_ratio=sharpe,
         methodology=methodology,
-        assumptions=assumptions,
-        limitations=limitations,
         key_metrics={
             "bars": n,
             "commission_bps": config.commission_bps,

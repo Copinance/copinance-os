@@ -3,11 +3,8 @@
 from typing import Any
 
 from copinance_os.domain.models.analysis_report import AnalysisReport
+from copinance_os.domain.models.methodology import envelope_from_text_methodology
 
-_DEFAULT_METHODOLOGY = (
-    "Deterministic market analysis: market regime indicators (VIX, breadth, rotation), "
-    "rule-based regime detection, and macro series (FRED-first with market proxies)."
-)
 _DEFAULT_ASSUMPTIONS = (
     "Macro and market series may be delayed; provider availability affects coverage.",
     "Regime labels are model outputs, not forecasts.",
@@ -44,10 +41,19 @@ def build_market_analysis_report(results: dict[str, Any]) -> AnalysisReport | No
         ),
     }
 
+    methodology = envelope_from_text_methodology(
+        spec_id="market_analysis.deterministic",
+        model_family="regime_indicators_and_macro_series",
+        assumptions=_DEFAULT_ASSUMPTIONS,
+        limitations=_DEFAULT_LIMITATIONS,
+        data_inputs={
+            "market_index": idx,
+            "execution_mode": str(results.get("execution_mode") or ""),
+        },
+    )
+
     return AnalysisReport(
         summary=summary,
         key_metrics=key_metrics,
-        methodology=_DEFAULT_METHODOLOGY,
-        assumptions=list(_DEFAULT_ASSUMPTIONS),
-        limitations=list(_DEFAULT_LIMITATIONS),
+        methodology=methodology,
     )

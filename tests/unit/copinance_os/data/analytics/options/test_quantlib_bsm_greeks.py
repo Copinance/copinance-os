@@ -8,7 +8,7 @@ import pytest
 
 pytest.importorskip("QuantLib")
 
-from copinance_os.data.analytics.options.quantlib_bsm_greeks import (
+from copinance_os.data.analytics.options.greeks import (
     QuantLibBsmGreekEstimator,
     compute_european_bsm_greeks,
     enrich_options_chain_missing_greeks,
@@ -198,10 +198,11 @@ def test_estimate_chain_sets_greeks_and_metadata() -> None:
     )
     assert out.calls[0].greeks is not None
     assert out.puts[0].greeks is not None
-    assert out.metadata.get("option_greeks_model") == "quantlib_analytic_european_bsm"
-    assert out.metadata.get("option_greeks_risk_free_rate") == "0.05"
-    assert out.metadata.get("option_greeks_methodology_version") == "quantlib_bsm_v2"
-    assert "European exercise" in str(out.metadata.get("option_greeks_assumptions"))
+    assert out.greeks_methodology is not None
+    spec0 = out.greeks_methodology.specs[0]
+    assert spec0.id == "options.greeks.quantlib_bsm_european"
+    assert spec0.parameters.get("risk_free_rate") == "0.05"
+    assert "European exercise" in spec0.assumptions[0]
 
 
 @pytest.mark.unit
@@ -316,7 +317,8 @@ def test_enrich_options_chain_missing_greeks_fills_when_quantlib_available() -> 
     )
     out = enrich_options_chain_missing_greeks(chain, evaluation_date=date(2026, 3, 28))
     assert out.calls[0].greeks is not None
-    assert out.metadata.get("option_greeks_model") == "quantlib_analytic_european_bsm"
+    assert out.greeks_methodology is not None
+    assert out.greeks_methodology.specs[0].id == "options.greeks.quantlib_bsm_european"
 
 
 @pytest.mark.unit
@@ -370,7 +372,7 @@ def test_estimator_lowers_call_delta_when_chain_metadata_dividend_higher(
 ) -> None:
     """``QuantLibBsmGreekEstimator`` uses chain ``metadata['dividend_yield']`` when set."""
     monkeypatch.setattr(
-        "copinance_os.data.analytics.options.quantlib_bsm_greeks.get_settings",
+        "copinance_os.data.analytics.options.greeks.enrichment.get_settings",
         lambda: Settings(
             option_greeks_risk_free_rate=0.05,
             option_greeks_dividend_yield_default=0.0,

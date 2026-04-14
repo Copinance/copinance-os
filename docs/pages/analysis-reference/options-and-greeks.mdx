@@ -2,7 +2,7 @@
 
 Option Greeks in Copinance OS are estimated with **European Black–Scholes–Merton** using QuantLib's `AnalyticEuropeanEngine` (`copinance_os.data.analytics.options`). Payoffs are European; American exercise or dividends beyond a continuous yield are not modeled.
 
-**Aggregate chain analytics** (dealer-style positioning summary: bias, IV rank/skew/term, flow scores, gamma regime, GEX profile, max pain, implied move, OI clusters, plus **vanna** / **charm** exposure, **mispricing** vs BSM fair value, **moneyness** buckets, and **pin risk**) live in the same package: **`copinance_os.data.analytics.options.positioning`** (`build_options_positioning_dict`, `compute_options_positioning_context`). Domain types: **`copinance_os.domain.models.options_positioning`**. These paths are separate from per-row QuantLib Greeks but reuse normalized **`OptionContract`** fields (including **`greeks`** when present).
+**Aggregate chain analytics** (dealer-style positioning summary: bias, IV rank/skew/term, flow scores, gamma regime, GEX profile, max pain, implied move, OI clusters, plus **vanna** / **charm** exposure, **mispricing** vs BSM fair value, **moneyness** buckets, and **pin risk**) live in the same package: **`copinance_os.data.analytics.options.positioning`** (`build_options_positioning`, `compute_options_positioning_context`). Domain types: **`copinance_os.domain.models.options_positioning`** with shared **`AnalysisMethodology`** from `copinance_os.domain.models.methodology`. These paths are separate from per-row QuantLib Greeks but reuse normalized **`OptionContract`** fields (including **`greeks`** when present).
 
 ---
 
@@ -67,9 +67,12 @@ The default expiration is the **earliest listed date on or after today**, avoidi
 
 ---
 
-## Metadata contract
+## Methodology contract
 
-`OptionsChain.metadata` is a `dict[str, str]` shared between data providers (inputs) and the analytics layer (outputs).
+`OptionsChain.metadata` remains provider-facing input metadata (for example, `provider` and optional `dividend_yield`). Methodology output is now explicit and structured:
+
+- `OptionsChain.greeks_methodology: AnalysisMethodology | None`
+- `OptionsPositioningResult.methodology: AnalysisMethodology`
 
 ### Provider inputs (optional)
 
@@ -82,15 +85,12 @@ The default expiration is the **earliest listed date on or after today**, avoidi
 
 Set by `estimate_bsm_greeks_for_options_chain` / `QuantLibBsmGreekEstimator` after a successful run:
 
-| Key | Example | Meaning |
-|-----|---------|---------|
-| `option_greeks_model` | `quantlib_analytic_european_bsm` | Model identifier |
-| `option_greeks_risk_free_rate` | `0.045` | Rate used for the run (string decimal) |
-| `option_greeks_dividend_yield_assumption` | `0` | Continuous yield passed to QuantLib |
-| `option_greeks_as_of_date` | `2026-03-28` | Evaluation date (ISO) |
-| `option_greeks_methodology_version` | `quantlib_bsm_v2` | Methodology contract version for transparent clients |
-| `option_greeks_assumptions` | `European exercise; ...` | Core model assumptions used for run-level interpretation |
-| `option_greeks_references` | `REF_QUANTLIB_ANALYTIC_EUROPEAN,...` | Reference identifiers tied to Greeks methodology |
+- `chain.greeks_methodology.version` (envelope version)
+- `chain.greeks_methodology.computed_at` (UTC timestamp)
+- `chain.greeks_methodology.specs[*]` (`id`, `model_family`, `assumptions`, `limitations`, `references`, `parameters`)
+- `chain.greeks_methodology.data_inputs` (symbol, as_of_date, and relevant run context)
+
+This replaces legacy ad-hoc `option_greeks_*` output keys in `OptionsChain.metadata`.
 
 ---
 
@@ -117,7 +117,7 @@ The default DI container uses `QuantLibBsmGreekEstimator()` with `profile=None`,
 | Module | Role |
 |--------|------|
 | `copinance_os.data.providers.*` | Vendor adapters (yfinance fetches raw chain) |
-| `copinance_os.data.analytics.options` | QuantLib BSM Greek estimation **and** aggregate positioning (`positioning.py`, `contract_numeric.py`) |
+| `copinance_os.data.analytics.options` | QuantLib BSM Greek estimation in `greeks/` **and** aggregate positioning in `positioning/` |
 | `copinance_os.data.providers.market` | Composed `MarketDataProvider` (fetch + estimate in one call) |
 
 See [Architecture](../developer-guide/architecture) for layer rules.

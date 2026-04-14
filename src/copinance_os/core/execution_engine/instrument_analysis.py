@@ -8,7 +8,7 @@ from typing import Any, Literal
 import structlog
 
 from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
-from copinance_os.data.analytics.options.positioning import build_options_positioning_dict
+from copinance_os.data.analytics.options.positioning import build_options_positioning
 from copinance_os.data.cache import CacheManager
 from copinance_os.data.schemas.market_data_conversions import (
     coerce_sorted_market_data_points,
@@ -32,7 +32,6 @@ from copinance_os.domain.models.market_requests import (
     GetQuoteRequest,
     GetQuoteResponse,
 )
-from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 from copinance_os.domain.ports.use_cases import UseCase
 from copinance_os.infra.error_handler import flatten_exception_message
 
@@ -331,19 +330,17 @@ class InstrumentAnalysisExecutor(BaseAnalysisExecutor):
                 "summary": payload["summary"],
             }
             pos_window = _positioning_window_from_context(context)
-            pos_raw = build_options_positioning_dict(
-                options_chain,
-                list(options_chain.calls or []),
-                list(options_chain.puts or []),
-                quote,
-                symbol,
-                pos_window,
+            pos = build_options_positioning(
+                chain=options_chain,
+                calls=list(options_chain.calls or []),
+                puts=list(options_chain.puts or []),
+                quote=quote,
+                symbol=symbol,
+                window=pos_window,
                 financial_literacy=resolve_financial_literacy(context.get("financial_literacy")),
                 enrich_missing_greeks=True,
             )
-            out["positioning"] = OptionsPositioningResult.model_validate(pos_raw).model_dump(
-                mode="json"
-            )
+            out["positioning"] = pos.model_dump(mode="json")
             return out
 
         async def _one(exp: str | None) -> dict[str, Any]:
