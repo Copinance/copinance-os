@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from copinance_os.domain.models.methodology import AnalysisMethodology
+
 
 # Market Regime Indicators Models
 class VIXData(BaseModel):
@@ -158,7 +160,7 @@ class MarketTrendData(BaseModel):
     )
     short_ma_period_used: int = Field(..., description="Short MA period actually used")
     long_ma_period_used: int = Field(..., description="Long MA period actually used")
-    methodology: str = Field(..., description="Detection methodology used")
+    methodology: AnalysisMethodology = Field(..., description="Detection methodology used")
     note: str | None = Field(None, description="Additional notes about the analysis")
     metadata: AnalysisMetadata = Field(..., description="Analysis metadata")
 

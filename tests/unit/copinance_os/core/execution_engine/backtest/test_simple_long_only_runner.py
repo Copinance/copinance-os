@@ -13,7 +13,11 @@ def test_execute_matches_domain() -> None:
     cfg = SimpleBacktestConfig(initial_cash=1.0)
     a = execute_simple_long_only_backtest(closes, weights, cfg)
     b = run_simple_long_only_backtest(closes, weights, cfg)
-    assert a.model_dump() == b.model_dump()
+    da = a.model_dump(mode="json")
+    db = b.model_dump(mode="json")
+    da["methodology"].pop("computed_at", None)
+    db["methodology"].pop("computed_at", None)
+    assert da == db
 
 
 @pytest.mark.unit

@@ -7,10 +7,15 @@ from typing import Literal
 from pydantic import ConfigDict, Field
 
 from copinance_os.domain.models.base import ValueObject
+from copinance_os.domain.models.methodology import AnalysisMethodology
 
 PositioningWindow = Literal["near", "mid"]
 PositioningBias = Literal["bullish", "bearish", "neutral"]
 GammaRegime = Literal["positive_gamma", "negative_gamma", "neutral"]
+VannaRegime = Literal["short_vanna", "long_vanna", "neutral"]
+OvernightDeltaDrift = Literal["selling_pressure", "buying_pressure", "neutral"]
+MispricingSentiment = Literal["neutral", "call_demand", "put_demand"]
+PinRiskLevel = Literal["low", "moderate", "high"]
 TermStructureSlope = Literal["contango", "backwardation", "flat"]
 SkewRegime = Literal["steep_put", "normal", "call_skewed"]
 SignalAgreement = Literal[
@@ -123,7 +128,7 @@ class VannaExposureModel(ValueObject):
     call_vanna_exposure: float = Field(..., alias="callVannaExposure")
     put_vanna_exposure: float = Field(..., alias="putVannaExposure")
     vanna_flip_strike: float | None = Field(default=None, alias="vannaFlipStrike")
-    regime: str = Field(default="neutral")
+    regime: VannaRegime = Field(default="neutral")
 
 
 class CharmExposureModel(ValueObject):
@@ -132,7 +137,7 @@ class CharmExposureModel(ValueObject):
     net_charm: float = Field(..., alias="netCharm")
     call_charm_exposure: float = Field(..., alias="callCharmExposure")
     put_charm_exposure: float = Field(..., alias="putCharmExposure")
-    overnight_delta_drift: str = Field(default="neutral")
+    overnight_delta_drift: OvernightDeltaDrift = Field(default="neutral")
 
 
 class MispricingModel(ValueObject):
@@ -142,7 +147,7 @@ class MispricingModel(ValueObject):
     put_avg_mispricing_pct: float = Field(..., alias="putAvgMispricingPct")
     overpriced_call_pct: float = Field(..., alias="overpricedCallPct")
     overpriced_put_pct: float = Field(..., alias="overpricedPutPct")
-    sentiment: str = Field(default="neutral")
+    sentiment: MispricingSentiment = Field(default="neutral")
 
 
 class MoneynessBucket(ValueObject):
@@ -178,7 +183,7 @@ class PinRiskModel(ValueObject):
     model_config = ConfigDict(populate_by_name=True)
 
     max_pin_strike: float | None = Field(default=None, alias="maxPinStrike")
-    pin_risk_level: str = Field(default="low")
+    pin_risk_level: PinRiskLevel = Field(default="low")
     dte: int | None = None
     top_strikes: list[PinRiskStrikeModel] = Field(default_factory=list, alias="topStrikes")
 
@@ -193,24 +198,6 @@ class SignalCategoriesModel(ValueObject):
     structure: list[PositioningMetricModel] = Field(default_factory=list)
 
 
-class MethodologyReferenceModel(ValueObject):
-    id: str
-    title: str
-    url: str
-
-
-class MethodologyModel(ValueObject):
-    model_config = ConfigDict(populate_by_name=True)
-
-    version: str
-    computed_at: str = Field(..., alias="computedAt")
-    model_family: str = Field(..., alias="modelFamily")
-    assumptions: list[str]
-    limitations: list[str]
-    references: list[MethodologyReferenceModel]
-    data_inputs: dict[str, str] = Field(..., alias="dataInputs")
-
-
 class OptionsPositioningResult(ValueObject):
     """Full options-intelligence payload (internal snake_case; aliases for API JSON)."""
 
@@ -218,7 +205,7 @@ class OptionsPositioningResult(ValueObject):
 
     symbol: str
     window: PositioningWindow
-    methodology: MethodologyModel
+    methodology: AnalysisMethodology
     confidence: float = Field(..., ge=0, le=1)
     market_bias: PositioningBias = Field(..., alias="marketBias")
     bullish_probability: float = Field(..., ge=0, le=1, alias="bullishProbability")
@@ -226,15 +213,12 @@ class OptionsPositioningResult(ValueObject):
     neutral_probability: float = Field(..., ge=0, le=1, alias="neutralProbability")
     key_levels: list[float] = Field(..., alias="keyLevels")
     analyst_summary: str = Field(..., alias="analystSummary")
-    signals: list[PositioningMetricModel]
     scenarios: list[PositioningScenarioModel]
     signal_categories: SignalCategoriesModel | None = Field(default=None, alias="signalCategories")
     regime: GammaRegime | None = None
     regime_explanation: str | None = Field(default=None, alias="regimeExplanation")
     iv_metrics: IVMetricsModel | None = Field(default=None, alias="ivMetrics")
     max_pain: float | None = Field(default=None, alias="maxPain")
-    implied_move: float | None = Field(default=None, alias="impliedMove")
-    implied_move_absolute: float | None = Field(default=None, alias="impliedMoveAbsolute")
     oi_clusters: list[StrikeOIClusterModel] = Field(default_factory=list, alias="oiClusters")
     data_quality: float | None = Field(default=None, ge=0, le=1, alias="dataQuality")
     dollar_metrics: DollarMetricsModel | None = Field(default=None, alias="dollarMetrics")

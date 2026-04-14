@@ -42,4 +42,5 @@ def test_partial_synthesis_adds_limitation() -> None:
     )
     assert r is not None
     assert r.key_metrics.get("synthesis_status") == "partial"
-    assert any("LLM narrative" in lim for lim in r.limitations)
+    lims = tuple(lim for spec in r.methodology.specs for lim in spec.limitations)
+    assert any("LLM narrative" in lim for lim in lims)

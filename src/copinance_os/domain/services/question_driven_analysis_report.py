@@ -5,16 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from copinance_os.domain.models.analysis_report import AnalysisReport
+from copinance_os.domain.models.methodology import envelope_from_text_methodology
 
-_DEFAULT_METHODOLOGY = (
-    "Question-driven analysis: LLM with tool calls to market, macro, and fundamental data "
-    "providers; numeric claims must align with tool outputs or deterministic blocks."
-)
-_DEFAULT_ASSUMPTIONS = (
+_DEFAULT_ASSUMPTIONS: tuple[str, ...] = (
     "External data may be delayed or incomplete; tool availability depends on configuration.",
     "Model output is explanatory; figures are provisional unless matched to tool results.",
 )
-_DEFAULT_LIMITATIONS = (
+_DEFAULT_LIMITATIONS: tuple[str, ...] = (
     "Not investment advice; for research and education only.",
     "LLM narrative is not a source of truth for prices, returns, Greeks, or ratios.",
 )
@@ -40,12 +37,17 @@ def build_question_driven_analysis_report(results: dict[str, Any]) -> AnalysisRe
         }
         if err:
             key_metrics["error"] = str(err)
+        methodology = envelope_from_text_methodology(
+            spec_id="question_driven_analysis.aborted",
+            model_family="llm_tool_loop",
+            assumptions=_DEFAULT_ASSUMPTIONS,
+            limitations=_DEFAULT_LIMITATIONS,
+            data_inputs={"status": "failed"},
+        )
         return AnalysisReport(
             summary=summary,
             key_metrics=key_metrics,
-            methodology="Question-driven run aborted or misconfigured before or during LLM execution.",
-            assumptions=list(_DEFAULT_ASSUMPTIONS),
-            limitations=list(_DEFAULT_LIMITATIONS),
+            methodology=methodology,
         )
 
     summary_text = ""
@@ -78,21 +80,30 @@ def build_question_driven_analysis_report(results: dict[str, Any]) -> AnalysisRe
     if results.get("llm_synthesis_error"):
         key_metrics["llm_synthesis_error"] = str(results["llm_synthesis_error"])[:2000]
 
-    assumptions = list(_DEFAULT_ASSUMPTIONS)
+    assumptions = _DEFAULT_ASSUMPTIONS
     if policy:
-        assumptions.append(str(policy))
+        assumptions = (*_DEFAULT_ASSUMPTIONS, str(policy))
 
-    limitations = list(_DEFAULT_LIMITATIONS)
+    limitations = _DEFAULT_LIMITATIONS
     if results.get("synthesis_status") == "partial":
-        limitations = [
-            *limitations,
+        limitations = (
+            *_DEFAULT_LIMITATIONS,
             "Final LLM narrative was not available; summary below includes tool output formatted for display.",
-        ]
+        )
+
+    methodology = envelope_from_text_methodology(
+        spec_id="question_driven_analysis.llm_tools",
+        model_family="llm_tool_loop",
+        assumptions=assumptions,
+        limitations=limitations,
+        data_inputs={
+            "execution_mode": str(results.get("execution_mode") or ""),
+            "llm_model": str(results.get("llm_model") or ""),
+        },
+    )
 
     return AnalysisReport(
         summary=summary_text,
         key_metrics=key_metrics,
-        methodology=_DEFAULT_METHODOLOGY,
-        assumptions=assumptions,
-        limitations=limitations,
+        methodology=methodology,
     )

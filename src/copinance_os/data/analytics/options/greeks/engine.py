@@ -1,38 +1,17 @@
-"""European vanilla option Greeks via QuantLib (analytic Black–Scholes–Merton).
-
-First-order sensitivities use ``AnalyticEuropeanEngine``. Higher-order closed-form
-pieces (vanna, charm, volga) use the same BSM ``d1``, ``d2`` as the engine inputs.
-
-Research touchpoints (methodology / interpretation, not model assumptions here):
-
-- **Vanna** (∂²V/∂S∂σ): smile-dynamics and spot–vol correlation hedging flows are
-  standard in Bergomi, *Smile Dynamics IV* (2005).
-- **Charm** (∂Δ/∂τ, calendar time): dealer delta drift with time; see Taleb,
-  *Dynamic Hedging* (1997), esp. Ch.9.
-- **Volga** (∂²V/∂σ²): wing convexity / vol-of-vol; variance-surface context in
-  Carr & Wu, *Variance Risk Premiums* (2009).
-- **NPV** vs market mid: systematic deviation from BSM at quoted IV as a sentiment
-  read; De Fontnouvelle et al. (2003) on option mispricing.
-- **P(ITM)** from ``itmCashProbability``: risk-neutral exercise probability;
-  combined with OI for pin-style heuristics per Avellaneda & Lipkin (2003).
-"""
+"""QuantLib analytic European BSM Greeks (engine primitives + chain batch estimate)."""
 
 from __future__ import annotations
 
 import math
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
 import structlog
 
-from copinance_os.data.analytics.options.assumptions import (
-    resolve_option_greek_assumptions,
-)
-from copinance_os.data.analytics.options.constants import DEFAULT_RISK_FREE_RATE
+from copinance_os.data.analytics.options.greeks.config import DEFAULT_RISK_FREE_RATE
+from copinance_os.data.analytics.options.greeks.methodology import quantlib_bsm_greeks_methodology
 from copinance_os.domain.models.market import OptionContract, OptionGreeks, OptionsChain, OptionSide
-from copinance_os.domain.models.profile import AnalysisProfile
-from copinance_os.infra.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -91,7 +70,7 @@ def _chain_dividend_yield(chain: OptionsChain) -> Decimal | None:
         return None
 
 
-def _effective_dividend_yield(chain: OptionsChain, div_default: Decimal) -> Decimal:
+def chain_effective_dividend_yield(chain: OptionsChain, div_default: Decimal) -> Decimal:
     parsed = _chain_dividend_yield(chain)
     return parsed if parsed is not None else div_default
 
@@ -121,10 +100,7 @@ def compute_european_bsm_greeks(
     evaluation_date: date,
     side: OptionSide,
 ) -> OptionGreeks | None:
-    """Return analytic BSM Greeks, or ``None`` when inputs are invalid or QuantLib is unavailable.
-
-    See module docstring for literature tied to higher-order Greeks and NPV / P(ITM).
-    """
+    """Return analytic BSM Greeks, or ``None`` when inputs are invalid or QuantLib is unavailable."""
     if QuantLib is None:
         logger.warning("quantlib_not_available", message="QuantLib is not installed")
         return None
@@ -136,7 +112,6 @@ def compute_european_bsm_greeks(
     try:
         ql_eval = _ql_business_eval_date(evaluation_date)
         ql_maturity = _to_ql_date(expiration_date)
-        # Strictly past expiry: no BSM Greeks. Same calendar day as eval may be 0DTE; allow.
         if ql_maturity < ql_eval:
             return None
 
@@ -250,16 +225,7 @@ def estimate_bsm_greeks_for_options_chain(
     evaluation_date: date | None = None,
     only_missing: bool = False,
 ) -> OptionsChain:
-    """Estimate European BSM Greeks per contract when spot and implied vol are available.
-
-    If QuantLib is not installed or no estimate succeeds, ``chain`` is returned unchanged
-    and chain metadata is not augmented with model provenance.
-
-    When ``only_missing`` is True, rows without ``greeks`` are filled. Rows that already
-    have vendor first-order Greeks are preserved, but missing higher-order fields
-    (vanna, charm, volga, theoretical_price, itm_probability) are merged from the same
-    QuantLib pass without overwriting delta/gamma/theta/vega/rho.
-    """
+    """Estimate European BSM Greeks per contract; sets ``greeks_methodology`` when any row updates."""
     if QuantLib is None:
         return chain
 
@@ -305,78 +271,12 @@ def estimate_bsm_greeks_for_options_chain(
     if not any(c.greeks for c in calls_out) and not any(c.greeks for c in puts_out):
         return chain
 
-    meta = dict(chain.metadata)
-    meta["option_greeks_model"] = "quantlib_analytic_european_bsm"
-    meta["option_greeks_risk_free_rate"] = str(risk_free_rate)
-    meta["option_greeks_dividend_yield_assumption"] = str(dividend_yield)
-    meta["option_greeks_as_of_date"] = eval_d.isoformat()
-    meta["option_greeks_methodology_version"] = "quantlib_bsm_v2"
-    meta["option_greeks_assumptions"] = (
-        "European exercise; Black-Scholes-Merton dynamics; "
-        "flat risk-free/dividend and constant implied volatility per contract."
+    gm = quantlib_bsm_greeks_methodology(
+        risk_free_rate=risk_free_rate,
+        dividend_yield=dividend_yield,
+        evaluation_date=eval_d,
+        computed_at=datetime.now(UTC),
     )
-    meta["option_greeks_references"] = ",".join(
-        (
-            "REF_QUANTLIB_ANALYTIC_EUROPEAN",
-            "REF_BERGOMI_2005",
-            "REF_TALEB_1997",
-            "REF_CARR_WU_2009",
-        )
+    return chain.model_copy(
+        update={"calls": calls_out, "puts": puts_out, "greeks_methodology": gm},
     )
-    return chain.model_copy(update={"calls": calls_out, "puts": puts_out, "metadata": meta})
-
-
-def enrich_options_chain_missing_greeks(
-    chain: OptionsChain,
-    *,
-    evaluation_date: date | None = None,
-    profile: AnalysisProfile | None = None,
-) -> OptionsChain:
-    """Fill missing Greeks via QuantLib analytic European BSM when spot/IV allow.
-
-    Rows with ``greeks is None`` get a full estimate. Rows with vendor first-order Greeks
-    but missing higher-order fields get a non-destructive merge from the same engine.
-
-    Uses the same risk-free and dividend assumptions as :class:`QuantLibBsmGreekEstimator`.
-    Returns ``chain`` unchanged when QuantLib is unavailable or no row is filled.
-    """
-    if QuantLib is None:
-        return chain
-    risk_free, div_default = resolve_option_greek_assumptions(
-        settings=get_settings(),
-        profile=profile,
-    )
-    div_yield = _effective_dividend_yield(chain, div_default)
-    return estimate_bsm_greeks_for_options_chain(
-        chain,
-        risk_free_rate=risk_free,
-        dividend_yield=div_yield,
-        evaluation_date=evaluation_date,
-        only_missing=True,
-    )
-
-
-class QuantLibBsmGreekEstimator:
-    """QuantLib-backed ``OptionsChainGreeksEstimator`` (analytic European BSM).
-
-    Uses :func:`resolve_option_greek_assumptions` with :func:`get_settings` on each
-    ``estimate`` call so environment changes are respected. Optional ``profile`` applies
-    ``AnalysisProfile.preferences`` overrides (for custom DI wiring); the default
-    container leaves this unset.
-    """
-
-    def __init__(self, profile: AnalysisProfile | None = None) -> None:
-        self._profile = profile
-
-    def estimate(self, chain: OptionsChain) -> OptionsChain:
-        risk_free, div_default = resolve_option_greek_assumptions(
-            settings=get_settings(),
-            profile=self._profile,
-        )
-        div_yield = _effective_dividend_yield(chain, div_default)
-        return estimate_bsm_greeks_for_options_chain(
-            chain,
-            risk_free_rate=risk_free,
-            dividend_yield=div_yield,
-            evaluation_date=date.today(),
-        )

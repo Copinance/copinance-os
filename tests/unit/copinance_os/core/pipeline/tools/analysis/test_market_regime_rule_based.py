@@ -228,6 +228,12 @@ class TestMarketRegimeDetectTrendTool:
         assert "log_return" in result.data
         assert "volatility_scaled_momentum" in result.data
         assert "methodology" in result.data
+        meth = result.data["methodology"]
+        assert isinstance(meth, dict)
+        assert meth.get("version") == "analysis_methodology_v1"
+        assert (
+            meth.get("specs") and meth["specs"][0].get("id") == "market_regime.detect_market_trend"
+        )
 
     @pytest.mark.asyncio
     async def test_execute_insufficient_data(

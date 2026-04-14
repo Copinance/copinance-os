@@ -22,7 +22,7 @@ The product vision is in the [Manifesto](https://github.com/copinance/copinance-
 - **Two ways to run analysis** — **Fixed pipelines** (walk through defined steps every time) and **question-driven** runs (the model picks which data and analysis tools to use for your question). **Back-and-forth conversations** with memory are supported when you use the **Python library**, not as a single CLI session—see the [library guide](getting-started/library#multi-turn-question-driven-analysis).
 - **Macro and regime in one place** — Broad economic and market-stress indicators (rates, credit, labor, housing, and more) sit alongside single-name and options work.
 - **Shared caching** — Fetches used during CLI market commands and during analysis can **reuse the same cache**, so repeated work is cheaper. You can inspect and clear cache from the CLI.
-- **Research-shaped output** — Successful runs can include a **standard report shape**: summary, metrics, methodology, assumptions, and limitations—so outputs read like research, not only raw JSON.
+- **Research-shaped output** — Successful runs can include a **standard report shape**: summary, metrics, and a methodology envelope (`specs` + `data_inputs`) so outputs read like research, not only raw JSON.
 - **License** — Apache 2.0.
 
 ## How the codebase is organized (mental model)
@@ -91,7 +91,7 @@ You ask in natural language. The system **loops**: the model may request data or
 
 ### What comes back from a run
 
-You always get a clear **success or failure**. On success, there is **structured payload** (numbers, tables, tool traces as applicable) and often a **written report** in a fixed shape: summary, key metrics, methodology, assumptions, and limitations—so readers know **what was assumed and what was not**.
+You always get a clear **success or failure**. On success, there is **structured payload** (numbers, tables, tool traces as applicable) and often a **written report** in a fixed shape: summary, key metrics, and a structured methodology envelope. The methodology envelope carries explicit assumptions and limitations per spec, plus `data_inputs` for traceability.
 
 ### One front door for “run this study”
 

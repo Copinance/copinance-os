@@ -4,6 +4,8 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field, model_validator
 
+from copinance_os.domain.models.methodology import AnalysisMethodology
+
 
 class SimpleBacktestConfig(BaseModel):
     """Long-only allocation backtest with explicit friction."""
@@ -35,9 +37,7 @@ class SimpleBacktestResult(BaseModel):
         None,
         description="Annualized Sharpe on period returns when sample is sufficient",
     )
-    methodology: str
-    assumptions: list[str]
-    limitations: list[str]
+    methodology: AnalysisMethodology
     key_metrics: dict[str, Any] = Field(default_factory=dict)
 
 

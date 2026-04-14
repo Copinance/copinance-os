@@ -27,7 +27,7 @@ Classifies the instrument as **bull**, **bear**, or **neutral** using moving ave
 | `volatility_scaled_momentum` | log_return / σ — the classification signal |
 | `ma_relationship` | `"bullish"` / `"bearish"` / `"neutral"` (50d vs 200d MA) |
 | `recent_volatility` | Annualized realized vol (percentage) |
-| `methodology` | `"log_returns_with_volatility_scaling"` |
+| `methodology` | `AnalysisMethodology` envelope (`specs` + `data_inputs`; trend spec id: `market_regime.detect_trend`) |
 
 **Parameters:** `symbol` (required), `lookback_days` (default 200), `short_ma_period` (default 50), `long_ma_period` (default 200).
 

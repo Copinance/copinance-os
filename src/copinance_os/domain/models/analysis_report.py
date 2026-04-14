@@ -1,8 +1,10 @@
-"""Standard analysis output envelope (convention: summary, metrics, methodology, assumptions, limitations)."""
+"""Standard analysis output envelope (summary, metrics, structured methodology)."""
 
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from copinance_os.domain.models.methodology import AnalysisMethodology
 
 
 class AnalysisReport(BaseModel):
@@ -13,6 +15,7 @@ class AnalysisReport(BaseModel):
         default_factory=dict,
         description="Structured key metrics (numbers, nested dicts allowed)",
     )
-    methodology: str = Field(default="", description="How the analysis was performed")
-    assumptions: list[str] = Field(default_factory=list)
-    limitations: list[str] = Field(default_factory=list)
+    methodology: AnalysisMethodology = Field(
+        ...,
+        description="How the analysis was performed (specs + data inputs)",
+    )

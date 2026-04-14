@@ -7,12 +7,11 @@ from typing import Any, Literal
 import structlog
 
 from copinance_os.core.pipeline.tools.data_provider.base import BaseDataProviderTool
-from copinance_os.data.analytics.options.positioning import build_options_positioning_dict
+from copinance_os.data.analytics.options.positioning import build_options_positioning
 from copinance_os.data.cache import CacheManager
 from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis import merge_instrument_expiration_inputs
 from copinance_os.domain.models.market import OptionSide
-from copinance_os.domain.models.options_positioning import OptionsPositioningResult
 from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import ToolSchema
@@ -461,17 +460,16 @@ class MarketDataOptionsPositioningTool(BaseDataProviderTool[MarketDataProvider])
                 underlying_symbol=symbol,
                 expiration_date=None,
             )
-            raw = build_options_positioning_dict(
-                chain,
-                list(chain.calls or []),
-                list(chain.puts or []),
-                quote,
-                symbol,
-                window,
+            model = build_options_positioning(
+                chain=chain,
+                calls=list(chain.calls or []),
+                puts=list(chain.puts or []),
+                quote=quote,
+                symbol=symbol,
+                window=window,
                 financial_literacy=lit,
                 enrich_missing_greeks=True,
             )
-            model = OptionsPositioningResult.model_validate(raw)
             return self._create_success_result(
                 data=model.model_dump(mode="json"),
                 metadata={"symbol": symbol, "window": window, "financial_literacy": lit.value},

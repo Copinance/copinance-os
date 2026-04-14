@@ -24,6 +24,7 @@ from copinance_os.data.cache import CacheManager
 from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.models.market import MarketDataPoint
+from copinance_os.domain.models.methodology import AnalysisMethodology
 from copinance_os.domain.models.regime import (
     AdvancedData,
     AnalysisMetadata,
@@ -249,7 +250,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
                 ma_relationship=data["ma_relationship"],
                 short_ma_period_used=data["short_ma_period_used"],
                 long_ma_period_used=data["long_ma_period_used"],
-                methodology=data["methodology"],
+                methodology=AnalysisMethodology.model_validate(data["methodology"]),
                 note=data.get("note"),
                 metadata=AnalysisMetadata(
                     analysis_period_days=data["analysis_period_days"],

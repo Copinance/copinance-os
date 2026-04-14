@@ -406,7 +406,7 @@ result = await orchestrator.run_job(job_equity, {})
 # result.success: bool
 # result.results: dict | None  — analysis output (question-driven success may include "conversation_turns" for multi-turn chaining)
 # result.error_message: str | None
-# result.report: AnalysisReport | None  — summary, key_metrics, methodology, assumptions, limitations
+# result.report: AnalysisReport | None  — summary, key_metrics, methodology envelope (specs + data_inputs)
 # result.report_exclusion_reason: ReportExclusionReason | None  — set if no report envelope exists for the executor type
 ```
 
@@ -628,10 +628,11 @@ asyncio.run(follow_up_example())
 
 ## Options positioning context
 
-For **options-surface / positioning intelligence** (bias, IV/skew/term, flow-style signals, gamma regime, GEX, vanna/charm exposure, mispricing vs BSM fair value, moneyness buckets, pin risk, max pain, implied move, OI clusters) as a **single JSON payload** aligned with the Copinance screener API, use:
+For **options-surface / positioning intelligence** (bias, IV/skew/term, flow-style signals, gamma regime, GEX, vanna/charm exposure, mispricing vs BSM fair value, moneyness buckets, pin risk, max pain, implied move, OI clusters) as a strongly typed result model, use:
 
 - **Import:** `from copinance_os.data.analytics.options.positioning import compute_options_positioning_context`
 - **Data:** `await compute_options_positioning_context(provider, symbol, window)` where `window` is `"near"` or `"mid"`, and `provider` is a **`MarketDataProvider`** (`get_quote`, `get_options_chain`). The usual choice is `container.market_data_provider()` from `get_container(...)`.
+- **Direct builder:** `build_options_positioning(...)` for already-fetched chain/quote payloads.
 
 ```python
 import asyncio
@@ -642,7 +643,8 @@ async def main():
     container = get_container(llm_config=None, load_from_env=False)
     provider = container.market_data_provider()
     result = await compute_options_positioning_context(provider, "SPY", "near")
-    # result.model_dump() uses snake_case; use model_dump(by_alias=True) for camelCase API JSON
+    # result.methodology is AnalysisMethodology (specs + parameters + data_inputs)
+    # Use model_dump(mode="json") when you need JSON-serialisable output.
     print(result.market_bias, result.confidence)
 
 asyncio.run(main())
@@ -739,7 +741,7 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 |------|--------|-----|
 | `Job` | `copinance_os.domain.models.job` | Analysis execution context: `scope`, `market_type`, `instrument_symbol`, `market_index`, `timeframe`, `execution_type`, `profile_id` |
 | `RunJobResult` | `copinance_os.domain.models.job` | `success`, `results`, `error_message`, **`report`** (`AnalysisReport \| None`), **`report_exclusion_reason`** (`ReportExclusionReason \| None`) |
-| `AnalysisReport` | `copinance_os.domain.models.analysis_report` | `summary`, `key_metrics`, `methodology`, `assumptions`, `limitations` |
+| `AnalysisReport` | `copinance_os.domain.models.analysis_report` | `summary`, `key_metrics`, `methodology` (`AnalysisMethodology` envelope with `specs` + `data_inputs`) |
 | `ReportExclusionReason` | `copinance_os.domain.models.job` | e.g. `UNKNOWN_EXECUTOR_TYPE` when results exist but no report builder is registered |
 | `JobScope` | `copinance_os.domain.models.job` | `INSTRUMENT`, `MARKET` |
 | `JobTimeframe` | `copinance_os.domain.models.job` | `SHORT_TERM`, `MID_TERM`, `LONG_TERM` |
