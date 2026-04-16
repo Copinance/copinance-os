@@ -119,6 +119,12 @@ def async_command(func: F) -> F:
     runs them using asyncio.run(), eliminating the need for nested
     async functions and manual asyncio.run() calls.
 
+    On an interactive terminal, a transient dots spinner is rendered on stderr
+    while the coroutine executes.  The spinner erases itself when the command
+    finishes so that only the command's own output remains.  The spinner is
+    suppressed automatically in JSON mode (``--json``) and in non-TTY
+    environments (pipes, CI, tests).
+
     Usage:
         @analyze_app.command("market")
         @async_command
@@ -138,7 +144,30 @@ def async_command(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        """Synchronous wrapper that runs the async function."""
+        """Synchronous wrapper that runs the async function with an optional startup spinner."""
+        # JSON mode: stdout must carry only valid JSON — no spinner or stray text allowed.
+        json_mode = any(
+            isinstance(getattr(a, "obj", None), dict) and getattr(a, "obj", {}).get("json_output")
+            for a in args
+        )
+
+        if not json_mode:
+            # Deferred imports: Rich is already in sys.modules by the time any command
+            # handler fires (command modules import it at their scope), so these are free.
+            from rich.console import Console  # noqa: PLC0415
+            from rich.live import Live  # noqa: PLC0415
+            from rich.spinner import Spinner  # noqa: PLC0415
+
+            stderr_console = Console(stderr=True)
+            if stderr_console.is_terminal:
+                with Live(
+                    Spinner("dots", style="dim"),
+                    console=stderr_console,
+                    transient=True,
+                    refresh_per_second=10,
+                ):
+                    return asyncio.run(func(*args, **kwargs))
+
         return asyncio.run(func(*args, **kwargs))
 
     return wrapper  # type: ignore[return-value]

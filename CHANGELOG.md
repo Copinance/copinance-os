@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CLI — async commands**: Transient Rich **dots** spinner on **stderr** while **`async_command`** runs in an interactive terminal; suppressed for **`--json`** (machine-readable stdout) and non-TTY environments.
 - **Transparency contract — options positioning + Greeks methodology (breaking)**: Methodology is now standardized through shared **`AnalysisMethodology`** / **`MethodologySpec`** value objects. `OptionsPositioningResult`, `AnalysisReport`, market-regime outputs, and backtest outputs all use the same structured envelope.
 - **Financial literacy — options positioning copy**: `domain.literacy` (`TieredCopy`, `resolve_financial_literacy`, `financial_literacy_prompt_value`) and `data.literacy.options_positioning` tiered strings remain the narrative layer; aggregate positioning via `build_options_positioning` adapts signal names/explanations and `analyst_summary` for **beginner** / **intermediate** / **advanced**.
 - **Options analytics modularization (breaking)**: Split monolithic modules into `data/analytics/options/greeks/` and `data/analytics/options/positioning/` with sub-computation modules and per-spec methodology. Public builder is now **`build_options_positioning`** returning `OptionsPositioningResult` directly (no legacy dict builder).
@@ -41,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings / DI — import and startup cost**: **`get_settings()`** returns a process-wide cached **`Settings`** instance (docstring notes how tests can reset). **`copinance_os.infra.di`** lazily resolves **`Container`** / **`get_container`** via **`__getattr__`** so importing the package does not pull in **`container.py`**. **`infra/di/container.py`**, **`data_providers.py`**, and market **`use_cases.py`** defer heavy vendor imports to **`configure_*`** bodies or **`_make_*`** factory helpers; profile providers live in **`infra/di/profile_use_cases.py`**. **`infra/logging.py`** defers **`structlog.dev`** imports until the aligned console renderer is built.
 - **Options positioning input semantics (breaking)**: Aggregate positioning now treats missing contract Greeks/OI/volume as unavailable inputs (skipped in computations) rather than fallback zeroes; unavailable downstream fields stay explicit `null`.
 - **Options positioning boundary validation**: `build_options_positioning` now raises domain `ValidationError` when no contracts/expiry are available for the requested positioning window instead of returning a silent empty payload.
 - **Options positioning — expirations used for nearest selection**: **`sorted_expirations`** now returns unique ISO dates **only from option contract rows** (calls/puts), sorted with **`expiration_sort_key`**, instead of merging provider **`available_expirations`** metadata that may omit strikes for a listed date.

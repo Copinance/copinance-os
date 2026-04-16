@@ -1,31 +1,88 @@
 """Main dependency injection container configuration.
 
 This module composes all container modules into a single Container class.
-It replaces the global state pattern with proper dependency injection for better
-testability and lifecycle management.
+
+### Import-cost design
+Every heavy vendor library (openai, pandas, google-genai, edgar, yfinance, QuantLib …)
+is imported *lazily* — either inside the ``configure_*`` factory functions (which are
+only called when a provider is first resolved) or inside the thin factory helpers
+defined below the class body (prefixed ``_make_``).  Importing this module itself is
+cheap so that ``get_container()`` can be called from CLI command handlers without
+adding startup latency.
 """
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from dependency_injector import containers, providers
 
-from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.ai.llm.config_loader import load_llm_config_from_env
-from copinance_os.ai.llm.resources import PromptManager
-from copinance_os.core.orchestrator.runners import (
-    DefaultAnalyzeInstrumentRunner,
-    DefaultAnalyzeMarketRunner,
-)
-from copinance_os.data.cache import CacheManager
-from copinance_os.data.repositories.storage import create_storage
-from copinance_os.infra.config import get_settings, get_storage_path_safe
+from copinance_os.infra.config import get_settings
 from copinance_os.infra.di.data_providers import configure_data_providers
+from copinance_os.infra.di.profile_use_cases import configure_profile_use_cases
 from copinance_os.infra.di.repositories import configure_repositories
 from copinance_os.infra.di.services import configure_services
 from copinance_os.infra.di.storage import configure_storage
-from copinance_os.infra.di.use_cases import configure_profile_use_cases, configure_use_cases
-from copinance_os.research.workflows.analyze import (
-    AnalyzeInstrumentUseCase,
-    AnalyzeMarketUseCase,
-)
+from copinance_os.infra.di.use_cases import configure_use_cases
+
+if TYPE_CHECKING:
+    from copinance_os.ai.llm.config import LLMConfig
+    from copinance_os.ai.llm.resources import PromptManager
+    from copinance_os.data.cache import CacheManager
+
+
+# ---------------------------------------------------------------------------
+# Thin factory helpers — deferred imports so Container class body stays light
+# ---------------------------------------------------------------------------
+
+
+def _make_prompt_manager() -> Any:
+    from copinance_os.ai.llm.resources import PromptManager  # noqa: PLC0415
+
+    return PromptManager()
+
+
+def _make_prompt_manager_with_templates(templates: dict[str, dict[str, str]]) -> Any:
+    from copinance_os.ai.llm.resources import PromptManager  # noqa: PLC0415
+
+    return PromptManager(templates=templates)
+
+
+def _make_analyze_instrument_runner(research_orchestrator: Any) -> Any:
+    from copinance_os.core.orchestrator.runners import (  # noqa: PLC0415
+        DefaultAnalyzeInstrumentRunner,
+    )
+
+    return DefaultAnalyzeInstrumentRunner(research_orchestrator=research_orchestrator)
+
+
+def _make_analyze_market_runner(research_orchestrator: Any) -> Any:
+    from copinance_os.core.orchestrator.runners import (  # noqa: PLC0415
+        DefaultAnalyzeMarketRunner,
+    )
+
+    return DefaultAnalyzeMarketRunner(research_orchestrator=research_orchestrator)
+
+
+def _make_analyze_instrument_use_case(analyze_instrument_runner: Any) -> Any:
+    from copinance_os.research.workflows.analyze import (  # noqa: PLC0415
+        AnalyzeInstrumentUseCase,
+    )
+
+    return AnalyzeInstrumentUseCase(analyze_instrument_runner=analyze_instrument_runner)
+
+
+def _make_analyze_market_use_case(analyze_market_runner: Any) -> Any:
+    from copinance_os.research.workflows.analyze import (  # noqa: PLC0415
+        AnalyzeMarketUseCase,
+    )
+
+    return AnalyzeMarketUseCase(analyze_market_runner=analyze_market_runner)
+
+
+# ---------------------------------------------------------------------------
+# Container
+# ---------------------------------------------------------------------------
 
 
 class Container(containers.DeclarativeContainer):
@@ -64,14 +121,13 @@ class Container(containers.DeclarativeContainer):
     fred_api_key_config = providers.Configuration()
 
     # Prompt templates: default manager (package prompts). Override via get_container().
-    prompt_manager = providers.Singleton(PromptManager)
+    # Uses _make_prompt_manager so PromptManager is only imported when first resolved.
+    prompt_manager = providers.Singleton(_make_prompt_manager)
 
     # Storage backend (singleton, configured from settings)
     storage_backend = configure_storage()
 
     # Repositories (singletons, use shared storage backend)
-    # Note: We need to assign providers directly, not from dict
-    # So we'll call configure_repositories and assign individually
     _repositories_config = configure_repositories(storage_backend)
     stock_repository = _repositories_config["stock_repository"]
     profile_repository = _repositories_config["profile_repository"]
@@ -83,7 +139,8 @@ class Container(containers.DeclarativeContainer):
 
     # Data providers (singletons, can be overridden).
     # Singleton caches the provider dict so inner Singletons (yfinance, cache, …) are not
-    # rebuilt on every use-case resolution (see configure_profile_use_cases vs full graph).
+    # rebuilt on every use-case resolution.  configure_data_providers itself is only
+    # invoked when the Singleton is first resolved (not at class-definition time).
     _data_providers_config = providers.Singleton(
         configure_data_providers,
         llm_config=llm_config,
@@ -196,21 +253,21 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["research_orchestrator"](),
         config=_use_cases_config,
     )
-    # Analyze runners (build Job + context, delegate to ResearchOrchestrator.run_job)
+    # Analyze runners — _make_* helpers defer the heavy runner/use-case imports
     analyze_instrument_runner = providers.Factory(
-        DefaultAnalyzeInstrumentRunner,
+        _make_analyze_instrument_runner,
         research_orchestrator=research_orchestrator,
     )
     analyze_market_runner = providers.Factory(
-        DefaultAnalyzeMarketRunner,
+        _make_analyze_market_runner,
         research_orchestrator=research_orchestrator,
     )
     analyze_instrument_use_case = providers.Factory(
-        AnalyzeInstrumentUseCase,
+        _make_analyze_instrument_use_case,
         analyze_instrument_runner=analyze_instrument_runner,
     )
     analyze_market_use_case = providers.Factory(
-        AnalyzeMarketUseCase,
+        _make_analyze_market_use_case,
         analyze_market_runner=analyze_market_runner,
     )
     analysis_executors = providers.Callable(
@@ -230,6 +287,9 @@ def _storage_override_provider(
     """Build a Singleton provider for storage when overrides are passed to get_container()."""
 
     def _create() -> object:
+        from copinance_os.data.repositories.storage import create_storage  # noqa: PLC0415
+        from copinance_os.infra.config import get_storage_path_safe  # noqa: PLC0415
+
         st = (
             storage_type_override
             if storage_type_override is not None
@@ -294,8 +354,12 @@ def get_container(
     if _container is None or fred_api_key is not None:
         container_instance = Container()
 
-        # Load LLM config if not provided
+        # Load LLM config if not provided — deferred import (LLM SDKs)
         if llm_config is None and load_from_env:
+            from copinance_os.ai.llm.config_loader import (  # noqa: PLC0415
+                load_llm_config_from_env,
+            )
+
             llm_config = load_llm_config_from_env()
 
         if llm_config is not None:
@@ -310,7 +374,7 @@ def get_container(
             container_instance.prompt_manager.override(providers.Object(prompt_manager))
         elif prompt_templates is not None:
             container_instance.prompt_manager.override(
-                providers.Singleton(PromptManager, templates=prompt_templates)
+                providers.Singleton(_make_prompt_manager_with_templates, templates=prompt_templates)
             )
 
         # Cache: custom manager, or disable if cache_enabled=False

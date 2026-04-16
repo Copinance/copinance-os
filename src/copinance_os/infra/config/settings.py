@@ -1,5 +1,7 @@
 """Application settings (pydantic-settings)."""
 
+from __future__ import annotations
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -108,9 +110,20 @@ class Settings(BaseSettings):
     )
 
 
+_settings: Settings | None = None
+
+
 def get_settings() -> Settings:
-    """Get application settings singleton."""
-    return Settings()
+    """Get application settings singleton.
+
+    Cached after first call so pydantic-settings parses env vars only once per process.
+    Tests that need a fresh instance should patch ``get_settings`` directly or reset
+    the cache via ``copinance_os.infra.config.settings._settings = None``.
+    """
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
 
 
 def get_storage_path_safe() -> str:

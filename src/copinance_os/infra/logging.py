@@ -1,13 +1,17 @@
 """Logging configuration using structlog."""
 
+from __future__ import annotations
+
 import logging
 import sys
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
-from structlog.dev import Column, ConsoleRenderer, LogLevelColumnFormatter
 
 from copinance_os.infra.config import Settings
+
+if TYPE_CHECKING:
+    from structlog.dev import ConsoleRenderer
 
 # Third-party libraries that emit DEBUG trace (HTTP, SQL, parser rules, SDK request dumps).
 # Root may be DEBUG (COPINANCEOS_LOG_LEVEL); keep vendor noise at WARNING unless you
@@ -95,6 +99,8 @@ class _PaddedAfterBracketLevelFormatter:
 
 def _console_renderer_with_aligned_level_column(*, colors: bool) -> ConsoleRenderer:
     """ConsoleRenderer with tight ``[info]`` text and trailing pad for column alignment."""
+    from structlog.dev import Column, ConsoleRenderer, LogLevelColumnFormatter  # noqa: PLC0415
+
     renderer = ConsoleRenderer(colors=colors, pad_level=False)
     columns = list(renderer.columns)
     for idx, col in enumerate(columns):

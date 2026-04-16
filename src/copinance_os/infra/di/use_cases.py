@@ -1,82 +1,22 @@
-"""Use case container configuration."""
+"""Market / analysis use case configuration.
+
+Heavy dependencies (openai, pandas, edgar, QuantLib, google-genai …) are imported
+*inside* ``configure_use_cases`` so that importing this module is nearly free.  The
+function is only called when the ``providers.Singleton`` wrapping it is first resolved
+— i.e. when an actual market or analysis command runs, not at CLI startup.
+
+Profile use cases live in ``infra.di.profile_use_cases`` (no heavy deps).
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dependency_injector import providers
 
-from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.ai.llm.resources import PromptManager
-from copinance_os.core.execution_engine.factory import AnalysisExecutorFactory
-from copinance_os.core.orchestrator.research_orchestrator import ResearchOrchestrator
-from copinance_os.core.orchestrator.run_job import DefaultJobRunner
-from copinance_os.research.workflows.fundamentals import GetStockFundamentalsUseCase
-from copinance_os.research.workflows.market import (
-    GetHistoricalDataUseCase,
-    GetInstrumentUseCase,
-    GetOptionsChainUseCase,
-    GetQuoteUseCase,
-    SearchInstrumentsUseCase,
-)
-from copinance_os.research.workflows.profile import (
-    CreateProfileUseCase,
-    DeleteProfileUseCase,
-    GetCurrentProfileUseCase,
-    GetProfileUseCase,
-    ListProfilesUseCase,
-    SetCurrentProfileUseCase,
-)
-
-
-def configure_profile_use_cases(
-    profile_repository: providers.Provider,
-    current_profile: providers.Provider,
-    profile_management_service: providers.Provider,
-) -> dict[str, providers.Provider]:
-    """Profile-only use cases (no market, fundamentals, or LLM dependencies)."""
-
-    create_profile_use_case = providers.Factory(
-        CreateProfileUseCase,
-        profile_repository=profile_repository,
-        profile_service=profile_management_service,
-        current_profile=current_profile,
-    )
-
-    get_current_profile_use_case = providers.Factory(
-        GetCurrentProfileUseCase,
-        profile_repository=profile_repository,
-        current_profile=current_profile,
-    )
-
-    set_current_profile_use_case = providers.Factory(
-        SetCurrentProfileUseCase,
-        profile_repository=profile_repository,
-        profile_service=profile_management_service,
-        current_profile=current_profile,
-    )
-
-    delete_profile_use_case = providers.Factory(
-        DeleteProfileUseCase,
-        profile_repository=profile_repository,
-        profile_service=profile_management_service,
-        current_profile=current_profile,
-    )
-
-    get_profile_use_case = providers.Factory(
-        GetProfileUseCase,
-        profile_repository=profile_repository,
-    )
-
-    list_profiles_use_case = providers.Factory(
-        ListProfilesUseCase,
-        profile_repository=profile_repository,
-    )
-
-    return {
-        "create_profile_use_case": create_profile_use_case,
-        "get_current_profile_use_case": get_current_profile_use_case,
-        "set_current_profile_use_case": set_current_profile_use_case,
-        "delete_profile_use_case": delete_profile_use_case,
-        "get_profile_use_case": get_profile_use_case,
-        "list_profiles_use_case": list_profiles_use_case,
-    }
+if TYPE_CHECKING:
+    from copinance_os.ai.llm.config import LLMConfig
+    from copinance_os.ai.llm.resources import PromptManager
 
 
 def configure_use_cases(
@@ -92,24 +32,46 @@ def configure_use_cases(
     llm_config: LLMConfig | None = None,
     prompt_manager: PromptManager | None = None,
 ) -> dict[str, providers.Provider]:
-    """Configure market and analysis use case providers (excludes profile CRUD; see ``configure_profile_use_cases``).
+    """Configure market and analysis use case providers.
+
+    All heavy imports (openai, pandas, google-genai, edgar, yfinance …) live inside
+    this function so the module can be imported without triggering them.  The function
+    is only executed by ``dependency_injector`` when the first market/analysis provider
+    is resolved at runtime.
 
     Args:
         stock_repository: Stock repository provider
-        profile_repository: Analysis profile repository provider (for job runner / orchestration)
+        profile_repository: Analysis profile repository provider
         current_profile: Current profile provider
         market_data_provider: Market data provider
         fundamental_data_provider: Fundamental data provider
-        sec_filings_provider: SEC / EDGAR provider (edgartools) for agent filing tools
+        sec_filings_provider: SEC / EDGAR provider
         macro_data_provider: Macro data provider
         cache_manager: Cache manager provider
         profile_management_service: Profile management service provider
-        llm_config: Optional LLM configuration. If None, question-driven analysis will not be available.
-        prompt_manager: Prompt manager for question-driven analysis. If None, a default is used.
+        llm_config: Optional LLM configuration.
+        prompt_manager: Prompt manager for question-driven analysis.
 
     Returns:
         Dictionary of use case providers
     """
+    # --- deferred heavy imports (openai, pandas, google, edgar, yfinance, QuantLib) ---
+    from copinance_os.core.execution_engine.factory import AnalysisExecutorFactory  # noqa: PLC0415
+    from copinance_os.core.orchestrator.research_orchestrator import (  # noqa: PLC0415
+        ResearchOrchestrator,
+    )
+    from copinance_os.core.orchestrator.run_job import DefaultJobRunner  # noqa: PLC0415
+    from copinance_os.research.workflows.fundamentals import (  # noqa: PLC0415
+        GetStockFundamentalsUseCase,
+    )
+    from copinance_os.research.workflows.market import (  # noqa: PLC0415
+        GetHistoricalDataUseCase,
+        GetInstrumentUseCase,
+        GetOptionsChainUseCase,
+        GetQuoteUseCase,
+        SearchInstrumentsUseCase,
+    )
+
     # Market instrument use cases
     get_instrument_use_case = providers.Factory(
         GetInstrumentUseCase,
