@@ -67,7 +67,7 @@ def compose_options_positioning_payload(
     up = chain.underlying_price
     underlying = safe_float(up, safe_float(quote.get("current_price")))
 
-    sorted_exp = sorted_expirations(chain, calls, puts)
+    sorted_exp = sorted_expirations(calls, puts)
     near_exps = nearest_expirations(sorted_exp, 2)
     nearest_exp = near_exps[0] if near_exps else None
     second_exp = near_exps[1] if len(near_exps) > 1 else None

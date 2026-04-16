@@ -6,6 +6,7 @@ Configure **settings** (LLM, FRED, storage, cache, BSM inputs) for CLI via **env
 
 1. **CLI**: Environment variables or a `.env` file.
 2. **Library**: Pass `LLMConfig` and optional `fred_api_key` into `get_container()`. See [Library Integration](#library-integration) below.
+3. **Logging**: Set `COPINANCEOS_LOG_LEVEL` and optional `COPINANCEOS_LOG_FORMAT` in the environment, or call `configure_logging(...)` once at process startup when embedding the package. See [Logging](#logging).
 
 ## Environment Variables (CLI)
 
@@ -107,6 +108,45 @@ COPINANCEOS_CACHE_ENABLED=true
 
 **SEC / edgartools:** Filing metadata and filing content from EDGAR are stored in the same file cache as tool results (versioned under your persistence/cache paths). Disabling cache or using a custom `cache_manager` applies to EDGAR-backed calls as well.
 
+## Logging
+
+Structured logging uses **structlog** over the standard library `logging` module. Levels and output format are defined on **`Settings`** (`copinance_os.infra.config`) and applied by **`configure_logging`** (`copinance_os.infra.logging`).
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `COPINANCEOS_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` (case-insensitive). Unrecognized values fall back to `INFO` when logging is configured. |
+| `COPINANCEOS_LOG_FORMAT` | `console` | `console` (human-readable, aligned level tags) or `json` (one JSON object per line). |
+
+`Settings` reads these from the environment (and from `.env` when present), same as other `COPINANCEOS_*` fields.
+
+### CLI
+
+The `copinance` entrypoint calls `configure_logging(get_settings())` so env / `.env` controls level and format for every CLI run.
+
+### Library (embedding Copinance OS)
+
+Importing the package **does not** configure logging. To get the same handlers and structlog processors as the CLI, call **`configure_logging` once** at startup (before heavy library use):
+
+```python
+from copinance_os.infra.config import Settings, get_settings
+from copinance_os.infra.logging import configure_logging
+
+# Respect COPINANCEOS_LOG_LEVEL / COPINANCEOS_LOG_FORMAT from the environment:
+configure_logging(get_settings())
+
+# Or set explicitly in code:
+configure_logging(Settings(log_level="DEBUG", log_format="json"))
+```
+
+If you skip `configure_logging`, third-party defaults may apply; Copinance loggers will not match CLI behavior until you configure them.
+
+### Finer control and vendor noise
+
+- After `configure_logging`, you can still use **`logging.getLogger("some.logger.name").setLevel(...)`** for specific logger names (including modules under `copinance_os`).
+- When the root level is `DEBUG`, `configure_logging` raises several **noisy third-party** loggers (for example HTTP clients and some SDKs) to **`WARNING`** so request dumps and parser trace do not overwhelm output. Override those loggers yourself if you need their `DEBUG` output.
+
 ## Complete .env Examples
 
 **Gemini:**
@@ -119,6 +159,9 @@ COPINANCEOS_FRED_API_KEY=your-fred-key
 # EDGAR_IDENTITY="Your Name you@company.com"
 COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinance
+# Optional — logging (see Logging section)
+# COPINANCEOS_LOG_LEVEL=INFO
+# COPINANCEOS_LOG_FORMAT=console
 ```
 
 **OpenAI:**
@@ -128,6 +171,9 @@ COPINANCEOS_OPENAI_API_KEY=sk-...
 COPINANCEOS_OPENAI_MODEL=gpt-4o-mini
 COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinance
+# Optional — logging (see Logging section)
+# COPINANCEOS_LOG_LEVEL=INFO
+# COPINANCEOS_LOG_FORMAT=console
 ```
 
 **Ollama:**
@@ -137,6 +183,9 @@ COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
 COPINANCEOS_OLLAMA_MODEL=llama3.2
 COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinance
+# Optional — logging (see Logging section)
+# COPINANCEOS_LOG_LEVEL=INFO
+# COPINANCEOS_LOG_FORMAT=console
 ```
 
 ## Security
@@ -156,10 +205,11 @@ Never commit `.env`. Add to `.gitignore`:
 
 ## Library Integration
 
-When using Copinance OS as a **library**, pass config into `get_container()`; env vars are for CLI only.
+When using Copinance OS as a **library**, pass config into `get_container()` for LLM, FRED, storage, and cache. **`Settings`** still loads **`COPINANCEOS_*`** from the environment (and `.env`) if you use **`get_settings()`**—for example for logging—so env is not “CLI-only” for every knob.
 
 - **LLMConfig**: Required for question-driven analysis. Example: `get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))`.
 - **FRED**: Optional. `get_container(..., fred_api_key="your-key")`.
 - **Storage**: To avoid creating a `.copinance` directory on disk, use `get_container(..., storage_type="memory")` or set `COPINANCEOS_STORAGE_TYPE=memory` in env. See [Storage and Persistence](library#storage-and-persistence).
+- **Logging**: Call `configure_logging(get_settings())` or `configure_logging(Settings(...))` once at startup; see [Logging](#logging).
 
 Full container options and examples: [Using as a Library](library).

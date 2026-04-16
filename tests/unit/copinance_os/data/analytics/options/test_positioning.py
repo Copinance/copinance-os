@@ -119,6 +119,43 @@ def toy_chain() -> tuple[OptionsChain, list[OptionContract], list[OptionContract
 
 
 @pytest.mark.unit
+def test_positioning_ignores_available_expirations_without_contract_rows() -> None:
+    """Provider calendars may list an earlier expiry than the returned option strip."""
+    exp_contracts = date(2026, 4, 17)
+    phantom = date(2026, 4, 16)
+    calls = [
+        _gc(500, 1000, 100, 18.0, 0.5, 0.02).model_copy(update={"expiration_date": exp_contracts}),
+    ]
+    puts = [
+        _gp(500, 1000, 100, 18.0, -0.5, 0.02).model_copy(update={"expiration_date": exp_contracts}),
+    ]
+    chain = OptionsChain(
+        underlying_symbol="SPY",
+        expiration_date=exp_contracts,
+        available_expirations=[phantom, exp_contracts],
+        underlying_price=Decimal("500"),
+        calls=calls,
+        puts=puts,
+    )
+    quote = {"current_price": 500.0}
+    raw = _build_pos_dict(
+        chain,
+        calls,
+        puts,
+        quote,
+        "SPY",
+        "near",
+        as_of_date=exp_contracts,
+        enrich_missing_greeks=False,
+    )
+    model = OptionsPositioningResult.model_validate(raw)
+    assert model.symbol == "SPY"
+    expiries_used = model.methodology.data_inputs.get("expirations_used", "")
+    assert phantom.isoformat() not in expiries_used
+    assert exp_contracts.isoformat() in expiries_used
+
+
+@pytest.mark.unit
 def test__build_pos_dict_validates(toy_chain: tuple) -> None:
     chain, calls, puts = toy_chain
     quote = {"current_price": 595.0}

@@ -11,6 +11,7 @@ This guide is for developers who want to integrate Copinance OS into their own P
 - [Core Concepts](#core-concepts)
 - [Quick Start: Run an Analysis](#quick-start-run-an-analysis)
 - [Configuration](#configuration)
+- [Logging](#logging)
 - [Running analysis (ResearchOrchestrator)](#running-analysis-researchorchestrator)
 - [Gateway, chat UI, and agent progress](#gateway-chat-ui-and-agent-progress)
 - [Using Use Cases Directly](#using-use-cases-directly)
@@ -154,6 +155,19 @@ container = get_container(
 - **`storage_type`** / **`storage_path`:** Optional. See [Storage and Persistence](#storage-and-persistence) below. Use `storage_type="memory"` to avoid creating a `.copinance` directory on disk.
 
 **Performance:** The container is created only on first use (lazy proxy), and use cases and providers are singletons created when first requested. See [Architecture — Container and performance](../developer-guide/architecture#container-and-performance) for details.
+
+### Logging
+
+The CLI configures structlog automatically; **library embeds must call `configure_logging` once** if you want the same behavior (level, format, noisy third-party logger clamping). Environment variables `COPINANCEOS_LOG_LEVEL` and `COPINANCEOS_LOG_FORMAT` are read through **`Settings`** when you pass them into `configure_logging`.
+
+```python
+from copinance_os.infra.config import get_settings
+from copinance_os.infra.logging import configure_logging
+
+configure_logging(get_settings())
+```
+
+Details, valid levels, `json` vs `console`, and per-logger tuning: [Configuration — Logging](configuration#logging).
 
 ### LLMConfig (required for question-driven analysis)
 

@@ -148,14 +148,15 @@ async def get_market_quote(
     table.add_column("Field", style="cyan")
     table.add_column("Value", style="green")
 
+    vol_raw = quote.get("volume")
     rows = [
         ("Current Price", quote.get("current_price", "N/A")),
         ("Previous Close", quote.get("previous_close", "N/A")),
         ("Open", quote.get("open", "N/A")),
         ("High", quote.get("high", "N/A")),
         ("Low", quote.get("low", "N/A")),
-        ("Volume", quote.get("volume", "N/A")),
-        ("Market Cap", quote.get("market_cap", "N/A")),
+        ("Volume", format_volume(vol_raw) if vol_raw is not None else "N/A"),
+        ("Market Cap", format_compact_number(quote.get("market_cap"))),
         ("Currency", quote.get("currency", "N/A")),
         ("Exchange", quote.get("exchange", "N/A")),
         ("Timestamp", quote.get("timestamp", "N/A")),

@@ -60,7 +60,7 @@ def build_options_positioning(
         calls_work = list(chain_work.calls or [])
         puts_work = list(chain_work.puts or [])
 
-    sorted_exp = sorted_expirations(chain_work, calls_work, puts_work)
+    sorted_exp = sorted_expirations(calls_work, puts_work)
     near_exps = nearest_expirations(sorted_exp, 2)
     requested_exp = near_exps[0] if near_exps else None
     if requested_exp is None:

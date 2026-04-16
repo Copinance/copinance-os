@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from copinance_os.data.analytics.options.positioning.math import safe_float
-from copinance_os.domain.models.market import OptionContract, OptionsChain
+from copinance_os.domain.models.market import OptionContract
 
 
 def numeric_greek(contract: OptionContract, name: str) -> float | None:
@@ -108,20 +108,14 @@ def expiration_sort_key(s: str) -> tuple[int, str]:
     return (1, s)
 
 
-def sorted_expirations(
-    chain: OptionsChain, calls: list[OptionContract], puts: list[OptionContract]
-) -> list[str]:
-    out: set[str] = set()
-    for e in chain.available_expirations or []:
-        if isinstance(e, date):
-            out.add(e.isoformat())
-        elif hasattr(e, "isoformat"):
-            out.add(str(e.date() if isinstance(e, datetime) else e))
-        else:
-            out.add(str(e).strip())
-    for c in (*calls, *puts):
-        out.add(contract_expiration_iso(c))
-    return sorted(out)
+def sorted_expirations(calls: list[OptionContract], puts: list[OptionContract]) -> list[str]:
+    """Return unique expiration ISO strings that appear on at least one leg.
+
+    Provider metadata can list expirations without option rows for that strip;
+    nearest-expiry selection follows contract rows only.
+    """
+    out = {contract_expiration_iso(c) for c in (*calls, *puts)}
+    return sorted(out, key=expiration_sort_key)
 
 
 def nearest_expirations(sorted_exp: list[str], n: int = 2) -> list[str]:

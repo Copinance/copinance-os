@@ -1,5 +1,7 @@
 """Unit tests for main CLI commands."""
 
+import importlib
+
 import pytest
 import typer.testing
 
@@ -41,6 +43,31 @@ class TestMainCLI:
         assert 'copinance "How is Tesla doing financially?"' in epilog
         assert "copinance --json" in epilog
         assert "\n\n" in epilog
+
+    def test_main_configures_logging_before_dispatch(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CLI entry must call configure_logging so console format (e.g. pad_level) applies."""
+        # Package re-exports ``main`` from this submodule, so ``import cli.main`` resolves to
+        # the function; load the module object explicitly.
+        cli_main_module = importlib.import_module("copinance_os.interfaces.cli.main")
+
+        configure_calls: list[object] = []
+
+        def spy_configure(settings: object) -> None:
+            configure_calls.append(settings)
+
+        monkeypatch.setattr("copinance_os.infra.logging.configure_logging", spy_configure)
+        monkeypatch.setattr("dotenv.load_dotenv", lambda: None)
+
+        def boom(argv: list[str]) -> object:
+            raise ZeroDivisionError("stop-parse")
+
+        monkeypatch.setattr(cli_main_module, "parse_root_argv", boom)
+        monkeypatch.setattr("sys.argv", ["copinance", "x"])
+
+        with pytest.raises(ZeroDivisionError, match="stop-parse"):
+            cli_main_module.main()
+
+        assert len(configure_calls) == 1
 
 
 @pytest.mark.unit

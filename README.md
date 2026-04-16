@@ -314,3 +314,15 @@ Apache License 2.0 — see [LICENSE](LICENSE) for details.
 ## Star history
 
 [![Star History Chart](https://api.star-history.com/svg?repos=copinance/copinance-os&type=Timeline)](https://star-history.com/#copinance/copinance-os&Timeline)
+
+
+## VHS
+
+```bash
+copinance profile create --literacy beginner --name "My Profile"
+copinance analyze equity AAPL --timeframe mid_term
+copinance analyze options AAPL
+copinance analyze --stream equity AAPL --question "Explain the current trend"
+copinance analyze macro
+copinance "How is Tesla doing financially?"
+```

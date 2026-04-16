@@ -15,6 +15,13 @@ def main() -> None:
 
     load_dotenv()
 
+    # Apply app logging (structlog processors, console pad_level, JSON when configured).
+    # This module stays Typer/async-free; Settings + logging are lightweight.
+    from copinance_os.infra.config import get_settings
+    from copinance_os.infra.logging import configure_logging
+
+    configure_logging(get_settings())
+
     argv = sys.argv[1:]
     parsed = parse_root_argv(argv)
     if isinstance(parsed, GenericInvocation):

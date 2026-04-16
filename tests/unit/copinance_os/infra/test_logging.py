@@ -2,13 +2,14 @@
 
 import logging
 import os
-import sys
 from io import StringIO
 from unittest.mock import patch
 
 import pytest
 import structlog
+from structlog.dev import ConsoleRenderer
 
+from copinance_os.infra import logging as copinance_logging
 from copinance_os.infra.config import Settings
 from copinance_os.infra.logging import configure_logging, get_logger
 
@@ -138,6 +139,20 @@ class TestConfigureLogging:
         processor_types = [type(p).__name__ for p in processors]
         assert "ConsoleRenderer" in processor_types
 
+        console_renderers = [p for p in processors if isinstance(p, ConsoleRenderer)]
+        assert len(console_renderers) == 1
+        assert console_renderers[0].pad_level is False
+        level_fmt = next(c.formatter for c in console_renderers[0].columns if c.key == "level")
+        assert isinstance(level_fmt, copinance_logging._PaddedAfterBracketLevelFormatter)
+
+    def test_configure_logging_quietens_noisy_stdlib_loggers(self) -> None:
+        """Vendor HTTP/SQL trace loggers stay at WARNING so DEBUG app level is usable."""
+        settings = create_settings(log_level="DEBUG", log_format="console")
+        configure_logging(settings)
+        for name in copinance_logging._NOISY_STD_LIB_LOGGER_NAMES:
+            assert logging.getLogger(name).level == logging.WARNING
+        assert logging.getLogger("asyncio").level == logging.INFO
+
     def test_configure_logging_sets_standard_processors(self) -> None:
         """Test that standard processors are always included."""
         settings = create_settings(log_level="INFO", log_format="json")
@@ -179,7 +194,9 @@ class TestConfigureLogging:
             mock_basic_config.assert_called_once()
             call_kwargs = mock_basic_config.call_args[1]
             assert call_kwargs["format"] == "%(message)s"
-            assert call_kwargs["stream"] == sys.stdout
+            handlers = call_kwargs.get("handlers") or []
+            assert len(handlers) == 1
+            assert isinstance(handlers[0], copinance_logging._FollowingStderrHandler)
             assert call_kwargs["level"] == logging.INFO
 
     def test_configure_logging_json_vs_console_different_processors(self) -> None:
@@ -203,6 +220,19 @@ class TestConfigureLogging:
         assert "ConsoleRenderer" in processors_console
         # They should be different
         assert processors_json != processors_console
+
+
+@pytest.mark.unit
+class TestPaddedAfterBracketLevelFormatter:
+    """Behaviour of the custom level column (no spaces inside brackets)."""
+
+    def test_plain_width_matches_target_for_short_levels(self) -> None:
+        fmt = copinance_logging._PaddedAfterBracketLevelFormatter(
+            {"info": "", "debug": ""},
+            "",
+            target_plain_len=len("[debug]"),
+        )
+        assert len(fmt("level", "info")) == len(fmt("level", "debug"))
 
 
 @pytest.mark.unit
@@ -242,11 +272,11 @@ class TestGetLogger:
         """Test that returned logger can actually log messages."""
         logger = get_logger("test_module")
 
-        # Capture stdout to verify logging works
-        with patch("sys.stdout", new=StringIO()) as mock_stdout:
+        # Capture stderr (app logs use stderr so stdout stays clean for --json / Rich).
+        with patch("sys.stderr", new=StringIO()) as mock_stderr:
             logger.info("test message", key="value")
             # In JSON format, output should contain the message
-            output = mock_stdout.getvalue()
+            output = mock_stderr.getvalue()
             # The exact format depends on structlog configuration, but should contain something
             assert output is not None
 

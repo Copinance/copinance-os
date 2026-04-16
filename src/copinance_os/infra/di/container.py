@@ -121,7 +121,7 @@ class Container(containers.DeclarativeContainer):
         config=_data_providers_config,
     )
 
-    # Profile use cases: resolved without market/fundamentals/cache (fast CLI path).
+    # Profile use cases: resolved without market/fundamentals/cache graph.
     _profile_use_cases_config = providers.Singleton(
         configure_profile_use_cases,
         profile_repository=profile_repository,
