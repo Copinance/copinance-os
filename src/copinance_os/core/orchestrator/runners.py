@@ -54,6 +54,8 @@ class DefaultAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
             "stream": request.stream,
             "no_cache": request.no_cache,
         }
+        if request.financial_literacy is not None:
+            context["financial_literacy"] = request.financial_literacy.value
         if request.run_id is not None:
             context["run_id"] = request.run_id
         if request.conversation_history:
@@ -102,6 +104,8 @@ class DefaultAnalyzeMarketRunner(AnalyzeMarketRunner):
             "stream": request.stream,
             "no_cache": request.no_cache,
         }
+        if request.financial_literacy is not None:
+            context["financial_literacy"] = request.financial_literacy.value
         if request.run_id is not None:
             context["run_id"] = request.run_id
         if request.conversation_history:

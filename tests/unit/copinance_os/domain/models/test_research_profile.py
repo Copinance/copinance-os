@@ -21,7 +21,7 @@ class TestAnalysisProfileModel:
         assert isinstance(profile.preferences, dict)
 
     def test_profile_default_literacy(self) -> None:
-        """Test profile with default literacy level."""
+        """New profiles default to intermediate (aligned with analysis / resolve_financial_literacy)."""
         profile = AnalysisProfile()
 
-        assert profile.financial_literacy == FinancialLiteracy.BEGINNER
+        assert profile.financial_literacy == FinancialLiteracy.INTERMEDIATE

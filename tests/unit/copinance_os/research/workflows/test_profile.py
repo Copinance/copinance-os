@@ -102,7 +102,7 @@ class TestProfileUseCases:
 
         response = await use_case.execute(request)
 
-        assert response.profile.financial_literacy == FinancialLiteracy.BEGINNER
+        assert response.profile.financial_literacy == FinancialLiteracy.INTERMEDIATE
         assert response.profile.display_name is None
         assert response.profile.preferences == {}
 

@@ -24,7 +24,7 @@ profile_app = typer.Typer(help="Analysis profile management commands", no_args_i
 @profile_app.command("create")
 def create_profile(
     literacy: FinancialLiteracy = typer.Option(
-        FinancialLiteracy.BEGINNER, help="Financial literacy level"
+        FinancialLiteracy.INTERMEDIATE, help="Financial literacy level"
     ),
     name: str | None = typer.Option(None, help="Display name for the profile"),
 ) -> None:

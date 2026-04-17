@@ -30,7 +30,7 @@ class AnalysisProfile(Entity):
     """
 
     financial_literacy: FinancialLiteracy = Field(
-        default=FinancialLiteracy.BEGINNER,
+        default=FinancialLiteracy.INTERMEDIATE,
         description="Financial literacy level for output adaptation",
     )
     preferences: dict[str, str] = Field(

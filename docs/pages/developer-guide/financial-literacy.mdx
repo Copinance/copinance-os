@@ -1,0 +1,219 @@
+# Financial literacy integration guide
+
+Copinance OS adapts every text output — LLM responses, regime labels, report summaries, options narration — to the caller's financial literacy tier. This guide covers the three ways to set literacy, how the precedence chain works, and what each tier actually produces.
+
+---
+
+## Tiers
+
+| Value | Enum constant | Who it's for |
+|-------|---------------|--------------|
+| `"beginner"` | `FinancialLiteracy.BEGINNER` | Plain-language summaries; every term defined on first use; no acronym stacks |
+| `"intermediate"` | `FinancialLiteracy.INTERMEDIATE` | Standard market vocabulary; brief glosses for niche concepts; light structure |
+| `"advanced"` | `FinancialLiteracy.ADVANCED` | Institutional vocabulary; second-order effects; options structure; no tutorial copy |
+
+The default when nothing is set is **`intermediate`**.
+
+---
+
+## Precedence
+
+```
+AnalyzeInstrumentRequest.financial_literacy   ← highest priority
+  └─ AnalysisProfile.financial_literacy       ← used when request field is None
+       └─ intermediate (DEFAULT)              ← used when no profile is attached
+                                                (logs a WARNING)
+```
+
+The request field always wins. You do not need a profile to set literacy.
+
+---
+
+## Option 1 — Set literacy on the request (recommended for integrations)
+
+This is the simplest path. No profile, no persistence, no extra round-trip.
+
+```python
+from copinance_os import (
+    AnalyzeInstrumentRequest,
+    AnalyzeMarketRequest,
+    FinancialLiteracy,
+)
+from copinance_os.infra.di import get_container
+
+container = get_container(llm_config=my_llm_config)
+
+# Per-request override — maps directly from your user session
+user_literacy = FinancialLiteracy(user.preferred_literacy)  # e.g. "beginner"
+
+result = await container.analyze_instrument_use_case().execute(
+    AnalyzeInstrumentRequest(
+        symbol="AAPL",
+        question="What is the current options flow telling us?",
+        financial_literacy=user_literacy,
+    )
+)
+```
+
+The same field exists on `AnalyzeMarketRequest`:
+
+```python
+result = await container.analyze_market_use_case().execute(
+    AnalyzeMarketRequest(
+        question="Summarise macro conditions in plain English.",
+        financial_literacy=FinancialLiteracy.BEGINNER,
+    )
+)
+```
+
+**When to use:** server-side apps where your user model already knows the preference, or any context where you want stateless, per-request control.
+
+---
+
+## Option 2 — Persist literacy in a profile (CLI / multi-session apps)
+
+Use profiles when you want the user's preference stored server-side and attached to any request without re-passing it.
+
+```python
+from copinance_os.research.workflows.profile import (
+    CreateProfileRequest,
+    SetCurrentProfileRequest,
+)
+from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.infra.di import get_container
+
+container = get_container()
+
+# Create once per user
+response = await container.create_profile_use_case().execute(
+    CreateProfileRequest(
+        financial_literacy=FinancialLiteracy.INTERMEDIATE,
+        display_name="Alice",
+    )
+)
+profile_id = response.profile.id  # store this in your user DB
+
+# Attach to every request — no financial_literacy field needed
+result = await container.analyze_instrument_use_case().execute(
+    AnalyzeInstrumentRequest(
+        symbol="NVDA",
+        question="What's driving the implied volatility skew?",
+        profile_id=profile_id,        # literacy comes from profile
+        # financial_literacy=None     # (default) — profile fills in
+    )
+)
+```
+
+**Precedence reminder:** if you pass both `profile_id` *and* `financial_literacy` on a request, the `financial_literacy` field wins. This lets you temporarily override a profile without updating it.
+
+---
+
+## Option 3 — Raw job API (advanced)
+
+If you build `Job` objects manually (e.g. custom queue / batch), set `financial_literacy` in the context dict directly:
+
+```python
+from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
+
+job = Job(
+    scope=JobScope.INSTRUMENT,
+    market_type=MarketType.EQUITY,
+    instrument_symbol="TSLA",
+    timeframe=JobTimeframe.MID_TERM,
+    execution_type="question_driven_instrument_analysis",
+    profile_id=None,
+)
+context = {
+    "question": "Explain the Sharpe ratio in simple terms.",
+    "financial_literacy": "beginner",   # string value of the enum
+    "stream": False,
+}
+result = await container.research_orchestrator().run_job(job, context)
+```
+
+`DefaultJobRunner` logs a `WARNING` if `financial_literacy` is absent from the context and no profile is attached. In that case the output defaults to `intermediate`.
+
+---
+
+## What changes between tiers
+
+### LLM (question-driven) responses
+
+The system prompt injects a mandatory output contract block. Each tier has binding rules:
+
+| Tier | Mandatory rules |
+|------|----------------|
+| **beginner** | Lead with one plain-English sentence. Define every finance term on first use. Prefer everyday analogies. No acronym stacks. |
+| **intermediate** | Standard market terms. Brief gloss for less common concepts. Mix intuition with light structure. |
+| **advanced** | Full institutional vocabulary. No tutorial definitions. Chain second-order effects, cross-asset context, options structure directly. |
+
+### Deterministic output (regime labels, macro interpretation, options positioning)
+
+Tiered strings from `data/literacy/` are selected at response time. For example, the `market_regime` literacy module maps `"very_tight"` → `"very tight"` (beginner) / `"very_tight"` (intermediate) / `"very tight labor"` (advanced). Options positioning uses ~40 such mappings covering GEX, vanna, charm, mispricing, and pin risk.
+
+### Report envelope
+
+`summary`, `assumptions`, and `limitations` in `AnalysisReport` use tiered copy from `data/literacy/reports.py`. Machine-readable fields (`key_metrics`, `methodology`) are identical across tiers — only prose changes.
+
+---
+
+## Mapping your user model to literacy tiers
+
+A common pattern is to store literacy as a string column in your user table and convert at request time:
+
+```python
+from copinance_os.domain.literacy import resolve_financial_literacy
+
+# Handles None, unknown strings, and enum values gracefully
+lit = resolve_financial_literacy(user.literacy_preference)  # returns FinancialLiteracy
+
+result = await runner.run(
+    AnalyzeInstrumentRequest(symbol="SPY", financial_literacy=lit)
+)
+```
+
+`resolve_financial_literacy` accepts `None`, any `FinancialLiteracy` enum value, or a raw string (`"beginner"`, `"intermediate"`, `"advanced"`). Unknown values fall back to `intermediate`.
+
+---
+
+## Multi-turn chat
+
+Literacy is per-request, not per-session. For a chat UI, read the user's preference at the start of the session and pass the same `financial_literacy` value on every turn:
+
+```python
+async def handle_chat_turn(
+    user_id: str,
+    message: str,
+    history: list[dict],
+) -> str:
+    user = await db.get_user(user_id)
+    lit = resolve_financial_literacy(user.literacy_preference)
+
+    result = await container.analyze_market_use_case().execute(
+        AnalyzeMarketRequest(
+            question=message,
+            conversation_history=[
+                LLMConversationTurn(**turn) for turn in history
+            ],
+            financial_literacy=lit,
+        )
+    )
+    return result.report.summary if result.report else ""
+```
+
+---
+
+## Checking what tier is active
+
+The executor records `financial_literacy` in structlog context for every run. In structured logs, look for `financial_literacy` on `job_run_start` and `job_run_success` events. In results, `RunJobResult.results` for question-driven runs includes `"financial_literacy"` in the top-level dict.
+
+---
+
+## Common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Passing `financial_literacy="Beginner"` (mixed case) | Use the enum: `FinancialLiteracy.BEGINNER`, or the lowercase string `"beginner"`. `resolve_financial_literacy()` normalises, but be consistent. |
+| Setting literacy on the profile then wondering why the override doesn't work | Request-level `financial_literacy` always wins over the profile. Set it to `None` on the request to let the profile take effect. |
+| Creating profiles defaulting to `beginner` | The default is now `intermediate`. Existing profiles created before this change may have `beginner` stored — migrate or re-create them if needed. |
+| Expecting literacy to affect `key_metrics` numbers | Literacy only changes prose fields (`summary`, `assumptions`, `limitations`, interpretation labels). All numeric values are tier-independent. |

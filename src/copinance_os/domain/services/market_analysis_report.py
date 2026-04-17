@@ -13,8 +13,8 @@ from copinance_os.domain.models.profile import FinancialLiteracy
 def build_market_analysis_report(
     results: dict[str, Any], lit: FinancialLiteracy
 ) -> AnalysisReport | None:
-    resolved_lit = resolve_financial_literacy(lit)
     """Build a report envelope from ``market_analysis`` executor output, if applicable."""
+    resolved_lit = resolve_financial_literacy(lit)
     if results.get("execution_type") != "market_analysis":
         return None
 

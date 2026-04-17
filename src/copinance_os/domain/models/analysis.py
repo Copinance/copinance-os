@@ -15,6 +15,7 @@ from copinance_os.domain.models.llm_conversation import (
     validate_conversation_history_pairs,
 )
 from copinance_os.domain.models.market import MarketType, OptionSide
+from copinance_os.domain.models.profile import FinancialLiteracy
 
 # Executor routing keys (scope + mode)
 INSTRUMENT_DETERMINISTIC_TYPE = "deterministic_instrument_analysis"
@@ -125,6 +126,14 @@ class AnalyzeInstrumentRequest(BaseModel):
         description="Options side hint when market_type is options",
     )
     profile_id: UUID | None = Field(None, description="Profile ID for context")
+    financial_literacy: FinancialLiteracy | None = Field(
+        None,
+        description=(
+            "Literacy tier for output adaptation (beginner/intermediate/advanced). "
+            "Takes precedence over the profile's literacy when set. "
+            "Defaults to the attached profile's level, or intermediate when no profile."
+        ),
+    )
     include_prompt_in_results: bool = Field(
         False,
         description="Whether to include rendered prompts in question-driven results",
@@ -220,6 +229,14 @@ class AnalyzeMarketRequest(BaseModel):
     include_global: bool = Field(True, description="Include global indicators")
     include_advanced: bool = Field(True, description="Include advanced indicators")
     profile_id: UUID | None = Field(None, description="Profile ID for context")
+    financial_literacy: FinancialLiteracy | None = Field(
+        None,
+        description=(
+            "Literacy tier for output adaptation (beginner/intermediate/advanced). "
+            "Takes precedence over the profile's literacy when set. "
+            "Defaults to the attached profile's level, or intermediate when no profile."
+        ),
+    )
     include_prompt_in_results: bool = Field(
         False,
         description="Whether to include rendered prompts in question-driven results",

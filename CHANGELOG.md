@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Library — `financial_literacy` on analyze requests & stable imports**: Optional **`financial_literacy`** on **`AnalyzeInstrumentRequest`** / **`AnalyzeMarketRequest`** overrides the attached profile tier; **`copinance_os`** re-exports **`AnalyzeInstrumentRequest`**, **`AnalyzeMarketRequest`**, **`AnalyzeMode`**, **`RunJobResult`**, **`AnalysisReport`**, **`AnalysisProfile`**, and **`FinancialLiteracy`** for a single import path. Developer guide **`financial-literacy.mdx`** (nav **Financial literacy (clients)**); **Using as a Library** documents request-level literacy, precedence, and the intermediate default.
 - **CLI — async commands**: Transient Rich **dots** spinner on **stderr** while **`async_command`** runs in an interactive terminal; suppressed for **`--json`** (machine-readable stdout) and non-TTY environments.
 - **Transparency contract — options positioning + Greeks methodology (breaking)**: Methodology is now standardized through shared **`AnalysisMethodology`** / **`MethodologySpec`** value objects. `OptionsPositioningResult`, `AnalysisReport`, market-regime outputs, and backtest outputs all use the same structured envelope.
 - **Financial literacy — options positioning copy**: `domain.literacy` (`TieredCopy`, `resolve_financial_literacy`, `financial_literacy_prompt_value`) and `data.literacy.options_positioning` tiered strings remain the narrative layer; aggregate positioning via `build_options_positioning` adapts signal names/explanations and `analyst_summary` for **beginner** / **intermediate** / **advanced**.
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Financial literacy — defaults, job context, and macro cache**: **`AnalysisProfile`**, **`CreateProfileRequest`**, **`copinance profile create`**, and Typer-built analyze defaults use **`INTERMEDIATE`** (was beginner). **`DefaultAnalyzeInstrumentRunner`** / **`DefaultAnalyzeMarketRunner`** forward non-**`None`** request **`financial_literacy`** into job context; **`DefaultJobRunner`** no longer replaces an already-set request value with the profile. **`MacroRegimeIndicatorsTool`** stores **`_raw_interpretation`** in cached blocks and applies tiered **`interpretation`** strings per resolved literacy at read time (literacy-neutral cache entries).
 - **Market regime (rule-based tools)**: Trend and volatility detector payloads now keep **canonical `regime` codes** for structured consumers and expose tiered copy as **`regime_label`** (literacy-aware), instead of overwriting **`regime`** with display strings.
 - **Question-driven analysis**: System prompt stresses **one literacy tier at a time** (no mixed tone); beginner guidance defines unavoidable jargon on first use. Executor structlog context binds **`financial_literacy`** for observability.
 - **Settings / DI — import and startup cost**: **`get_settings()`** returns a process-wide cached **`Settings`** instance (docstring notes how tests can reset). **`copinance_os.infra.di`** lazily resolves **`Container`** / **`get_container`** via **`__getattr__`** so importing the package does not pull in **`container.py`**. **`infra/di/container.py`**, **`data_providers.py`**, and market **`use_cases.py`** defer heavy vendor imports to **`configure_*`** bodies or **`_make_*`** factory helpers; profile providers live in **`infra/di/profile_use_cases.py`**. **`infra/logging.py`** defers **`structlog.dev`** imports until the aligned console renderer is built.
@@ -82,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Docs — library literacy example**: Replaced smart quotes in the **Using as a Library** Python snippet with ASCII string literals so the sample is valid Python.
 - **yfinance quotes**: Intraday quote `volume` prefers a whole-session sum from 1m history when available (latest bar volume is often zero); `info` volume fields use safe integer coercion with fallbacks (`regularMarketVolume`, `volume`, `averageVolume`, `averageDailyVolume3Month`).
 - **Options positioning tests**: Regenerated `tests/fixtures/options_positioning/toy_near.json` to match updated methodology reference metadata and keep golden-fixture regression assertions in sync.
 - **Fundamentals use case**: `GetStockFundamentalsUseCase` rejects **`periods < 1`** with **`ValidationError`** (**`periods must be at least 1`**) after the workflow refactor briefly allowed invalid counts to reach the provider.

@@ -15,7 +15,7 @@ class CreateProfileRequest(BaseModel):
     """Request to create a new analysis profile."""
 
     financial_literacy: FinancialLiteracy = Field(
-        default=FinancialLiteracy.BEGINNER, description="Financial literacy level"
+        default=FinancialLiteracy.INTERMEDIATE, description="Financial literacy level"
     )
     display_name: str | None = Field(None, description="Optional display name")
     preferences: dict[str, str] = Field(default_factory=dict, description="Analysis preferences")

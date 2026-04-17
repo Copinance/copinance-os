@@ -350,7 +350,7 @@ Built-in executors read mode-specific options from the **context** dict (second 
 
 - **`deterministic_instrument_analysis`** — Instrument scope, deterministic equity/options analysis. Context may include `expiration_date` (single expiry), **`expiration_dates`** (list of YYYY-MM-DD strings, merged with `expiration_date` when both are set), **`option_side`** for options, and **`positioning_window`**: `"near"` (default) or `"mid"` for aggregate options positioning when **`market_type`** is options (single-expiry instrument runs include **`positioning`** in executor results; multi-expiry runs omit it).
 - **`deterministic_market_analysis`** — Market scope, deterministic macro regime dashboard. Context includes `market_index`, `lookback_days`, and `include_*` booleans.
-- **Literacy context (all modes)** — Optional `financial_literacy` (`beginner` / `intermediate` / `advanced`) controls tiered deterministic narration in summaries, regime/macro labels, and report-envelope text. If omitted, default is `intermediate`.
+- **Literacy context (all modes)** — `financial_literacy` (`beginner` / `intermediate` / `advanced`) controls tiered deterministic narration in summaries, regime/macro labels, and report-envelope text. **Set it directly on the request** (`financial_literacy=FinancialLiteracy.BEGINNER`) — no profile needed. Falls back to the attached profile's literacy when omitted from the request, then to `intermediate`. See [Financial literacy integration guide](../developer-guide/financial-literacy).
 - **`question_driven_instrument_analysis`** — Instrument scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, optional **`conversation_history`** (list of `{"role","content"}` dicts: alternating user/assistant, ending with assistant), optional options context, `stream`, optional **`run_id`** (correlation for logs and UI), optional **`progress_sink`** (see [Gateway, chat UI, and agent progress](#gateway-chat-ui-and-agent-progress)), optional **`include_agent_progress_timeline`** (default: true — adds **`results["agent_progress_timeline"]`** for REST/SSE summaries; see [developer guide](../developer-guide/agent-progress-client-integration)), and `include_prompt`.
 - **`question_driven_market_analysis`** — Market scope, tool-using analysis; requires `LLMConfig`. Context includes `question`, optional **`conversation_history`** (same shape), `market_index`, `stream`, optional **`run_id`**, optional **`progress_sink`**, the same optional **`include_agent_progress_timeline`**, and `include_prompt`.
 
@@ -730,8 +730,8 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 
 | Use case | Request | Response | Request fields |
 |----------|---------|----------|----------------|
-| Analyze instrument | `AnalyzeInstrumentRequest` | `RunJobResult` | `symbol` (required), `market_type` (`MarketType.EQUITY` / `OPTIONS`, default `EQUITY`), `timeframe` (optional; defaults by market type), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `expiration_date` (optional YYYY-MM-DD), **`expiration_dates`** (optional list of YYYY-MM-DD; merged with `expiration_date`), `option_side`, **`positioning_window`** (`"near"` \| `"mid"`; options only), `profile_id`, `include_prompt_in_results`, `stream` |
-| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, `include_prompt_in_results`, `stream` |
+| Analyze instrument | `AnalyzeInstrumentRequest` | `RunJobResult` | `symbol` (required), `market_type` (`MarketType.EQUITY` / `OPTIONS`, default `EQUITY`), `timeframe` (optional; defaults by market type), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `expiration_date` (optional YYYY-MM-DD), **`expiration_dates`** (optional list of YYYY-MM-DD; merged with `expiration_date`), `option_side`, **`positioning_window`** (`"near"` \| `"mid"`; options only), `profile_id`, **`financial_literacy`** (`FinancialLiteracy` or `None`; takes precedence over profile), `include_prompt_in_results`, `stream` |
+| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, **`financial_literacy`** (`FinancialLiteracy` or `None`; takes precedence over profile), `include_prompt_in_results`, `stream` |
 
 **Ports for custom runners:** `AnalyzeInstrumentRunner` and `AnalyzeMarketRunner` in **`copinance_os.domain.ports.analysis_execution`** — each: `async def run(self, request: ...Request) -> RunJobResult`.
 
@@ -741,7 +741,7 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 
 | Use case | Request | Response | Request fields |
 |----------|---------|----------|----------------|
-| Create profile | `CreateProfileRequest` | `CreateProfileResponse` | `financial_literacy` (`FinancialLiteracy.BEGINNER` / `INTERMEDIATE` / `ADVANCED`), `display_name`, `preferences: dict[str, str]` |
+| Create profile | `CreateProfileRequest` | `CreateProfileResponse` | `financial_literacy` (`FinancialLiteracy.BEGINNER` / `INTERMEDIATE` / `ADVANCED`, default `INTERMEDIATE`), `display_name`, `preferences: dict[str, str]` |
 | Get profile | `GetProfileRequest` | `GetProfileResponse` | `profile_id: UUID` |
 | List profiles | `ListProfilesRequest` | `ListProfilesResponse` | `limit` (default `100`), `offset` (default `0`) |
 | Get current profile | `GetCurrentProfileRequest` | `GetCurrentProfileResponse` | (no fields) |
@@ -821,9 +821,25 @@ By default, analyze uses **runners** that build a `Job` and call **`ResearchOrch
 
 Profiles store **financial literacy level** and preferences; they are not user accounts. Your app owns users and auth; you map users to profile IDs if you want.
 
-- **Create a profile:** use `create_profile_use_case()` with literacy (e.g. `beginner`, `intermediate`, `advanced`) and optional name.
-- **Attach to a job:** set `job.profile_id` to the profile UUID. The runner will pass literacy and preferences into the analysis context.
-- **Current profile:** the container has a “current profile” (used by CLI). In a library you can ignore it and always set `profile_id` on the job, or use `set_current_profile_use_case()` and leave `profile_id` unset to use current.
+**Literacy without profiles (recommended for integrations):** Set `financial_literacy` directly on the request. No profile needs to exist:
+
+```python
+from copinance_os import AnalyzeInstrumentRequest, FinancialLiteracy
+
+request = AnalyzeInstrumentRequest(
+    symbol="AAPL",
+    question="What does the options positioning say?",
+    financial_literacy=FinancialLiteracy.BEGINNER,  # no profile_id needed
+)
+```
+
+**Profiles as user preference storage:** Useful when you want to persist a user's preferred literacy across sessions. Map your users to profile UUIDs and pass `profile_id` on the request. The request-level `financial_literacy` field always takes precedence over the profile when both are set.
+
+- **Create a profile:** use `create_profile_use_case()` with literacy (`BEGINNER` / `INTERMEDIATE` / `ADVANCED`, default `INTERMEDIATE`) and optional name.
+- **Attach to a request:** pass `profile_id=<uuid>` on `AnalyzeInstrumentRequest` / `AnalyzeMarketRequest`. The runner reads literacy from the profile when `financial_literacy` is not set on the request.
+- **Current profile:** the container has a “current profile” (used by CLI). Library integrations should ignore it and always pass `profile_id` or `financial_literacy` explicitly.
+
+See [Financial literacy integration guide](../developer-guide/financial-literacy) for a full walkthrough.
 
 ---
 

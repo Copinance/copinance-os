@@ -15,8 +15,8 @@ from copinance_os.domain.models.profile import FinancialLiteracy
 def build_question_driven_analysis_report(
     results: dict[str, Any], lit: FinancialLiteracy
 ) -> AnalysisReport | None:
-    resolved_lit = resolve_financial_literacy(lit)
     """Build a report envelope from ``question_driven_analysis`` executor output, if applicable."""
+    resolved_lit = resolve_financial_literacy(lit)
     if results.get("execution_type") != "question_driven_analysis":
         return None
 

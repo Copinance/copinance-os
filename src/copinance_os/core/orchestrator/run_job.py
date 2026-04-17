@@ -64,10 +64,17 @@ class DefaultJobRunner(JobRunner):
         if job.profile_id and self._profile_repository:
             profile = await self._profile_repository.get_by_id(job.profile_id)
             if profile:
-                out["financial_literacy"] = profile.financial_literacy.value
+                # Request-level financial_literacy takes precedence over profile value
+                if "financial_literacy" not in out:
+                    out["financial_literacy"] = profile.financial_literacy.value
                 out["profile_preferences"] = profile.preferences
                 if profile.display_name:
                     out["profile_display_name"] = profile.display_name
+        if "financial_literacy" not in out:
+            logger.warning(
+                "financial_literacy not in context and no profile attached; defaulting to intermediate",
+                execution_type=job.execution_type,
+            )
         return out
 
     async def run(self, job: Job, context: dict[str, Any]) -> RunJobResult:

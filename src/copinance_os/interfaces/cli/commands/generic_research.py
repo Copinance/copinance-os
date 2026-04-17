@@ -47,6 +47,7 @@ async def run_generic_research(
         include_global=True,
         include_advanced=True,
         profile_id=final_profile_id,
+        financial_literacy=None,
         include_prompt_in_results=include_prompt_in_results,
         stream=stream and not json_output,
         run_id=None,

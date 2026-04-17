@@ -47,16 +47,35 @@ class MacroRegimeIndicatorsTool(Tool):
         self._macro_provider = macro_data_provider
         self._market_provider = market_data_provider
         self._cache_manager = cache_manager
-        self._financial_literacy: FinancialLiteracy = resolve_financial_literacy(None)
 
-    def _apply_literacy_to_interpretation(self, interpretation: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _apply_literacy_to_interpretation(
+        interpretation: dict[str, Any], lit: FinancialLiteracy
+    ) -> dict[str, Any]:
+        """Translate raw coded interpretation values to tiered prose strings."""
         out: dict[str, Any] = {}
         for key, value in interpretation.items():
             if isinstance(value, str):
-                out[key] = macro_lit.interpret_label(value, self._financial_literacy)
+                out[key] = macro_lit.interpret_label(value, lit)
             else:
                 out[key] = value
         return out
+
+    @staticmethod
+    def _resolve_block_literacy(block: dict[str, Any], lit: FinancialLiteracy) -> dict[str, Any]:
+        """Apply literacy to a cached block's raw interpretation codes.
+
+        Blocks store raw coded strings under ``_raw_interpretation`` so that
+        cached data is literacy-neutral and can be served to any caller tier.
+        """
+        raw = block.get("_raw_interpretation")
+        if not raw:
+            return block
+        result = {k: v for k, v in block.items() if k != "_raw_interpretation"}
+        result["interpretation"] = MacroRegimeIndicatorsTool._apply_literacy_to_interpretation(
+            raw, lit
+        )
+        return result
 
     async def _get_block_cached(
         self, block_name: str, start_date: datetime, end_date: datetime
@@ -199,9 +218,7 @@ class MacroRegimeIndicatorsTool(Tool):
             include_consumer = bool(validated.get("include_consumer", True))
             include_global = bool(validated.get("include_global", True))
             include_advanced = bool(validated.get("include_advanced", True))
-            self._financial_literacy = resolve_financial_literacy(
-                validated.get("financial_literacy")
-            )
+            lit = resolve_financial_literacy(validated.get("financial_literacy"))
 
             end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=lookback_days + 30)
@@ -212,31 +229,49 @@ class MacroRegimeIndicatorsTool(Tool):
             }
 
             if include_rates:
-                data["rates"] = await self._get_rates_block(start_date, end_date)
+                data["rates"] = self._resolve_block_literacy(
+                    await self._get_rates_block(start_date, end_date), lit
+                )
 
             if include_credit:
-                data["credit"] = await self._get_credit_block(start_date, end_date)
+                data["credit"] = self._resolve_block_literacy(
+                    await self._get_credit_block(start_date, end_date), lit
+                )
 
             if include_commodities:
-                data["commodities"] = await self._get_commodities_block(start_date, end_date)
+                data["commodities"] = self._resolve_block_literacy(
+                    await self._get_commodities_block(start_date, end_date), lit
+                )
 
             if include_labor:
-                data["labor"] = await self._get_labor_block(start_date, end_date)
+                data["labor"] = self._resolve_block_literacy(
+                    await self._get_labor_block(start_date, end_date), lit
+                )
 
             if include_housing:
-                data["housing"] = await self._get_housing_block(start_date, end_date)
+                data["housing"] = self._resolve_block_literacy(
+                    await self._get_housing_block(start_date, end_date), lit
+                )
 
             if include_manufacturing:
-                data["manufacturing"] = await self._get_manufacturing_block(start_date, end_date)
+                data["manufacturing"] = self._resolve_block_literacy(
+                    await self._get_manufacturing_block(start_date, end_date), lit
+                )
 
             if include_consumer:
-                data["consumer"] = await self._get_consumer_block(start_date, end_date)
+                data["consumer"] = self._resolve_block_literacy(
+                    await self._get_consumer_block(start_date, end_date), lit
+                )
 
             if include_global:
-                data["global"] = await self._get_global_block(start_date, end_date)
+                data["global"] = self._resolve_block_literacy(
+                    await self._get_global_block(start_date, end_date), lit
+                )
 
             if include_advanced:
-                data["advanced"] = await self._get_advanced_block(start_date, end_date)
+                data["advanced"] = self._resolve_block_literacy(
+                    await self._get_advanced_block(start_date, end_date), lit
+                )
 
             return ToolResult(success=True, data=data, metadata={"lookback_days": lookback_days})
         except Exception as e:
@@ -346,7 +381,7 @@ class MacroRegimeIndicatorsTool(Tool):
                     )
 
                 if interpretation:
-                    out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                    out["_raw_interpretation"] = interpretation
                 logger.info("Successfully fetched rates from FRED", series_count=len(fred_series))
                 await self._set_block_cached("rates", start_date, end_date, out)
                 return out
@@ -489,7 +524,7 @@ class MacroRegimeIndicatorsTool(Tool):
                     )
 
                 if interpretation:
-                    out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                    out["_raw_interpretation"] = interpretation
                 logger.info("Successfully fetched credit spreads from FRED")
                 await self._set_block_cached("credit", start_date, end_date, out)
                 return out
@@ -569,15 +604,12 @@ class MacroRegimeIndicatorsTool(Tool):
                         pct = float(
                             (pts[-1].value - pts[0].value) / pts[0].value * _safe_decimal(100)
                         )
-                        out["interpretation"] = {
+                        out["_raw_interpretation"] = {
                             "energy_impulse": (
                                 "cooling" if pct < -5 else ("heating" if pct > 5 else "flat")
                             ),
                             "wti_change_20d_pct": round(pct, 2),
                         }
-                        out["interpretation"] = self._apply_literacy_to_interpretation(
-                            out["interpretation"]
-                        )
                 logger.info("Successfully fetched commodities from FRED")
                 await self._set_block_cached("commodities", start_date, end_date, out)
                 return out
@@ -674,7 +706,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                out["_raw_interpretation"] = interpretation
 
             logger.info("Successfully fetched labor market indicators from FRED")
             await self._set_block_cached("labor", start_date, end_date, out)
@@ -751,7 +783,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                out["_raw_interpretation"] = interpretation
 
             logger.info("Successfully fetched housing indicators from FRED")
             await self._set_block_cached("housing", start_date, end_date, out)
@@ -836,7 +868,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                out["_raw_interpretation"] = interpretation
 
             logger.info("Successfully fetched manufacturing indicators from FRED")
             await self._set_block_cached("manufacturing", start_date, end_date, out)
@@ -950,7 +982,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 interpretation["saving_rate_current"] = round(save_rate, 1)
 
             if interpretation:
-                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                out["_raw_interpretation"] = interpretation
 
             logger.info("Successfully fetched consumer indicators from FRED")
             await self._set_block_cached("consumer", start_date, end_date, out)
@@ -1050,7 +1082,7 @@ class MacroRegimeIndicatorsTool(Tool):
                 )
 
             if interpretation:
-                out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                out["_raw_interpretation"] = interpretation
 
             logger.info("Successfully fetched global indicators")
             await self._set_block_cached("global", start_date, end_date, out)
@@ -1107,7 +1139,7 @@ class MacroRegimeIndicatorsTool(Tool):
                     interpretation["fed_balance_sheet_trillions"] = round(bs_size / 1000, 2)
 
                 if interpretation:
-                    out["interpretation"] = self._apply_literacy_to_interpretation(interpretation)
+                    out["_raw_interpretation"] = interpretation
 
                 logger.info("Successfully fetched advanced FRED indicators")
             except Exception as e:
