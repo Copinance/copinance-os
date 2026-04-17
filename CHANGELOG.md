@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Market regime (rule-based tools)**: Trend and volatility detector payloads now keep **canonical `regime` codes** for structured consumers and expose tiered copy as **`regime_label`** (literacy-aware), instead of overwriting **`regime`** with display strings.
+- **Question-driven analysis**: System prompt stresses **one literacy tier at a time** (no mixed tone); beginner guidance defines unavoidable jargon on first use. Executor structlog context binds **`financial_literacy`** for observability.
 - **Settings / DI — import and startup cost**: **`get_settings()`** returns a process-wide cached **`Settings`** instance (docstring notes how tests can reset). **`copinance_os.infra.di`** lazily resolves **`Container`** / **`get_container`** via **`__getattr__`** so importing the package does not pull in **`container.py`**. **`infra/di/container.py`**, **`data_providers.py`**, and market **`use_cases.py`** defer heavy vendor imports to **`configure_*`** bodies or **`_make_*`** factory helpers; profile providers live in **`infra/di/profile_use_cases.py`**. **`infra/logging.py`** defers **`structlog.dev`** imports until the aligned console renderer is built.
 - **Options positioning input semantics (breaking)**: Aggregate positioning now treats missing contract Greeks/OI/volume as unavailable inputs (skipped in computations) rather than fallback zeroes; unavailable downstream fields stay explicit `null`.
 - **Options positioning boundary validation**: `build_options_positioning` now raises domain `ValidationError` when no contracts/expiry are available for the requested positioning window instead of returning a silent empty payload.

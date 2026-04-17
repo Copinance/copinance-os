@@ -438,7 +438,9 @@ class MarketRegimeDetectTrendTool(Tool):
 
             result = {
                 "symbol": symbol,
-                "regime": mr_lit.trend_regime_label(regime, financial_literacy),
+                # Canonical codes for structured consumers (e.g. MarketTrendData); see regime_label for tiered copy.
+                "regime": regime,
+                "regime_label": mr_lit.trend_regime_label(regime, financial_literacy),
                 "confidence": confidence,
                 "current_price": current_price,
                 "price_change_pct": round(price_change_pct, 2),  # Log-return as percentage
@@ -668,7 +670,8 @@ class MarketRegimeDetectVolatilityTool(Tool):
 
             result = {
                 "symbol": symbol,
-                "regime": mr_lit.volatility_regime_label(regime, financial_literacy),
+                "regime": regime,
+                "regime_label": mr_lit.volatility_regime_label(regime, financial_literacy),
                 "current_volatility": round(current_vol * 100, 2),  # As percentage
                 "mean_volatility": round(mean_vol * 100, 2),
                 "max_volatility": round(max_vol * 100, 2),

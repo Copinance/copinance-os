@@ -363,6 +363,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             symbol=symbol,
             tool_count=len(tools),
             provider=llm_provider.get_provider_name(),
+            financial_literacy=financial_literacy,
         )
 
         stream = bool(context.get("stream"))
