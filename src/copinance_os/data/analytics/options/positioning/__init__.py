@@ -1,9 +1,11 @@
 """Aggregate options-chain positioning analytics."""
 
+from copinance_os.data.analytics.options.positioning.bias import signal_agreement_direction
 from copinance_os.data.analytics.options.positioning.config import (
     DEFAULT_POSITIONING_METHODOLOGY,
     PositioningMethodology,
 )
+from copinance_os.data.analytics.options.positioning.iv_rank import iv_percentile_rank
 from copinance_os.data.analytics.options.positioning.runner import (
     build_options_positioning,
     compute_options_positioning_context,
@@ -14,4 +16,6 @@ __all__ = [
     "PositioningMethodology",
     "build_options_positioning",
     "compute_options_positioning_context",
+    "signal_agreement_direction",
+    "iv_percentile_rank",
 ]

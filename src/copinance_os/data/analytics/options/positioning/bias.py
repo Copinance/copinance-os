@@ -126,6 +126,20 @@ def apply_window_to_bias_score(score: float, window: str, config: BiasConfig) ->
     return score
 
 
+def signal_agreement_direction(agreement: str) -> str:
+    """Map a :data:`SignalAgreement` value to a tri-state direction string.
+
+    Returns ``"bullish"``, ``"bearish"``, or ``"neutral"`` (for ``"mixed"``).
+    Consumers use this when they need a simple directional chip rather than the
+    full agreement strength (e.g. sector treemap options-flow indicators).
+    """
+    if "bullish" in agreement:
+        return "bullish"
+    if "bearish" in agreement:
+        return "bearish"
+    return "neutral"
+
+
 def bias_probabilities(score: float) -> tuple[float, float, float]:
     bullish_probability = sigmoid(score)
     bearish_probability = sigmoid(-score)

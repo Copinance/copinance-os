@@ -144,6 +144,7 @@ container = get_container(
     cache_manager=None,                # optional; use your own CacheManager
     storage_type=None,                 # optional; "file" | "memory" to override settings
     storage_path=None,                 # optional; root path for file storage
+    storage_backend=None,              # optional; custom Storage instance (Tier 1 persistence)
 )
 ```
 
@@ -153,6 +154,7 @@ container = get_container(
 - **`prompt_templates`** / **`prompt_manager`:** Optional. See [Prompt templates](#prompt-templates) below.
 - **`cache_enabled`** / **`cache_manager`:** Optional. See [Cache](#cache) below.
 - **`storage_type`** / **`storage_path`:** Optional. See [Storage and Persistence](#storage-and-persistence) below. Use `storage_type="memory"` to avoid creating a `.copinance` directory on disk.
+- **`storage_backend`:** Optional. Pass a concrete `Storage` instance (Tier 1 persistence — custom file format, SQLite, S3). Takes precedence over `storage_type`/`storage_path`. For async databases (Postgres), implement the `StockRepository` / `AnalysisProfileRepository` ABCs instead and override them on the container after creation (Tier 2).
 
 **Performance:** The container is created only on first use (lazy proxy), and use cases and providers are singletons created when first requested. See [Architecture — Container and performance](../developer-guide/architecture#container-and-performance) for details.
 
@@ -589,6 +591,33 @@ market_question_res = await market_uc.execute(
 )
 ```
 
+### Example: LLM market narrative
+
+`GenerateMarketNarrativeUseCase` generates a short prose summary of current market conditions. It runs deterministic analysis internally to ground the text in real data, then calls the LLM. When no LLM is configured (or the LLM call fails), a deterministic template is returned and `result.fallback` is `True`.
+
+```python
+from copinance_os import MarketNarrativeRequest, NarrativeResult, FinancialLiteracy
+from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+
+container = get_container(
+    llm_config=LLMConfig(provider="openai", api_key="sk-..."),
+)
+narrative_uc = container.generate_market_narrative_use_case()
+result: NarrativeResult = await narrative_uc.execute(
+    MarketNarrativeRequest(
+        market_index="SPY",
+        financial_literacy=FinancialLiteracy.BEGINNER,
+    )
+)
+print(result.narrative)      # e.g. "Markets are trending upward with low volatility…"
+print(result.fallback)       # True when LLM was unavailable; deterministic template used
+```
+
+Both `MarketNarrativeRequest` and `NarrativeResult` are importable directly from `copinance_os`.
+
+---
+
 ### Multi-turn question-driven analysis
 
 This section is **Python-only**; the CLI cannot supply **`conversation_history`** (see the note at the top of this page). Use this when the user’s **new** question should see **prior** user/assistant messages from an earlier run (same symbol / market scope). Each LLM provider maps history to its native chat API (**Gemini** `Content` list + **systemInstruction**; **OpenAI** Chat Completions **`messages`**; **Ollama** `/api/chat` **`messages`**).
@@ -697,6 +726,7 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 | | `container.analyze_market_runner()` | `AnalyzeMarketRunner` impl | Default: builds Job, calls `ResearchOrchestrator.run_job` |
 | **Orchestration** | `container.research_orchestrator()` | `ResearchOrchestrator` | **Preferred:** `run_job(job, context)` (wraps `JobRunner` internally) |
 | | `container.analysis_executors()` | `list[AnalysisExecutor]` | Registered analysis executors (advanced: validate/execute yourself) |
+| **Narrative** | `container.generate_market_narrative_use_case()` | `GenerateMarketNarrativeUseCase` | LLM prose summary of current market conditions (falls back to deterministic template when LLM unavailable) |
 | **Profiles** | `container.create_profile_use_case()` | `CreateProfileUseCase` | Create analysis profile |
 | | `container.get_profile_use_case()` | `GetProfileUseCase` | Get profile by ID |
 | | `container.list_profiles_use_case()` | `ListProfilesUseCase` | List profiles (paginated) |
@@ -768,6 +798,8 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 | `JobTimeframe` | `copinance_os.domain.models.job` | `SHORT_TERM`, `MID_TERM`, `LONG_TERM` |
 | `MarketType` | `copinance_os.domain.models.market` | `EQUITY`, `OPTIONS` |
 | `OptionSide` | `copinance_os.domain.models.market` | `CALL`, `PUT`, `ALL` |
+| `MarketNarrativeRequest` | `copinance_os.domain.models.narrative` | `market_index` (default `"SPY"`), `financial_literacy`, `no_cache` |
+| `NarrativeResult` | `copinance_os.domain.models.narrative` | `narrative` (prose string), `literacy`, `market_index`, `generated_at`, `fallback` (`True` when LLM unavailable) |
 | `LLMConversationTurn` | `copinance_os.domain.models.llm_conversation` | `role` (`user` / `assistant`), `content`; used for **`conversation_history`** on analyze requests |
 | `MarketDataPoint` | `copinance_os.domain.models.market` | OHLCV + symbol, timestamp |
 | `OptionsChain` | `copinance_os.domain.models.market` | `underlying_symbol`, `expiration_date`, `calls`, `puts`, `underlying_price`, etc. |
@@ -866,7 +898,37 @@ The **`.copinance`** directory (e.g. `data/`, `equities.json`) is created by the
 
 For a long-running app you may want file persistence: keep the default (or set `storage_type="file"` and optionally `storage_path`). In-memory storage loses data when the process exits.
 
-The library does not impose a database. You can implement the repository and storage ports (see [Developer Guide](../developer-guide/extending)) and wire them into the container if you need PostgreSQL, MongoDB, etc.
+**Two-tier persistence model:**
+
+Copinance OS is a *computation library*, not a data store. Consumers own persistence; copinance-os produces clean Pydantic results. Use `.model_dump(mode="json")` to serialise and store results wherever you want.
+
+| Tier | When to use | How |
+|------|------------|-----|
+| **Tier 1 — custom `Storage`** | File-format alternatives, SQLite, S3 | Implement `Storage` ABC from `copinance_os.domain.ports.storage` and pass it as `storage_backend` to `get_container()`. `save()` must be atomic. |
+| **Tier 2 — async repository** | Postgres, any async DB | Implement `StockRepository` or `AnalysisProfileRepository` ABC from `copinance_os.domain.ports.repositories`. Override on the container after creation via `container.stock_repository.override(providers.Object(my_repo))`. The `Storage` ABC is synchronous and collection-based — it does not fit async databases; use this tier instead. |
+
+```python
+# Tier 1: custom Storage (e.g. S3-backed)
+from copinance_os import Storage
+from copinance_os.infra.di import get_container
+
+class S3Storage(Storage):
+    ...  # implement get_collection / save / clear
+
+container = get_container(storage_backend=S3Storage(bucket="my-bucket"))
+
+# Tier 2: custom async repository (e.g. Postgres)
+from copinance_os import StockRepository
+from dependency_injector import providers
+
+class PostgresStockRepository(StockRepository):
+    ...  # implement async methods against your DB pool
+
+container = get_container()
+container.stock_repository.override(providers.Object(PostgresStockRepository(pool=pg_pool)))
+```
+
+Both `Storage`, `CacheBackend`, `StockRepository`, and `AnalysisProfileRepository` ABCs are re-exported from `copinance_os` root for library consumers' convenience.
 
 ---
 
