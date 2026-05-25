@@ -10,7 +10,7 @@ Profile use cases live in ``infra.di.profile_use_cases`` (no heavy deps).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from dependency_injector import providers
 
@@ -70,6 +70,9 @@ def configure_use_cases(
         GetOptionsChainUseCase,
         GetQuoteUseCase,
         SearchInstrumentsUseCase,
+    )
+    from copinance_os.research.workflows.narrative import (  # noqa: PLC0415
+        GenerateMarketNarrativeUseCase,
     )
 
     # Market instrument use cases
@@ -133,6 +136,37 @@ def configure_use_cases(
         job_runner=job_runner,
     )
 
+    # Narrative use case — needs the analyze_market_runner and, when available, an LLM provider.
+    # The LLM provider is resolved lazily inside the factory so LLM SDKs only load if configured.
+    def _make_analyze_market_runner_for_narrative() -> Any:
+        from copinance_os.core.orchestrator.runners import (  # noqa: PLC0415
+            DefaultAnalyzeMarketRunner,
+        )
+
+        return DefaultAnalyzeMarketRunner(research_orchestrator=research_orchestrator())
+
+    def _make_llm_provider_for_narrative() -> Any:
+        if llm_config is None:
+            return None
+        try:
+            from copinance_os.ai.llm.providers.factory import LLMProviderFactory  # noqa: PLC0415
+
+            provider_name = LLMProviderFactory.get_provider_for_execution_type(
+                "question_driven_analysis", llm_config=llm_config
+            )
+            from copinance_os.ai.llm.analyzer_factory import LLMAnalyzerFactory  # noqa: PLC0415
+
+            analyzer = LLMAnalyzerFactory.create(provider_name, llm_config=llm_config)
+            return getattr(analyzer, "_llm_provider", None)
+        except Exception:
+            return None
+
+    generate_market_narrative_use_case = providers.Factory(
+        GenerateMarketNarrativeUseCase,
+        analyze_market_runner=providers.Callable(_make_analyze_market_runner_for_narrative),
+        llm_provider=providers.Callable(_make_llm_provider_for_narrative),
+    )
+
     return {
         "get_instrument_use_case": get_instrument_use_case,
         "search_instruments_use_case": search_instruments_use_case,
@@ -142,4 +176,5 @@ def configure_use_cases(
         "get_stock_fundamentals_use_case": get_stock_fundamentals_use_case,
         "analysis_executors": analysis_executors,
         "research_orchestrator": research_orchestrator,
+        "generate_market_narrative_use_case": generate_market_narrative_use_case,
     }

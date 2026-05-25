@@ -274,6 +274,10 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["analysis_executors"](),
         config=_use_cases_config,
     )
+    generate_market_narrative_use_case = providers.Callable(
+        lambda config: config["generate_market_narrative_use_case"](),
+        config=_use_cases_config,
+    )
 
 
 # Global container instance (can be overridden for testing)
@@ -311,6 +315,7 @@ def get_container(
     cache_manager: CacheManager | None = None,
     storage_type: str | None = None,
     storage_path: str | None = None,
+    storage_backend: Any | None = None,
 ) -> Container:
     """Get the global dependency injection container.
 
@@ -344,6 +349,14 @@ def get_container(
             ``storage_type`` is ``"file"`` (or when falling back to file from settings).
             If ``storage_type`` is ``None``, this is ignored unless you also set
             storage_type explicitly; when both are None, settings are used.
+        storage_backend: Optional pre-built ``Storage`` instance. When provided,
+            takes precedence over ``storage_type`` and ``storage_path``. Use this
+            when you have a custom ``Storage`` implementation (e.g. SQLite, S3) and
+            want to inject it directly. For Postgres, prefer overriding individual
+            repository providers via ``container.stock_repository.override()`` after
+            this call, since the ``Storage`` ABC is oriented toward collection-based
+            backends (file/memory); a Postgres backend is better expressed as async
+            repository implementations.
 
     Returns:
         Container instance
@@ -383,8 +396,10 @@ def get_container(
         elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
             container_instance.cache_manager.override(providers.Object(None))
 
-        # Storage: override when storage_type or storage_path provided (library integrators)
-        if storage_type is not None or storage_path is not None:
+        # Storage: custom instance takes precedence, then type/path string overrides
+        if storage_backend is not None:
+            container_instance.storage_backend.override(providers.Object(storage_backend))
+        elif storage_type is not None or storage_path is not None:
             container_instance.storage_backend.override(
                 _storage_override_provider(storage_type, storage_path)
             )
@@ -401,7 +416,9 @@ def get_container(
         _container.cache_manager.override(providers.Object(None))
 
     # Apply storage overrides when storage_type or storage_path provided
-    if storage_type is not None or storage_path is not None:
+    if storage_backend is not None:
+        _container.storage_backend.override(providers.Object(storage_backend))
+    elif storage_type is not None or storage_path is not None:
         _container.storage_backend.override(_storage_override_provider(storage_type, storage_path))
 
     return _container

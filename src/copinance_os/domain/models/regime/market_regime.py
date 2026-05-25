@@ -6,6 +6,29 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+# ---------------------------------------------------------------------------
+# Confidence normalisation
+# ---------------------------------------------------------------------------
+
+_LABEL_TO_SCORE: dict[str, int] = {"high": 85, "medium": 60, "low": 30}
+
+
+def regime_confidence_score(confidence: Literal["high", "medium", "low"] | float) -> int:
+    """Normalise a regime confidence value to an integer in [0, 100].
+
+    String labels map to representative integers (high→85, medium→60, low→30).
+    Floats in [0, 1] are scaled to [0, 100]; floats already in (1, 100] are
+    rounded directly.  Values outside [0, 100] are clamped.
+
+    This lets library consumers store and compare regime confidence across
+    snapshots without re-implementing the mapping.
+    """
+    if isinstance(confidence, str):
+        return _LABEL_TO_SCORE.get(confidence.lower(), 60)
+    scaled = float(confidence) * 100 if 0.0 <= float(confidence) <= 1.0 else float(confidence)
+    return max(0, min(100, round(scaled)))
+
+
 from copinance_os.domain.models.methodology import AnalysisMethodology
 
 

@@ -29,10 +29,12 @@ from copinance_os.domain.models.regime.market_regime import (
     SectorRotationData,
     VIXData,
     VolatilityRegimeData,
+    regime_confidence_score,
 )
 
 __all__ = [
     "AnalysisMetadata",
+    "regime_confidence_score",
     "MacroSeriesData",
     "MacroSeriesMetadata",
     "MacroRegimeResult",

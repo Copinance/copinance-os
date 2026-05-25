@@ -160,6 +160,7 @@ container = get_container(
     fred_api_key="...",             # optional; enables FRED macro data
     storage_type="memory",          # "file" | "memory"; avoids disk in library use
     storage_path=None,              # root path for file storage
+    storage_backend=None,           # custom Storage instance (Tier 1; overrides storage_type/path)
     cache_enabled=None,             # True / False / None (use settings)
     cache_manager=None,             # custom CacheManager instance
     prompt_templates=None,          # dict overlay for prompt names
@@ -168,14 +169,44 @@ container = get_container(
 )
 
 # Entry points
-container.research_orchestrator()       # ResearchOrchestrator
-container.market_data_provider()        # MarketDataProvider (composed, with Greeks)
-container.fundamental_data_provider()   # FundamentalDataProvider (yfinance)
-container.sec_filings_provider()        # FundamentalDataProvider (EDGAR)
-container.macro_data_provider()         # MacroeconomicDataProvider (FRED/yfinance)
+container.research_orchestrator()                # ResearchOrchestrator
+container.market_data_provider()                 # MarketDataProvider (composed, with Greeks)
+container.fundamental_data_provider()            # FundamentalDataProvider (yfinance)
+container.sec_filings_provider()                 # FundamentalDataProvider (EDGAR)
+container.macro_data_provider()                  # MacroeconomicDataProvider (FRED/yfinance)
+container.generate_market_narrative_use_case()   # GenerateMarketNarrativeUseCase
 ```
 
 Full options and examples: [Library Guide — Configuration](../getting-started/library#configuration).
+
+---
+
+## Domain utilities (public API)
+
+These standalone functions are re-exported from `copinance_os` root and require no container.
+
+| Symbol | Module | Purpose |
+|--------|--------|---------|
+| `regime_confidence_score(confidence)` | `copinance_os.domain.models.regime` | Maps `"high"/"medium"/"low"` or float → `int` 0–100 for regime snapshot storage and comparison across snapshots |
+| `signal_agreement_direction(agreement)` | `copinance_os.data.analytics.options.positioning.bias` | Maps `SignalAgreement` string → `"bullish"/"bearish"/"neutral"` tri-state |
+| `iv_percentile_rank(current_iv, history)` | `copinance_os.data.analytics.options.positioning.iv_rank` | IV percentile rank (0–100) from a caller-supplied rolling history sequence |
+
+```python
+from copinance_os import regime_confidence_score, signal_agreement_direction, iv_percentile_rank
+
+# Regime confidence — store as int for comparison, charts, or thresholds
+score = regime_confidence_score("high")   # → 85
+score = regime_confidence_score(0.72)     # → 72
+
+# Options signal direction — tri-state summary for UI chips / filters
+direction = signal_agreement_direction("strong_bullish")   # → "bullish"
+direction = signal_agreement_direction("mixed")            # → "neutral"
+
+# IV percentile rank — caller owns the rolling IV history
+rank = iv_percentile_rank(current_iv=0.28, history=[0.15, 0.20, 0.25, 0.30, 0.35])  # → 60
+```
+
+**Persistence note:** `regime_confidence_score` is designed for consumers who want to store regime snapshots (e.g. in Postgres) and compare confidence values numerically. Copinance OS produces the regime data; you own the persistence.
 
 ---
 
