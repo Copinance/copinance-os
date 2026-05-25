@@ -19,6 +19,7 @@ The product vision is in the [Manifesto](https://github.com/copinance/copinance-
 ## Capabilities at a glance
 
 - **Audience-aware explanations** — Analysis can be tuned to **financial literacy** (from plain-language to technical). This is **context for wording**, not a login system; your product still owns user identity if you need it.
+- **Curated follow-up questions** — After you render a quote, chain, regime card, or similar artifact, the library can suggest **Ask AI chips** grounded in that payload (`generate_curated_questions_use_case`). See [library guide](getting-started/library#curated-follow-up-questions) and [client integration](developer-guide/curated-questions-integration).
 - **Two ways to run analysis** — **Fixed pipelines** (walk through defined steps every time) and **question-driven** runs (the model picks which data and analysis tools to use for your question). **Back-and-forth conversations** with memory are supported when you use the **Python library**, not as a single CLI session—see the [library guide](getting-started/library#multi-turn-question-driven-analysis).
 - **Macro and regime in one place** — Broad economic and market-stress indicators (rates, credit, labor, housing, and more) sit alongside single-name and options work.
 - **Shared caching** — Fetches used during CLI market commands and during analysis can **reuse the same cache**, so repeated work is cheaper. You can inspect and clear cache from the CLI.
@@ -36,6 +37,7 @@ Think in **areas of responsibility** rather than file names: **contracts and bus
 | Install and run a first analysis | [Installation](getting-started/installation) → [Quick Start](getting-started/quickstart) |
 | Use the CLI (options, JSON output, streaming) | [CLI Reference](user-guide/cli) |
 | Integrate in an application | [Using as a Library](getting-started/library) |
+| Suggest Ask AI chips from data you already have | [Curated questions (clients)](developer-guide/curated-questions-integration) |
 | Keys, cache, storage, EDGAR identity, options/Greeks settings | [Configuration](getting-started/configuration) |
 | Deterministic vs question-driven behavior | [Analysis modes](user-guide/analysis-modes) |
 | BSM Greeks and chain metadata | [Options & Greeks](analysis-reference/options-and-greeks) |

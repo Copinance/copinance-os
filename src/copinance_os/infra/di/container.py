@@ -278,6 +278,10 @@ class Container(containers.DeclarativeContainer):
         lambda config: config["generate_market_narrative_use_case"](),
         config=_use_cases_config,
     )
+    generate_curated_questions_use_case = providers.Callable(
+        lambda config: config["generate_curated_questions_use_case"](),
+        config=_use_cases_config,
+    )
 
 
 # Global container instance (can be overridden for testing)

@@ -17,10 +17,10 @@ Copinance OS follows **clean (hexagonal) architecture** with strict boundaries: 
 │                          Rich output or `--json` on analyze/market       │
 └───────────────────────────────┬──────────────────────────────────────────┘
                                 │
-┌───────────────────────────────▼─────────────────────────────────────────┐
-│  research/workflows     Use cases (analyze, market, profile, backtest)  │
-│                           Build requests / jobs; call orchestrator      │
-└───────────────────────────────┬─────────────────────────────────────────┘
+┌───────────────────────────────▼───────────────────────────────────────────────────────────────────────┐
+│  research/workflows     Use cases (analyze, market, narrative, curated questions, profile, backtest)  │
+│                           Build requests / jobs; call orchestrator                                    │
+└───────────────────────────────┬───────────────────────────────────────────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼─────────────────────────────────────────────────────────────────────────────┐
 │  core/orchestrator        ResearchOrchestrator → JobRunner                                                  │

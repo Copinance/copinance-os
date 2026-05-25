@@ -13,6 +13,14 @@ from copinance_os.domain.models.analysis import (
     resolve_analyze_mode,
 )
 from copinance_os.domain.models.analysis_report import AnalysisReport
+from copinance_os.domain.models.curated_questions import (
+    ArtifactType,
+    CuratedQuestion,
+    CuratedQuestionsBlock,
+    CuratedQuestionsMeta,
+    GenerateCuratedQuestionsRequest,
+    LLMUnavailableReason,
+)
 from copinance_os.domain.models.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
@@ -81,6 +89,13 @@ from copinance_os.domain.models.tool_results import (
 
 __all__ = [
     "AnalysisReport",
+    # Curated questions
+    "ArtifactType",
+    "CuratedQuestion",
+    "CuratedQuestionsBlock",
+    "CuratedQuestionsMeta",
+    "GenerateCuratedQuestionsRequest",
+    "LLMUnavailableReason",
     # Analysis request models
     "AnalyzeInstrumentRequest",
     "AnalyzeMarketRequest",
