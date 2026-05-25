@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
 
 from copinance_os.domain.exceptions import ValidationError
-from copinance_os.domain.models.fundamentals import StockFundamentals
-from copinance_os.domain.models.market import OptionsChain
-from copinance_os.domain.models.profile import FinancialLiteracy
-from copinance_os.domain.models.stock import Stock
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.stock import Stock
+from copinance_os.domain.models.market.fundamentals import StockFundamentals
+from copinance_os.domain.models.market.types import OptionsChain
 
 
 class ArtifactType(StrEnum):

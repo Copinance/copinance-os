@@ -12,7 +12,7 @@ import httpx
 import structlog
 from typing_extensions import override
 
-from copinance_os.domain.models.macro import MacroDataPoint
+from copinance_os.domain.models.market.macro import MacroDataPoint
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider
 
 logger = structlog.get_logger(__name__)

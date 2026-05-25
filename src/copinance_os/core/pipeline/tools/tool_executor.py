@@ -7,8 +7,8 @@ import structlog
 
 from copinance_os.core.progress.emit import maybe_emit_progress
 from copinance_os.core.progress.redaction import summarize_for_tool_args, summarize_tool_result
-from copinance_os.domain.models.agent_progress import ToolFinishedEvent, ToolStartedEvent
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.agent_progress import ToolFinishedEvent, ToolStartedEvent
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.progress import ProgressSink
 from copinance_os.domain.ports.tools import Tool
 

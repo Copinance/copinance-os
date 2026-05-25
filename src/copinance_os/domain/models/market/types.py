@@ -6,8 +6,8 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from copinance_os.domain.models.base import ValueObject
-from copinance_os.domain.models.methodology import AnalysisMethodology
+from copinance_os.domain.models.common.base import ValueObject
+from copinance_os.domain.models.common.methodology import AnalysisMethodology
 
 
 class MarketType(StrEnum):

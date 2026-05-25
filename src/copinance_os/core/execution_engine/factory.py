@@ -12,11 +12,11 @@ from copinance_os.core.execution_engine.question_driven_analysis import (
     QuestionDrivenAnalysisExecutor,
 )
 from copinance_os.data.cache import CacheManager
-from copinance_os.domain.models.fundamentals import (
+from copinance_os.domain.models.market.fundamentals import (
     GetStockFundamentalsRequest,
     GetStockFundamentalsResponse,
 )
-from copinance_os.domain.models.market_requests import (
+from copinance_os.domain.models.market.requests import (
     GetHistoricalDataRequest,
     GetHistoricalDataResponse,
     GetInstrumentRequest,

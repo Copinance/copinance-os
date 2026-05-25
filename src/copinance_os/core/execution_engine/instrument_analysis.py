@@ -18,13 +18,14 @@ from copinance_os.data.schemas.market_data_conversions import (
 )
 from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis import INSTRUMENT_DETERMINISTIC_TYPE
-from copinance_os.domain.models.fundamentals import (
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
+from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
+from copinance_os.domain.models.market import MarketType, OptionsChain, OptionSide
+from copinance_os.domain.models.market.fundamentals import (
     GetStockFundamentalsRequest,
     GetStockFundamentalsResponse,
 )
-from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
-from copinance_os.domain.models.market import MarketType, OptionsChain, OptionSide
-from copinance_os.domain.models.market_requests import (
+from copinance_os.domain.models.market.requests import (
     GetHistoricalDataRequest,
     GetHistoricalDataResponse,
     GetInstrumentRequest,
@@ -34,7 +35,6 @@ from copinance_os.domain.models.market_requests import (
     GetQuoteRequest,
     GetQuoteResponse,
 )
-from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.ports.use_cases import UseCase
 from copinance_os.infra.error_handler import flatten_exception_message
 

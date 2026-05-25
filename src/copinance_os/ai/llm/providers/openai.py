@@ -34,8 +34,8 @@ from copinance_os.core.execution_engine.question_driven_tool_summary import (
 )
 from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
 from copinance_os.core.progress.emit import maybe_emit_progress
-from copinance_os.domain.models.agent_progress import IterationStartedEvent
-from copinance_os.domain.models.llm_conversation import LLMConversationTurn
+from copinance_os.domain.models.pipeline.agent_progress import IterationStartedEvent
+from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
 from copinance_os.domain.ports.progress import ProgressSink
 from copinance_os.domain.ports.tools import Tool
 

@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 
 class MarketNarrativeRequest(BaseModel):

@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from copinance_os.domain.models.analysis_report import AnalysisReport
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.analysis.report import AnalysisReport
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.services.instrument_analysis_report import (
     build_instrument_analysis_report,
 )

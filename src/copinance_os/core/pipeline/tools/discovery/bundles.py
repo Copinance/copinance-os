@@ -12,7 +12,7 @@ from copinance_os.core.pipeline.tools.data_provider.registry import (
     create_fundamental_data_tools_with_providers,
     create_market_data_tools,
 )
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 from copinance_os.domain.ports.tools import Tool
 
 

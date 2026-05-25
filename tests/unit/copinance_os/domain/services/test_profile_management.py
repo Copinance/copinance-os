@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from copinance_os.domain.exceptions import ProfileNotFoundError
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 from copinance_os.domain.services.profile_management import ProfileManagementService
 

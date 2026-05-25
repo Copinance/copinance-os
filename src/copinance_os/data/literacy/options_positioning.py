@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from copinance_os.domain.literacy import TieredCopy
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 # --- Positioning block (main four signals) ---
 

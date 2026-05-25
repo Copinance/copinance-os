@@ -22,9 +22,9 @@ from copinance_os.data.analytics.options.positioning.moneyness import compute_mo
 from copinance_os.data.analytics.options.positioning.pin_risk import compute_pin_risk
 from copinance_os.data.analytics.options.positioning.vanna import compute_vanna_exposure
 from copinance_os.domain.exceptions import ValidationError
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.market import OptionContract, OptionGreeks, OptionsChain, OptionSide
-from copinance_os.domain.models.options_positioning import OptionsPositioningResult
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.options.positioning import OptionsPositioningResult
 
 TOY_AS_OF = date(2026, 1, 9)
 

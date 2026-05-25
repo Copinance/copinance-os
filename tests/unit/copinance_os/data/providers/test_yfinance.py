@@ -12,7 +12,8 @@ from copinance_os.data.providers.yfinance import (
     YFinanceMarketProvider,
 )
 from copinance_os.domain.exceptions import DataProviderError
-from copinance_os.domain.models.fundamentals import (
+from copinance_os.domain.models.market import MarketDataPoint
+from copinance_os.domain.models.market.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
     FinancialRatios,
@@ -20,7 +21,6 @@ from copinance_os.domain.models.fundamentals import (
     IncomeStatement,
     StockFundamentals,
 )
-from copinance_os.domain.models.market import MarketDataPoint
 
 
 @pytest.mark.unit

@@ -6,7 +6,7 @@ import pytest
 
 from copinance_os.data.literacy import instrument_analysis as ia_lit
 from copinance_os.data.literacy import options_positioning as op_lit
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 _ACRONYM_RE = re.compile(r"\b[A-Z]{2,}\b")
 

@@ -5,8 +5,8 @@ from decimal import Decimal
 
 import pytest
 
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint
-from copinance_os.domain.models.stock import Stock
 
 
 @pytest.mark.unit

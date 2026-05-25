@@ -11,8 +11,8 @@ from copinance_os.data.analytics.options.greeks.engine import (
     chain_effective_dividend_yield,
     estimate_bsm_greeks_for_options_chain,
 )
+from copinance_os.domain.models.entities.profile import AnalysisProfile
 from copinance_os.domain.models.market import OptionsChain
-from copinance_os.domain.models.profile import AnalysisProfile
 from copinance_os.domain.ports.analytics import OptionsChainGreeksEstimator
 from copinance_os.infra.config import get_settings
 

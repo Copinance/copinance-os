@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 from copinance_os.domain.literacy import resolve_financial_literacy
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 
 def _partial_header(lit: FinancialLiteracy) -> str:

@@ -31,7 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 DEFAULT_LITERACY_FOR_ANALYSIS_OUTPUT: Final = FinancialLiteracy.INTERMEDIATE
 

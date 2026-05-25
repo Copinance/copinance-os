@@ -2,7 +2,7 @@
 
 import pytest
 
-from copinance_os.domain.models.agent_progress import (
+from copinance_os.domain.models.pipeline.agent_progress import (
     RunStartedEvent,
     ToolStartedEvent,
     parse_agent_progress_event,

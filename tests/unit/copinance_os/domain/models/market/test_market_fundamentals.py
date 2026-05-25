@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from copinance_os.domain.models.fundamentals import (
+from copinance_os.domain.models.market.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
     FinancialRatios,

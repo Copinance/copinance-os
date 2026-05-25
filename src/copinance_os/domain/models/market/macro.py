@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from copinance_os.domain.models.base import ValueObject
+from copinance_os.domain.models.common.base import ValueObject
 
 
 class MacroDataPoint(ValueObject):

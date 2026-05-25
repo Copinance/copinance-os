@@ -13,9 +13,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from copinance_os.domain.models.analysis_report import AnalysisReport
-from copinance_os.domain.models.base import Entity
-from copinance_os.domain.models.market import MarketType
+from copinance_os.domain.models.analysis.report import AnalysisReport
+from copinance_os.domain.models.common.base import Entity
+from copinance_os.domain.models.market.types import MarketType
 
 
 class ReportExclusionReason(StrEnum):

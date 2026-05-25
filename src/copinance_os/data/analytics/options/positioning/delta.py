@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from copinance_os.data.analytics.options.positioning.contracts import contract_oi, numeric_greek
+from copinance_os.domain.models.common.methodology import MethodologySpec
 from copinance_os.domain.models.market import OptionContract
-from copinance_os.domain.models.methodology import MethodologySpec
 
 # OCC-listed equity options use a 100-share multiplier per contract.
 DEFAULT_CONTRACT_MULTIPLIER = 100.0

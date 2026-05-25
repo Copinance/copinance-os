@@ -3,9 +3,9 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from copinance_os.domain.models.entities.profile import AnalysisProfile
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint
-from copinance_os.domain.models.profile import AnalysisProfile
-from copinance_os.domain.models.stock import Stock
 
 
 class AnalysisProfileRepository(ABC):

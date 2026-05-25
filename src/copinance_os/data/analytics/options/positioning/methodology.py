@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from copinance_os.domain.models.methodology import (
+from copinance_os.domain.models.common.methodology import (
     ANALYSIS_METHODOLOGY_ENVELOPE_VERSION,
     AnalysisMethodology,
     MethodologySpec,

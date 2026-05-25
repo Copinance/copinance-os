@@ -80,7 +80,7 @@ from copinance_os.data.analytics.options.positioning.volatility import (
     VolatilityConfig,
     volatility_methodology,
 )
-from copinance_os.domain.models.methodology import MethodologySpec
+from copinance_os.domain.models.common.methodology import MethodologySpec
 
 
 @dataclass(frozen=True, slots=True)

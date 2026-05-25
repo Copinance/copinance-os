@@ -10,8 +10,8 @@ from copinance_os.ai.llm.resources import (
 )
 from copinance_os.core.execution_engine import QuestionDrivenAnalysisExecutor
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
-from copinance_os.domain.models.llm_conversation import LLMConversationTurn
 from copinance_os.domain.models.market import MarketType
+from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
 from copinance_os.domain.ports.analyzers import LLMAnalyzer
 from copinance_os.research.workflows.analyze import (
     INSTRUMENT_DETERMINISTIC_TYPE,

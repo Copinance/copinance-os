@@ -7,7 +7,7 @@ import pytest
 
 from copinance_os.ai.curated_questions.generator import CuratedQuestionsGenerator
 from copinance_os.data.cache.cache_manager import CacheManager
-from copinance_os.domain.models.curated_questions import (
+from copinance_os.domain.models.curated.questions import (
     ArtifactType,
     CuratedQuestionsBlock,
     CuratedQuestionsMeta,

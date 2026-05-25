@@ -17,7 +17,7 @@ from copinance_os.ai.llm.streaming import (
     TextStreamingMode,
     normalize_text_streaming_mode,
 )
-from copinance_os.domain.models.llm_conversation import LLMConversationTurn
+from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
 from copinance_os.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)

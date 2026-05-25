@@ -16,8 +16,8 @@ from copinance_os.data.analytics.options.positioning.contracts import (
     contracts_for_expiration,
     parse_expiration_to_date,
 )
+from copinance_os.domain.models.common.methodology import MethodologySpec
 from copinance_os.domain.models.market import OptionContract
-from copinance_os.domain.models.methodology import MethodologySpec
 
 
 @dataclass(frozen=True, slots=True)

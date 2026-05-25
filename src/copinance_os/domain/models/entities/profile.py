@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from copinance_os.domain.models.base import Entity
+from copinance_os.domain.models.common.base import Entity
 
 
 class FinancialLiteracy(StrEnum):

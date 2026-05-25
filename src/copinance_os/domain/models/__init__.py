@@ -12,8 +12,8 @@ from copinance_os.domain.models.analysis import (
     get_default_instrument_timeframe,
     resolve_analyze_mode,
 )
-from copinance_os.domain.models.analysis_report import AnalysisReport
-from copinance_os.domain.models.curated_questions import (
+from copinance_os.domain.models.analysis.report import AnalysisReport
+from copinance_os.domain.models.curated import (
     ArtifactType,
     CuratedQuestion,
     CuratedQuestionsBlock,
@@ -21,16 +21,7 @@ from copinance_os.domain.models.curated_questions import (
     GenerateCuratedQuestionsRequest,
     LLMUnavailableReason,
 )
-from copinance_os.domain.models.fundamentals import (
-    BalanceSheet,
-    CashFlowStatement,
-    FinancialRatios,
-    FinancialStatementPeriod,
-    GetStockFundamentalsRequest,
-    GetStockFundamentalsResponse,
-    IncomeStatement,
-    StockFundamentals,
-)
+from copinance_os.domain.models.entities import AnalysisProfile, FinancialLiteracy, Stock
 from copinance_os.domain.models.job import (
     Job,
     JobScope,
@@ -39,16 +30,11 @@ from copinance_os.domain.models.job import (
     ReportExclusionReason,
     RunJobResult,
 )
-from copinance_os.domain.models.macro import MacroDataPoint
 from copinance_os.domain.models.market import (
-    MarketDataPoint,
-    MarketType,
-    OptionContract,
-    OptionGreeks,
-    OptionsChain,
-    OptionSide,
-)
-from copinance_os.domain.models.market_requests import (
+    BalanceSheet,
+    CashFlowStatement,
+    FinancialRatios,
+    FinancialStatementPeriod,
     GetHistoricalDataRequest,
     GetHistoricalDataResponse,
     GetInstrumentRequest,
@@ -57,8 +43,20 @@ from copinance_os.domain.models.market_requests import (
     GetOptionsChainResponse,
     GetQuoteRequest,
     GetQuoteResponse,
+    GetStockFundamentalsRequest,
+    GetStockFundamentalsResponse,
+    IncomeStatement,
+    MacroDataPoint,
+    MarketDataPoint,
+    MarketType,
+    OptionContract,
+    OptionGreeks,
+    OptionsChain,
+    OptionSide,
+    StockFundamentals,
 )
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.pipeline import ToolResult
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 from copinance_os.domain.models.regime import (
     AnalysisMetadata,
     CommoditiesData,
@@ -80,11 +78,6 @@ from copinance_os.domain.models.regime import (
     SectorRotationData,
     VIXData,
     VolatilityRegimeData,
-)
-from copinance_os.domain.models.stock import Stock
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
-from copinance_os.domain.models.tool_results import (
-    ToolResult,
 )
 
 __all__ = [

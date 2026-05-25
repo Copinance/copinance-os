@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from copinance_os.domain.exceptions import InvalidStockSymbolError, ValidationError
-from copinance_os.domain.models.fundamentals import StockFundamentals
+from copinance_os.domain.models.market.fundamentals import StockFundamentals
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider
 from copinance_os.research.workflows.fundamentals import (
     GetStockFundamentalsRequest,

@@ -7,8 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from copinance_os.domain.models.market import MarketDataPoint, OptionsChain
-from copinance_os.domain.models.stock import Stock
+from copinance_os.domain.models.entities.stock import Stock
+from copinance_os.domain.models.market.types import MarketDataPoint, OptionsChain
 
 
 class GetInstrumentRequest(BaseModel):

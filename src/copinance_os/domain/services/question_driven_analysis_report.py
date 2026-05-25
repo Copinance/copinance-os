@@ -7,9 +7,9 @@ from typing import Any
 from copinance_os.data.literacy import instrument_analysis as ia_lit
 from copinance_os.data.literacy import reports as reports_lit
 from copinance_os.domain.literacy import resolve_financial_literacy
-from copinance_os.domain.models.analysis_report import AnalysisReport
-from copinance_os.domain.models.methodology import envelope_from_text_methodology
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.analysis.report import AnalysisReport
+from copinance_os.domain.models.common.methodology import envelope_from_text_methodology
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 
 def build_question_driven_analysis_report(

@@ -6,8 +6,8 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field
 
-from copinance_os.domain.models.base import ValueObject
-from copinance_os.domain.models.methodology import AnalysisMethodology, MethodologySpec
+from copinance_os.domain.models.common.base import ValueObject
+from copinance_os.domain.models.common.methodology import AnalysisMethodology, MethodologySpec
 
 PositioningWindow = Literal["near", "mid"]
 PositioningBias = Literal["bullish", "bearish", "neutral"]

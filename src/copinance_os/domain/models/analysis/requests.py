@@ -9,13 +9,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from copinance_os.domain.models.job import JobScope, JobTimeframe
-from copinance_os.domain.models.llm_conversation import (
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
+from copinance_os.domain.models.job.job import JobScope, JobTimeframe
+from copinance_os.domain.models.market.types import MarketType, OptionSide
+from copinance_os.domain.models.pipeline.llm_conversation import (
     LLMConversationTurn,
     validate_conversation_history_pairs,
 )
-from copinance_os.domain.models.market import MarketType, OptionSide
-from copinance_os.domain.models.profile import FinancialLiteracy
 
 # Executor routing keys (scope + mode)
 INSTRUMENT_DETERMINISTIC_TYPE = "deterministic_instrument_analysis"

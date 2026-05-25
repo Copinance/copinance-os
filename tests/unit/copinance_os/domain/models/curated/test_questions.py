@@ -3,7 +3,7 @@
 import pytest
 
 from copinance_os.domain.exceptions import ValidationError
-from copinance_os.domain.models.curated_questions import (
+from copinance_os.domain.models.curated.questions import (
     ArtifactType,
     filter_suggested_tools,
     validate_artifact_payload,

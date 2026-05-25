@@ -13,7 +13,7 @@ from copinance_os.core.pipeline.tools.discovery.specs import (
     QUESTION_DRIVEN_TOOL_BUNDLE_SPECS,
 )
 from copinance_os.core.pipeline.tools.tool_registry import ToolRegistry
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 from copinance_os.domain.plugins.registry import resolve_plugin_callable
 from copinance_os.domain.plugins.spec import PluginSpec
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider, MarketDataProvider

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from copinance_os.domain.models.methodology import (
+from copinance_os.domain.models.common.methodology import (
     AnalysisMethodology,
     MethodologyReference,
     MethodologySpec,

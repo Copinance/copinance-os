@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from copinance_os.domain.exceptions import ProfileNotFoundError
-from copinance_os.domain.models.profile import AnalysisProfile
+from copinance_os.domain.models.entities.profile import AnalysisProfile
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 
 

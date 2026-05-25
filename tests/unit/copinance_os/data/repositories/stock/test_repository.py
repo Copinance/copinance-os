@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from copinance_os.data.repositories.stock.repository import StockRepositoryImpl
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint
-from copinance_os.domain.models.stock import Stock
 from copinance_os.domain.ports.storage import Storage
 
 

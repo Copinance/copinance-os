@@ -44,19 +44,19 @@ except ImportError:
     pd = None  # type: ignore[assignment]
 
 from copinance_os.domain.exceptions import DataProviderError, ValidationError
-from copinance_os.domain.models.fundamentals import (
+from copinance_os.domain.models.market import (
+    MarketDataPoint,
+    OptionContract,
+    OptionsChain,
+    OptionSide,
+)
+from copinance_os.domain.models.market.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
     FinancialRatios,
     FinancialStatementPeriod,
     IncomeStatement,
     StockFundamentals,
-)
-from copinance_os.domain.models.market import (
-    MarketDataPoint,
-    OptionContract,
-    OptionsChain,
-    OptionSide,
 )
 from copinance_os.domain.ports.data_providers import (
     FundamentalDataProvider,

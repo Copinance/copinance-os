@@ -12,7 +12,7 @@ from copinance_os.data.cache.cache_manager import CacheManager
 from copinance_os.data.curated_questions.context import build_context
 from copinance_os.data.curated_questions.limits import DASHBOARD_ARTIFACTS
 from copinance_os.domain.literacy import resolve_financial_literacy
-from copinance_os.domain.models.curated_questions import (
+from copinance_os.domain.models.curated.questions import (
     ArtifactType,
     CuratedQuestion,
     CuratedQuestionsBlock,

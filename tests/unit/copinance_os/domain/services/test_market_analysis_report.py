@@ -2,7 +2,7 @@
 
 import pytest
 
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.services.market_analysis_report import build_market_analysis_report
 
 

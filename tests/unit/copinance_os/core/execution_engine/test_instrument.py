@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from copinance_os.core.execution_engine import InstrumentAnalysisExecutor
-from copinance_os.domain.models.fundamentals import StockFundamentals
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import (
     MarketDataPoint,
@@ -16,7 +16,7 @@ from copinance_os.domain.models.market import (
     OptionsChain,
     OptionSide,
 )
-from copinance_os.domain.models.stock import Stock
+from copinance_os.domain.models.market.fundamentals import StockFundamentals
 from copinance_os.research.workflows.analyze import INSTRUMENT_DETERMINISTIC_TYPE
 from copinance_os.research.workflows.fundamentals import (
     GetStockFundamentalsRequest,

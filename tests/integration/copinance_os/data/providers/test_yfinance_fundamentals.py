@@ -12,7 +12,7 @@ from copinance_os.domain.exceptions import (
     InvalidStockSymbolError,
     ValidationError,
 )
-from copinance_os.domain.models.fundamentals import (
+from copinance_os.domain.models.market.fundamentals import (
     BalanceSheet,
     CashFlowStatement,
     FinancialRatios,

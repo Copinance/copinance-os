@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 
 from copinance_os.domain.exceptions import ValidationError
-from copinance_os.domain.models.curated_questions import (
+from copinance_os.domain.models.curated.questions import (
     ArtifactType,
     GenerateCuratedQuestionsRequest,
     LLMUnavailableReason,
 )
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.infra.di import get_container, reset_container
 
 

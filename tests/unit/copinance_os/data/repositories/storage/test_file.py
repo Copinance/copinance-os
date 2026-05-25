@@ -10,8 +10,8 @@ import pytest
 
 from copinance_os.data.loaders.persistence import get_data_dir
 from copinance_os.data.repositories.storage.file import JsonFileStorage
-from copinance_os.domain.models.base import Entity
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.common.base import Entity
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 
 
 class SampleEntity(Entity):

@@ -12,8 +12,8 @@ from copinance_os.data.analytics.options.positioning.contracts import (
     contracts_for_expiration,
     numeric_greek,
 )
+from copinance_os.domain.models.common.methodology import MethodologySpec
 from copinance_os.domain.models.market import OptionContract
-from copinance_os.domain.models.methodology import MethodologySpec
 
 # Floor prevents unstable tiny-sample regime flips.
 DEFAULT_VANNA_REGIME_FLOOR = 5000.0

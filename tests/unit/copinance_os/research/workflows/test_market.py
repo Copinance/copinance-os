@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint, OptionsChain
-from copinance_os.domain.models.stock import Stock
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.repositories import StockRepository
 from copinance_os.research.workflows.market import (
