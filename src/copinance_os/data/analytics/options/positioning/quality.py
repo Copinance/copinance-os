@@ -11,8 +11,8 @@ from copinance_os.data.analytics.options.positioning.contracts import (
     contract_strike,
     contract_vol,
 )
+from copinance_os.domain.models.common.methodology import MethodologySpec
 from copinance_os.domain.models.market import OptionContract
-from copinance_os.domain.models.methodology import MethodologySpec
 
 
 @dataclass(frozen=True, slots=True)

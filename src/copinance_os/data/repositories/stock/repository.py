@@ -1,8 +1,8 @@
 """Equity instrument repository implementation."""
 
 from copinance_os.data.repositories.storage.factory import create_storage
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint
-from copinance_os.domain.models.stock import Stock
 from copinance_os.domain.ports.repositories import StockRepository
 from copinance_os.domain.ports.storage import Storage
 

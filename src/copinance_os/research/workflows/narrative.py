@@ -13,9 +13,9 @@ from copinance_os.domain.literacy import (
     resolve_financial_literacy,
 )
 from copinance_os.domain.models.analysis import AnalyzeMarketRequest, AnalyzeMode
+from copinance_os.domain.models.analysis.narrative import MarketNarrativeRequest, NarrativeResult
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.job import JobTimeframe
-from copinance_os.domain.models.narrative import MarketNarrativeRequest, NarrativeResult
-from copinance_os.domain.models.profile import FinancialLiteracy
 from copinance_os.domain.ports.analysis_execution import AnalyzeMarketRunner
 from copinance_os.research.workflows.base import UseCase
 

@@ -15,8 +15,8 @@ import structlog
 from copinance_os.data.cache import CacheManager
 from copinance_os.data.literacy import macro_indicators as macro_lit
 from copinance_os.domain.literacy import resolve_financial_literacy
-from copinance_os.domain.models.profile import FinancialLiteracy
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
 from copinance_os.domain.services.macro_series_metrics import (

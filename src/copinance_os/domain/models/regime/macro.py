@@ -170,11 +170,11 @@ class MacroRegimeIndicatorsData(BaseModel):
 
 # Import ToolResult from the tool results
 # Import required models for type annotations
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.models.regime.market_regime import (
     MarketRegimeDetectionResult,
     MarketRegimeIndicatorsResult,
 )
-from copinance_os.domain.models.tool_results import ToolResult
 
 
 class MacroRegimeIndicatorsResult(ToolResult[MacroRegimeIndicatorsData]):

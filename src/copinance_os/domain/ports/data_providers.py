@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from copinance_os.domain.models.fundamentals import StockFundamentals
-from copinance_os.domain.models.macro import MacroDataPoint
 from copinance_os.domain.models.market import MarketDataPoint, OptionsChain
+from copinance_os.domain.models.market.fundamentals import StockFundamentals
+from copinance_os.domain.models.market.macro import MacroDataPoint
 
 
 class DataProvider(ABC):

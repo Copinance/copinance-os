@@ -24,9 +24,10 @@ from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators im
 from copinance_os.data.cache import CacheManager
 from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE
+from copinance_os.domain.models.common.methodology import AnalysisMethodology
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.models.market import MarketDataPoint
-from copinance_os.domain.models.methodology import AnalysisMethodology
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.models.regime import (
     AdvancedData,
     AnalysisMetadata,
@@ -49,7 +50,6 @@ from copinance_os.domain.models.regime import (
     RatesData,
     VolatilityRegimeData,
 )
-from copinance_os.domain.models.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
 
 logger = structlog.get_logger(__name__)

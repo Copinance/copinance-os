@@ -4,7 +4,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from copinance_os.domain.models.methodology import AnalysisMethodology
+from copinance_os.domain.models.common.methodology import AnalysisMethodology
 
 
 class SimpleBacktestConfig(BaseModel):

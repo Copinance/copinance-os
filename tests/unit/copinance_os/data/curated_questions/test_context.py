@@ -10,7 +10,7 @@ from copinance_os.data.curated_questions.context import (
     build_quote_context,
     build_sector_rotation_context,
 )
-from copinance_os.domain.models.curated_questions import ArtifactType
+from copinance_os.domain.models.curated.questions import ArtifactType
 
 
 @pytest.mark.unit

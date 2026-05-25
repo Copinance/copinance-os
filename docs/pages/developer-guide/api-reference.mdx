@@ -144,7 +144,7 @@ Tool discovery in `copinance_os.core.pipeline.tools.discovery`:
 | `build_data_provider_tool_registry(...)` | Market + fundamentals preset registry |
 | `load_tools_from_plugin_specs(specs, ctx)` | Low-level: build tools from `PluginSpec` list |
 
-Bundle protocol: `ToolBundleFactory` (`domain.ports.tool_bundles`). Context: `ToolBundleContext` (`domain.models.tool_bundle_context`).
+Bundle protocol: `ToolBundleFactory` (`domain.ports.tool_bundles`). Context: `ToolBundleContext` (`domain.models.pipeline.tool_bundle_context`).
 
 Tools can also be discovered via setuptools entry point group `copinance_os.tool_bundles` or by package scan of modules in `core.pipeline.tools.bundles` that export `tool_bundle_factory`.
 

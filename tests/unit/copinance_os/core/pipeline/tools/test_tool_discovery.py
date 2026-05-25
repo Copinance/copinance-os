@@ -11,7 +11,7 @@ from copinance_os.core.pipeline.tools.discovery import (
     load_tools_from_plugin_specs,
     scan_tool_bundle_factories,
 )
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider, MarketDataProvider
 
 

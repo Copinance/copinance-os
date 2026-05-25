@@ -93,8 +93,12 @@ from copinance_os.domain.models.analysis import (  # noqa: E402
     AnalyzeMarketRequest,
     AnalyzeMode,
 )
-from copinance_os.domain.models.analysis_report import AnalysisReport  # noqa: E402
-from copinance_os.domain.models.curated_questions import (  # noqa: E402
+from copinance_os.domain.models.analysis.narrative import (
+    MarketNarrativeRequest,
+    NarrativeResult,
+)  # noqa: E402
+from copinance_os.domain.models.analysis.report import AnalysisReport  # noqa: E402
+from copinance_os.domain.models.curated import (  # noqa: E402
     ArtifactType,
     CuratedQuestion,
     CuratedQuestionsBlock,
@@ -102,12 +106,8 @@ from copinance_os.domain.models.curated_questions import (  # noqa: E402
     GenerateCuratedQuestionsRequest,
     LLMUnavailableReason,
 )
+from copinance_os.domain.models.entities import AnalysisProfile, FinancialLiteracy  # noqa: E402
 from copinance_os.domain.models.job import RunJobResult  # noqa: E402
-from copinance_os.domain.models.narrative import (
-    MarketNarrativeRequest,
-    NarrativeResult,
-)  # noqa: E402
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy  # noqa: E402
 from copinance_os.domain.models.regime import regime_confidence_score  # noqa: E402
 from copinance_os.domain.ports.repositories import (  # noqa: E402
     AnalysisProfileRepository,

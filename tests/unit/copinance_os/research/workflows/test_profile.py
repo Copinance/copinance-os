@@ -9,7 +9,7 @@ import pytest
 
 from copinance_os.data.repositories.profile.current_profile import CurrentProfile
 from copinance_os.domain.exceptions import ProfileNotFoundError
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 from copinance_os.domain.services.profile_management import ProfileManagementService
 from copinance_os.research.workflows.profile import (

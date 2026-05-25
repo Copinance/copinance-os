@@ -72,8 +72,11 @@ from copinance_os.domain.indicators import (
     simple_moving_average,
 )
 from copinance_os.domain.literacy import resolve_financial_literacy
-from copinance_os.domain.models.methodology import MethodologySpec, analysis_methodology_single_spec
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.common.methodology import (
+    MethodologySpec,
+    analysis_methodology_single_spec,
+)
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
 

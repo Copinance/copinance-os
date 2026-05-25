@@ -37,7 +37,7 @@ from edgar import Company, Fund, find_funds, set_identity
 from typing_extensions import override
 
 from copinance_os.data.cache import CacheManager
-from copinance_os.domain.models.fundamentals import StockFundamentals
+from copinance_os.domain.models.market.fundamentals import StockFundamentals
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider
 
 logger = structlog.get_logger(__name__)

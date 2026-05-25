@@ -8,7 +8,7 @@ from collections import Counter
 from typing import Any
 
 from copinance_os.data.curated_questions.limits import ARTIFACT_MAX_JSON_CHARS
-from copinance_os.domain.models.curated_questions import ArtifactType
+from copinance_os.domain.models.curated.questions import ArtifactType
 
 
 def _safe_float(value: Any) -> float | None:

@@ -442,7 +442,7 @@ Copinance OS is a **library**, not an HTTP server. If you expose analysis to mul
 | **Isolation** | Scope storage/cache keys per tenant or user; do not share mutable request state across users. |
 | **LLM keys** | Configure `LLMConfig` / env per deployment or tenant; never embed keys in client payloads. |
 | **Rate limiting** | Enforce before `ResearchOrchestrator.run_job`. |
-| **Transport** | Use your framework’s HTTP/SSE/WebSocket; serialize progress from a `ProgressSink` (see `copinance_os.domain.models.agent_progress`). |
+| **Transport** | Use your framework’s HTTP/SSE/WebSocket; serialize progress from a `ProgressSink` (see `copinance_os.domain.models.pipeline.agent_progress`). |
 | **Cancellation** | Cancel the asyncio task when the client disconnects. |
 | **Secrets** | Do not log full tool args, prompts, or PII; progress events are summarised but still sensitive. |
 
@@ -453,7 +453,7 @@ Copinance OS is a **library**, not an HTTP server. If you expose analysis to mul
 ```python
 import asyncio
 
-from copinance_os.domain.models.agent_progress import AgentProgressEvent
+from copinance_os.domain.models.pipeline.agent_progress import AgentProgressEvent
 
 
 class QueueProgressSink:
@@ -660,7 +660,7 @@ This section is **Python-only**; the CLI cannot supply **`conversation_history`*
 ```python
 import asyncio
 
-from copinance_os.domain.models.llm_conversation import LLMConversationTurn
+from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
 from copinance_os.infra.di import get_container
 from copinance_os.research.workflows.analyze import (
     AnalyzeInstrumentRequest,
@@ -772,7 +772,7 @@ The **`JobRunner`** port is not exposed as a container method; customize orchest
 
 ### Market use cases — `copinance_os.research.workflows.market`
 
-DTOs for quote/history/options/instrument are defined in **`copinance_os.domain.models.market_requests`** and re-exported from this workflow module for convenience.
+DTOs for quote/history/options/instrument are defined in **`copinance_os.domain.models.market.requests`** and re-exported from this workflow module for convenience.
 
 | Use case | Request | Response | Request fields (all optional except noted) |
 |----------|---------|----------|--------------------------------------------|
@@ -808,7 +808,7 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 | Set current profile | `SetCurrentProfileRequest` | `SetCurrentProfileResponse` | `profile_id: UUID \| None` (None clears current) |
 | Delete profile | `DeleteProfileRequest` | `DeleteProfileResponse` | `profile_id: UUID` |
 
-**Type:** `FinancialLiteracy` from `copinance_os.domain.models.profile`.
+**Type:** `FinancialLiteracy` from `copinance_os.domain.models.entities.profile`.
 
 ### Fundamentals use case — `copinance_os.research.workflows.fundamentals`
 
@@ -853,23 +853,23 @@ block = await container.generate_curated_questions_use_case().execute(
 |------|--------|-----|
 | `Job` | `copinance_os.domain.models.job` | Analysis execution context: `scope`, `market_type`, `instrument_symbol`, `market_index`, `timeframe`, `execution_type`, `profile_id` |
 | `RunJobResult` | `copinance_os.domain.models.job` | `success`, `results`, `error_message`, **`report`** (`AnalysisReport \| None`), **`report_exclusion_reason`** (`ReportExclusionReason \| None`) |
-| `AnalysisReport` | `copinance_os.domain.models.analysis_report` | `summary`, `key_metrics`, `methodology` (`AnalysisMethodology` envelope with `specs` + `data_inputs`) |
+| `AnalysisReport` | `copinance_os.domain.models.analysis.report` | `summary`, `key_metrics`, `methodology` (`AnalysisMethodology` envelope with `specs` + `data_inputs`) |
 | `ReportExclusionReason` | `copinance_os.domain.models.job` | e.g. `UNKNOWN_EXECUTOR_TYPE` when results exist but no report builder is registered |
 | `JobScope` | `copinance_os.domain.models.job` | `INSTRUMENT`, `MARKET` |
 | `JobTimeframe` | `copinance_os.domain.models.job` | `SHORT_TERM`, `MID_TERM`, `LONG_TERM` |
 | `MarketType` | `copinance_os.domain.models.market` | `EQUITY`, `OPTIONS` |
 | `OptionSide` | `copinance_os.domain.models.market` | `CALL`, `PUT`, `ALL` |
-| `MarketNarrativeRequest` | `copinance_os.domain.models.narrative` | `market_index` (default `"SPY"`), `financial_literacy`, `no_cache` |
-| `NarrativeResult` | `copinance_os.domain.models.narrative` | `narrative` (prose string), `literacy`, `market_index`, `generated_at`, `fallback` (`True` when LLM unavailable) |
-| `GenerateCuratedQuestionsRequest` | `copinance_os.domain.models.curated_questions` | `artifact`, `payload`, `count`, `financial_literacy`, `learning_step`, `no_cache` |
-| `CuratedQuestionsBlock` | `copinance_os.domain.models.curated_questions` | `questions`, `meta` (`llm_enabled`, `llm_unavailable_reason`, `cache_hit`, …) |
-| `ArtifactType` | `copinance_os.domain.models.curated_questions` | Payload-shape enum for curated-question generation |
-| `CuratedQuestion` | `copinance_os.domain.models.curated_questions` | Chip: `text`, `focus`, `suggested_tools`, `requires_symbol` |
-| `LLMUnavailableReason` | `copinance_os.domain.models.curated_questions` | Typed fallback when `questions` is empty |
-| `LLMConversationTurn` | `copinance_os.domain.models.llm_conversation` | `role` (`user` / `assistant`), `content`; used for **`conversation_history`** on analyze requests |
+| `MarketNarrativeRequest` | `copinance_os.domain.models.analysis.narrative` | `market_index` (default `"SPY"`), `financial_literacy`, `no_cache` |
+| `NarrativeResult` | `copinance_os.domain.models.analysis.narrative` | `narrative` (prose string), `literacy`, `market_index`, `generated_at`, `fallback` (`True` when LLM unavailable) |
+| `GenerateCuratedQuestionsRequest` | `copinance_os.domain.models.curated.questions` | `artifact`, `payload`, `count`, `financial_literacy`, `learning_step`, `no_cache` |
+| `CuratedQuestionsBlock` | `copinance_os.domain.models.curated.questions` | `questions`, `meta` (`llm_enabled`, `llm_unavailable_reason`, `cache_hit`, …) |
+| `ArtifactType` | `copinance_os.domain.models.curated.questions` | Payload-shape enum for curated-question generation |
+| `CuratedQuestion` | `copinance_os.domain.models.curated.questions` | Chip: `text`, `focus`, `suggested_tools`, `requires_symbol` |
+| `LLMUnavailableReason` | `copinance_os.domain.models.curated.questions` | Typed fallback when `questions` is empty |
+| `LLMConversationTurn` | `copinance_os.domain.models.pipeline.llm_conversation` | `role` (`user` / `assistant`), `content`; used for **`conversation_history`** on analyze requests |
 | `MarketDataPoint` | `copinance_os.domain.models.market` | OHLCV + symbol, timestamp |
 | `OptionsChain` | `copinance_os.domain.models.market` | `underlying_symbol`, `expiration_date`, `calls`, `puts`, `underlying_price`, etc. |
-| `Stock` | `copinance_os.domain.models.stock` | Instrument entity (symbol, name, exchange, sector, …) |
+| `Stock` | `copinance_os.domain.models.entities.stock` | Instrument entity (symbol, name, exchange, sector, …) |
 
 ### Override points
 
@@ -911,7 +911,7 @@ By default, analyze uses **runners** that build a `Job` and call **`ResearchOrch
 
 3. **Job-based execution:** For queues or batch, implement **`JobRunner`** and inject it into a **`ResearchOrchestrator`** you construct yourself, or replace the orchestrator/runners on a custom container.
 
-**Imports:** Market request/response DTOs also live in **`copinance_os.domain.models.market_requests`** (re-exported from **`research.workflows.market`**). Analyze requests: **`domain.models.analysis`** (re-exported from **`research.workflows.analyze`**).
+**Imports:** Market request/response DTOs also live in **`copinance_os.domain.models.market.requests`** (re-exported from **`research.workflows.market`**). Analyze requests: **`domain.models.analysis`** (re-exported from **`research.workflows.analyze`**).
 
 ---
 

@@ -7,7 +7,8 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, Field
 
-from copinance_os.domain.models.market_requests import (
+from copinance_os.domain.models.entities.stock import Stock
+from copinance_os.domain.models.market.requests import (
     GetHistoricalDataRequest,
     GetHistoricalDataResponse,
     GetInstrumentRequest,
@@ -17,7 +18,6 @@ from copinance_os.domain.models.market_requests import (
     GetQuoteRequest,
     GetQuoteResponse,
 )
-from copinance_os.domain.models.stock import Stock
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.repositories import StockRepository
 from copinance_os.domain.validation import StockSymbolValidator

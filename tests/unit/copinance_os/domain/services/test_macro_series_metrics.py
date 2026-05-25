@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from copinance_os.domain.models.macro import MacroDataPoint
+from copinance_os.domain.models.market.macro import MacroDataPoint
 from copinance_os.domain.services.macro_series_metrics import (
     macro_last_n,
     macro_scalar_to_decimal,

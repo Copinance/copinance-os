@@ -7,9 +7,9 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import Field, ValidationError
 
-from copinance_os.domain.models.base import Entity, ValueObject
+from copinance_os.domain.models.common.base import Entity, ValueObject
+from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint
-from copinance_os.domain.models.stock import Stock
 
 
 # Sample entity class for direct testing - must be defined at module level

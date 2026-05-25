@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from pydantic import ConfigDict, Field, field_serializer
 
-from copinance_os.domain.models.base import ValueObject
+from copinance_os.domain.models.common.base import ValueObject
 
 ANALYSIS_METHODOLOGY_ENVELOPE_VERSION = "analysis_methodology_v1"
 

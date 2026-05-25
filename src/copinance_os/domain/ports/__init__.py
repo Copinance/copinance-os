@@ -1,6 +1,6 @@
 """Domain ports (interfaces) for external dependencies."""
 
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.analysis_execution import (
     AnalysisExecutor,
     AnalyzeInstrumentRunner,

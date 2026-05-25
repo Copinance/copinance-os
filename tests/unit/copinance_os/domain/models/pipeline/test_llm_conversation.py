@@ -2,7 +2,7 @@
 
 import pytest
 
-from copinance_os.domain.models.llm_conversation import (
+from copinance_os.domain.models.pipeline.llm_conversation import (
     LLMConversationTurn,
     parse_conversation_history,
     validate_conversation_history_pairs,

@@ -29,7 +29,7 @@ def regime_confidence_score(confidence: Literal["high", "medium", "low"] | float
     return max(0, min(100, round(scaled)))
 
 
-from copinance_os.domain.models.methodology import AnalysisMethodology
+from copinance_os.domain.models.common.methodology import AnalysisMethodology
 
 
 # Market Regime Indicators Models
@@ -144,7 +144,7 @@ class MarketRegimeIndicatorsData(BaseModel):
 
 
 # Import ToolResult from the tool results
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 
 
 class MarketRegimeIndicatorsResult(ToolResult[MarketRegimeIndicatorsData]):

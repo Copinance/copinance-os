@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from copinance_os.core.progress.emit import maybe_emit_progress
-from copinance_os.domain.models.agent_progress import AgentProgressEvent, LlmStreamProgressEvent
+from copinance_os.domain.models.pipeline.agent_progress import (
+    AgentProgressEvent,
+    LlmStreamProgressEvent,
+)
 from copinance_os.domain.ports.progress import ProgressSink
 
 

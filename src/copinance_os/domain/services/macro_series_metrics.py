@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from copinance_os.domain.models.macro import MacroDataPoint
+from copinance_os.domain.models.market.macro import MacroDataPoint
 
 
 def macro_last_n(points: list[MacroDataPoint], n: int) -> list[MacroDataPoint]:

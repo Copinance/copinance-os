@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.interfaces.cli.commands.profile import (
     create_profile,
     delete_profile,

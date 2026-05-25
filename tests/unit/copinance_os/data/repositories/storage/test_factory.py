@@ -10,7 +10,7 @@ from copinance_os.data.repositories.storage.factory import (
     get_default_storage,
 )
 from copinance_os.data.repositories.storage.file import JsonFileStorage
-from copinance_os.domain.models.base import Entity
+from copinance_os.domain.models.common.base import Entity
 from copinance_os.domain.ports.storage import Storage
 
 

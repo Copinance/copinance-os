@@ -10,8 +10,8 @@ from copinance_os.core.orchestrator.runners import (
     DefaultAnalyzeMarketRunner,
 )
 from copinance_os.domain.models.job import JobScope, JobTimeframe, RunJobResult
-from copinance_os.domain.models.llm_conversation import LLMConversationTurn
 from copinance_os.domain.models.market import MarketType, OptionSide
+from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
 from copinance_os.domain.ports.analysis_execution import JobRunner
 from copinance_os.research.workflows.analyze import (
     INSTRUMENT_DETERMINISTIC_TYPE,

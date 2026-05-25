@@ -10,7 +10,7 @@ from copinance_os.data.analytics.options.greeks.config import (
     PROFILE_PREF_OPTION_GREEKS_RISK_FREE_RATE,
     resolve_option_greek_assumptions,
 )
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.infra.config import Settings
 
 

@@ -7,7 +7,7 @@ from typing import Any, Generic, TypeVar
 import structlog
 
 from copinance_os.data.cache import CacheManager
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import DataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
 

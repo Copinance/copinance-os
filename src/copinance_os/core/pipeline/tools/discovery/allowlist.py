@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 
 
 class _StubMarketProvider:

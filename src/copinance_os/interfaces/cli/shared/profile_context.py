@@ -7,7 +7,7 @@ from uuid import UUID
 import typer
 from rich.console import Console
 
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.interfaces.cli.shared.container_access import get_container
 from copinance_os.research.workflows.profile import (
     CreateProfileRequest,

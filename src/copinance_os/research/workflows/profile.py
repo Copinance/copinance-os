@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from copinance_os.data.repositories.profile import CurrentProfile
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 from copinance_os.domain.services import ProfileManagementService
 from copinance_os.research.workflows.base import UseCase

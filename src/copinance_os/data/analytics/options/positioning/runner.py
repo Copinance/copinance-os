@@ -25,9 +25,9 @@ from copinance_os.data.analytics.options.positioning.methodology import (
 )
 from copinance_os.domain.exceptions import ValidationError
 from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.domain.models.market import OptionContract, OptionsChain
-from copinance_os.domain.models.options_positioning import OptionsPositioningResult
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
+from copinance_os.domain.models.options.positioning import OptionsPositioningResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 
 

@@ -2,9 +2,9 @@
 
 import pytest
 
+from copinance_os.domain.models.entities.profile import AnalysisProfile, FinancialLiteracy
 from copinance_os.domain.models.job import Job, JobScope, JobStatus, JobTimeframe
 from copinance_os.domain.models.market import MarketType
-from copinance_os.domain.models.profile import AnalysisProfile, FinancialLiteracy
 
 
 @pytest.mark.unit

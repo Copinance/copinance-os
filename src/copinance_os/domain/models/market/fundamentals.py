@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from copinance_os.domain.models.base import Entity, ValueObject
+from copinance_os.domain.models.common.base import Entity, ValueObject
 
 
 class FinancialStatementPeriod(ValueObject):

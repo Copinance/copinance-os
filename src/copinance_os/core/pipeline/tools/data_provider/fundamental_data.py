@@ -11,7 +11,7 @@ from copinance_os.core.pipeline.tools.data_provider.provider_selector import (
 )
 from copinance_os.data.cache import CacheManager
 from copinance_os.domain.exceptions import ConfigurationError
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider
 from copinance_os.domain.ports.tools import ToolSchema
 

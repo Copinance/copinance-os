@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copinance_os.domain.literacy import TieredCopy
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 
 def report_assumptions(lit: FinancialLiteracy) -> tuple[str, str]:

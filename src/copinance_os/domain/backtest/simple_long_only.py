@@ -6,7 +6,10 @@ import math
 from collections.abc import Sequence
 
 from copinance_os.domain.backtest.models import SimpleBacktestConfig, SimpleBacktestResult
-from copinance_os.domain.models.methodology import MethodologySpec, analysis_methodology_single_spec
+from copinance_os.domain.models.common.methodology import (
+    MethodologySpec,
+    analysis_methodology_single_spec,
+)
 
 
 def run_simple_long_only_backtest(

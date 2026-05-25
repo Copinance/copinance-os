@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from copinance_os.domain.models.curated_questions import ArtifactType
+from copinance_os.domain.models.curated.questions import ArtifactType
 
 # Max serialized summary JSON characters (after context build, before prompt).
 ARTIFACT_MAX_JSON_CHARS: dict[ArtifactType, int] = {

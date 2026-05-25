@@ -14,8 +14,8 @@ from copinance_os.data.literacy import market_regime as mr_lit
 from copinance_os.data.literacy import options_positioning as op_lit
 from copinance_os.data.literacy import reports as reports_lit
 from copinance_os.domain.literacy import TieredCopy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.market import OptionContract, OptionGreeks, OptionsChain, OptionSide
-from copinance_os.domain.models.profile import FinancialLiteracy
 
 _DEGENERATE_ALLOWLIST = {
     ("copinance_os.data.literacy.market_regime", "_VIX_SENTIMENT"),

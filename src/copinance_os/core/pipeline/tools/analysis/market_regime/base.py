@@ -10,7 +10,7 @@ them from there directly.
 from abc import ABC, abstractmethod
 from typing import Any
 
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import Tool
 

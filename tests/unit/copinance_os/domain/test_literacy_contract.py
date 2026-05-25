@@ -3,7 +3,7 @@
 import pytest
 
 from copinance_os.domain.literacy import literacy_output_contract_for_question_driven
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 
 @pytest.mark.unit

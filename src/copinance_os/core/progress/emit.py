@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from copinance_os.domain.models.agent_progress import AgentProgressEvent
+from copinance_os.domain.models.pipeline.agent_progress import AgentProgressEvent
 from copinance_os.domain.ports.progress import ProgressSink
 
 

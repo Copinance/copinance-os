@@ -22,7 +22,13 @@ from copinance_os.core.pipeline.tools.discovery import collect_question_driven_t
 from copinance_os.core.progress.emit import maybe_emit_progress
 from copinance_os.core.progress.recording_sink import RecordingProgressSink
 from copinance_os.domain.literacy import financial_literacy_prompt_value
-from copinance_os.domain.models.agent_progress import (
+from copinance_os.domain.models.analysis import (
+    INSTRUMENT_QUESTION_DRIVEN_TYPE,
+    MARKET_QUESTION_DRIVEN_TYPE,
+)
+from copinance_os.domain.models.job import Job, JobScope
+from copinance_os.domain.models.market import MarketType
+from copinance_os.domain.models.pipeline.agent_progress import (
     GatheringContextEvent,
     LlmStreamProgressEvent,
     RunCompletedEvent,
@@ -30,14 +36,8 @@ from copinance_os.domain.models.agent_progress import (
     RunStartedEvent,
     SynthesisPhaseEvent,
 )
-from copinance_os.domain.models.analysis import (
-    INSTRUMENT_QUESTION_DRIVEN_TYPE,
-    MARKET_QUESTION_DRIVEN_TYPE,
-)
-from copinance_os.domain.models.job import Job, JobScope
-from copinance_os.domain.models.llm_conversation import parse_conversation_history
-from copinance_os.domain.models.market import MarketType
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+from copinance_os.domain.models.pipeline.llm_conversation import parse_conversation_history
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 from copinance_os.domain.ports.analyzers import LLMAnalyzer
 from copinance_os.domain.ports.data_providers import (
     FundamentalDataProvider,

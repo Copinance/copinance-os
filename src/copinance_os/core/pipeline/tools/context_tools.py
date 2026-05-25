@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.tools import Tool, ToolSchema
 
 

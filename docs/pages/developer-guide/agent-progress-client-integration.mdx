@@ -50,7 +50,7 @@ async def emit(self, event: AgentProgressEvent) -> None: ...
 
 ## 4. Event model (discriminate on `kind`)
 
-Every event includes **`schema_version`** (integer, currently **1**) and **`kind`**. Parse JSON with **`copinance_os.domain.models.agent_progress.parse_agent_progress_event`** if you need server-side validation.
+Every event includes **`schema_version`** (integer, currently **1**) and **`kind`**. Parse JSON with **`copinance_os.domain.models.pipeline.agent_progress.parse_agent_progress_event`** if you need server-side validation.
 
 | `kind` | Purpose |
 |--------|---------|
@@ -100,7 +100,7 @@ If **`run_id`** is present in **`run_job` context**, **`DefaultJobRunner`** bind
 ## 8. Versioning
 
 - **`schema_version`** on each event: bump in **breaking** changes to the library’s event shapes.
-- **`AGENT_PROGRESS_SCHEMA_VERSION`** in **`copinance_os.domain.models.agent_progress`**: global constant for documentation; clients can log or gate UI on it.
+- **`AGENT_PROGRESS_SCHEMA_VERSION`** in **`copinance_os.domain.models.pipeline.agent_progress`**: global constant for documentation; clients can log or gate UI on it.
 
 When upgrading the **`copinance-os`** package, re-read this page and the [Architecture](../developer-guide/architecture) package tree for changes.
 
@@ -128,7 +128,7 @@ When you add **timelines, steppers, or tool badges** in the client:
 
 | Item | Location |
 |------|----------|
-| Event union + `parse_agent_progress_event` | `copinance_os.domain.models.agent_progress` |
+| Event union + `parse_agent_progress_event` | `copinance_os.domain.models.pipeline.agent_progress` |
 | `ProgressSink` | `copinance_os.domain.ports.progress` |
 | `RecordingProgressSink` (timeline + optional forward) | `copinance_os.core.progress` |
 | Orchestration entry | `copinance_os.core.orchestrator.research_orchestrator.ResearchOrchestrator.run_job` |

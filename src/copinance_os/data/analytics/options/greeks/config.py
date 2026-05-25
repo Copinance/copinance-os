@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Final
 
-from copinance_os.domain.models.profile import AnalysisProfile
+from copinance_os.domain.models.entities.profile import AnalysisProfile
 from copinance_os.infra.config import Settings
 
 DEFAULT_RISK_FREE_RATE: Final[Decimal] = Decimal("0.045")

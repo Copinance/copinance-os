@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 from copinance_os.data.analytics.options.positioning.math import normalize, sigmoid
-from copinance_os.domain.models.methodology import MethodologyReference, MethodologySpec
-from copinance_os.domain.models.options_positioning import SignalAgreement
+from copinance_os.domain.models.common.methodology import MethodologyReference, MethodologySpec
+from copinance_os.domain.models.options.positioning import SignalAgreement
 
 REF_BOLLEN_WHALEY_2004 = MethodologyReference(
     id="REF_BOLLEN_WHALEY_2004",

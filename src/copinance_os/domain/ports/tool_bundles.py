@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Protocol
 from copinance_os.domain.ports.tools import Tool
 
 if TYPE_CHECKING:
-    from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+    from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 
 
 class ToolBundleFactory(Protocol):

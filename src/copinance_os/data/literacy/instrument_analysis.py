@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copinance_os.data.literacy import reports as reports_lit
 from copinance_os.domain.literacy import TieredCopy
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 _EQ_LABEL_INSTRUMENT = TieredCopy(
     beginner="Company",

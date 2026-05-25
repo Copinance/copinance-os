@@ -14,8 +14,8 @@ from copinance_os.data.analytics.options.positioning.contracts import (
 )
 from copinance_os.data.literacy import options_positioning as _pt
 from copinance_os.domain.literacy import FinancialLiteracy
+from copinance_os.domain.models.common.methodology import MethodologySpec
 from copinance_os.domain.models.market import OptionContract
-from copinance_os.domain.models.methodology import MethodologySpec
 
 # Keep only the largest absolute strike contributions for compact reports.
 DEFAULT_GEX_PROFILE_TOP_K = 15

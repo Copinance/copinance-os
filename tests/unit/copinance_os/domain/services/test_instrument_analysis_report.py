@@ -2,7 +2,7 @@
 
 import pytest
 
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.services.instrument_analysis_report import (
     build_instrument_analysis_report,
 )

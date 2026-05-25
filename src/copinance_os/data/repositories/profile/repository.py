@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from copinance_os.data.repositories.storage.factory import create_storage
-from copinance_os.domain.models.profile import AnalysisProfile
+from copinance_os.domain.models.entities.profile import AnalysisProfile
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 from copinance_os.domain.ports.storage import Storage
 

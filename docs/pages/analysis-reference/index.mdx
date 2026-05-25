@@ -29,7 +29,7 @@ Build and use tools directly from your container:
 
 ```python
 from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
-from copinance_os.domain.models.tool_bundle_context import ToolBundleContext
+from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
 from copinance_os.infra.di import get_container
 
 container = get_container(fred_api_key="your-key")

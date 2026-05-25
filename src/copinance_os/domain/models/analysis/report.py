@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from copinance_os.domain.models.methodology import AnalysisMethodology
+from copinance_os.domain.models.common.methodology import AnalysisMethodology
 
 
 class AnalysisReport(BaseModel):

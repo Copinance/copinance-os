@@ -12,7 +12,7 @@ from copinance_os.data.cache import CacheManager
 from copinance_os.domain.literacy import resolve_financial_literacy
 from copinance_os.domain.models.analysis import merge_instrument_expiration_inputs
 from copinance_os.domain.models.market import OptionSide
-from copinance_os.domain.models.tool_results import ToolResult
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import ToolSchema
 from copinance_os.infra.error_handler import flatten_exception_message

@@ -13,7 +13,7 @@ from copinance_os.ai.llm.policy import NUMERIC_GROUNDING_POLICY
 from copinance_os.ai.llm.providers.base import LLMProvider
 from copinance_os.ai.llm.resources import PromptManager
 from copinance_os.domain.literacy import financial_literacy_prompt_value, resolve_financial_literacy
-from copinance_os.domain.models.curated_questions import (
+from copinance_os.domain.models.curated.questions import (
     ArtifactType,
     CuratedQuestion,
     CuratedQuestionsBlock,
@@ -22,7 +22,7 @@ from copinance_os.domain.models.curated_questions import (
     filter_suggested_tools,
     utc_now,
 )
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 logger = structlog.get_logger(__name__)
 

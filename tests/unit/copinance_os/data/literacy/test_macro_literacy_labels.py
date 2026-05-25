@@ -1,7 +1,7 @@
 import pytest
 
 from copinance_os.data.literacy import macro_indicators as macro_lit
-from copinance_os.domain.models.profile import FinancialLiteracy
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 
 
 @pytest.mark.unit
