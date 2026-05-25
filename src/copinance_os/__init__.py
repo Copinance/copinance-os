@@ -33,6 +33,30 @@ Market narrative (LLM prose summary) example::
     )
     print(result.narrative)   # result.fallback=True when LLM is unavailable
 
+Curated follow-up questions (BFF chips; call after data fetch)::
+
+    from copinance_os import (
+        ArtifactType,
+        GenerateCuratedQuestionsRequest,
+        FinancialLiteracy,
+    )
+    from copinance_os.ai.llm.config import LLMConfig
+    from copinance_os.infra.di import get_container
+
+    container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+    quote_resp = await container.get_quote_use_case().execute(...)
+    payload = {**quote_resp.quote, "symbol": quote_resp.symbol}
+    block = await container.generate_curated_questions_use_case().execute(
+        GenerateCuratedQuestionsRequest(
+            artifact=ArtifactType.QUOTE,
+            payload=payload,
+            count=5,
+            financial_literacy=FinancialLiteracy.BEGINNER,
+        ),
+        llm_provider_override=user_provider,  # optional per-user API key
+    )
+    # block.questions — LLM text; block.meta.llm_unavailable_reason when empty
+
 Custom persistence backend (Postgres) example::
 
     from copinance_os import StockRepository
@@ -70,6 +94,14 @@ from copinance_os.domain.models.analysis import (  # noqa: E402
     AnalyzeMode,
 )
 from copinance_os.domain.models.analysis_report import AnalysisReport  # noqa: E402
+from copinance_os.domain.models.curated_questions import (  # noqa: E402
+    ArtifactType,
+    CuratedQuestion,
+    CuratedQuestionsBlock,
+    CuratedQuestionsMeta,
+    GenerateCuratedQuestionsRequest,
+    LLMUnavailableReason,
+)
 from copinance_os.domain.models.job import RunJobResult  # noqa: E402
 from copinance_os.domain.models.narrative import (
     MarketNarrativeRequest,
@@ -94,6 +126,13 @@ __all__ = [
     # Narrative request/response types
     "MarketNarrativeRequest",
     "NarrativeResult",
+    # Curated questions
+    "ArtifactType",
+    "CuratedQuestion",
+    "CuratedQuestionsBlock",
+    "CuratedQuestionsMeta",
+    "GenerateCuratedQuestionsRequest",
+    "LLMUnavailableReason",
     # Profile types
     "AnalysisProfile",
     "FinancialLiteracy",

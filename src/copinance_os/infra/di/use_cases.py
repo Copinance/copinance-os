@@ -56,11 +56,20 @@ def configure_use_cases(
         Dictionary of use case providers
     """
     # --- deferred heavy imports (openai, pandas, google, edgar, yfinance, QuantLib) ---
+    from copinance_os.ai.curated_questions.generator import (  # noqa: PLC0415
+        CuratedQuestionsGenerator,
+    )
     from copinance_os.core.execution_engine.factory import AnalysisExecutorFactory  # noqa: PLC0415
     from copinance_os.core.orchestrator.research_orchestrator import (  # noqa: PLC0415
         ResearchOrchestrator,
     )
     from copinance_os.core.orchestrator.run_job import DefaultJobRunner  # noqa: PLC0415
+    from copinance_os.core.pipeline.tools.discovery.allowlist import (  # noqa: PLC0415
+        question_driven_tool_names,
+    )
+    from copinance_os.research.workflows.curated_questions import (  # noqa: PLC0415
+        GenerateCuratedQuestionsUseCase,
+    )
     from copinance_os.research.workflows.fundamentals import (  # noqa: PLC0415
         GetStockFundamentalsUseCase,
     )
@@ -145,7 +154,7 @@ def configure_use_cases(
 
         return DefaultAnalyzeMarketRunner(research_orchestrator=research_orchestrator())
 
-    def _make_llm_provider_for_narrative() -> Any:
+    def _make_llm_provider_optional() -> Any:
         if llm_config is None:
             return None
         try:
@@ -161,10 +170,25 @@ def configure_use_cases(
         except Exception:
             return None
 
+    _llm_provider_optional = providers.Callable(_make_llm_provider_optional)
+
+    curated_questions_generator = providers.Factory(
+        CuratedQuestionsGenerator,
+        allowed_tool_names=providers.Callable(question_driven_tool_names),
+        prompt_manager=prompt_manager,
+    )
+
+    generate_curated_questions_use_case = providers.Factory(
+        GenerateCuratedQuestionsUseCase,
+        generator=curated_questions_generator,
+        cache_manager=cache_manager,
+        llm_provider=_llm_provider_optional,
+    )
+
     generate_market_narrative_use_case = providers.Factory(
         GenerateMarketNarrativeUseCase,
         analyze_market_runner=providers.Callable(_make_analyze_market_runner_for_narrative),
-        llm_provider=providers.Callable(_make_llm_provider_for_narrative),
+        llm_provider=_llm_provider_optional,
     )
 
     return {
@@ -177,4 +201,5 @@ def configure_use_cases(
         "analysis_executors": analysis_executors,
         "research_orchestrator": research_orchestrator,
         "generate_market_narrative_use_case": generate_market_narrative_use_case,
+        "generate_curated_questions_use_case": generate_curated_questions_use_case,
     }

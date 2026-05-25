@@ -17,6 +17,7 @@ This guide is for developers who want to integrate Copinance OS into their own P
 - [Using Use Cases Directly](#using-use-cases-directly)
 - [Options positioning context](#options-positioning-context) — **screener-style chain analytics (deterministic)**
 - [Library API Reference](#library-api-reference) — **container entry points, request/response types, all options**
+- [Curated follow-up questions](#curated-follow-up-questions) — Ask AI chips from payloads you already fetched
 - [Analysis Profiles](#analysis-profiles)
 - [Storage and Persistence](#storage-and-persistence)
 - [Custom Orchestration](#custom-orchestration)
@@ -616,6 +617,34 @@ print(result.fallback)       # True when LLM was unavailable; deterministic temp
 
 Both `MarketNarrativeRequest` and `NarrativeResult` are importable directly from `copinance_os`.
 
+### Example: Curated follow-up questions
+
+`GenerateCuratedQuestionsUseCase` suggests Ask AI chips from data you already have (quote, chain, regime card, etc.). It does **not** fetch market data — call it in parallel after your UI renders.
+
+```python
+from copinance_os import (
+    ArtifactType,
+    GenerateCuratedQuestionsRequest,
+    FinancialLiteracy,
+)
+from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+
+container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+block = await container.generate_curated_questions_use_case().execute(
+    GenerateCuratedQuestionsRequest(
+        artifact=ArtifactType.QUOTE,
+        payload={"symbol": "SPY", "current_price": 500, "volume": 1_000_000},
+        count=5,
+        financial_literacy=FinancialLiteracy.BEGINNER,
+    ),
+    llm_provider_override=None,  # optional per-user LLMProvider
+)
+# block.questions when meta.llm_enabled; else [] + meta.llm_unavailable_reason
+```
+
+BFF patterns (static-chip fallback, caching, chip → chat): [Curated questions (clients)](../developer-guide/curated-questions-integration). API tables: [Curated follow-up questions](#curated-follow-up-questions) under Library API Reference.
+
 ---
 
 ### Multi-turn question-driven analysis
@@ -727,6 +756,7 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 | **Orchestration** | `container.research_orchestrator()` | `ResearchOrchestrator` | **Preferred:** `run_job(job, context)` (wraps `JobRunner` internally) |
 | | `container.analysis_executors()` | `list[AnalysisExecutor]` | Registered analysis executors (advanced: validate/execute yourself) |
 | **Narrative** | `container.generate_market_narrative_use_case()` | `GenerateMarketNarrativeUseCase` | LLM prose summary of current market conditions (falls back to deterministic template when LLM unavailable) |
+| **Curated questions** | `container.generate_curated_questions_use_case()` | `GenerateCuratedQuestionsUseCase` | LLM follow-up question chips from an **already-fetched** payload (decoupled from data-fetch latency; optional per-call `llm_provider_override`) |
 | **Profiles** | `container.create_profile_use_case()` | `CreateProfileUseCase` | Create analysis profile |
 | | `container.get_profile_use_case()` | `GetProfileUseCase` | Get profile by ID |
 | | `container.list_profiles_use_case()` | `ListProfilesUseCase` | List profiles (paginated) |
@@ -786,6 +816,37 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 |----------|---------|----------|----------------|
 | Get fundamentals | `GetStockFundamentalsRequest` | `GetStockFundamentalsResponse` | `symbol` (required), `periods` (default `5`), `period_type` (`"annual"` or `"quarterly"`, default `"annual"`). Response: `fundamentals: StockFundamentals` |
 
+### Curated follow-up questions
+
+Generate **follow-up question chips** from data you already fetched (no extra market-data round-trip). Call this in parallel after rendering data so UI latency stays on the data path only. Module: `copinance_os.research.workflows.curated_questions`.
+
+| Use case | Request | Response | Notes |
+|----------|---------|----------|--------|
+| Generate curated questions | `GenerateCuratedQuestionsRequest` | `CuratedQuestionsBlock` | `artifact` (`ArtifactType`), `payload` (dict, validated per artifact), `count` (1–10, default 3), `financial_literacy`, optional `learning_step` (1–8), `no_cache` |
+
+**`ArtifactType` values:** `options_chain`, `quote`, `historical_bars`, `instrument`, `fundamentals`, `market_regime`, `macro_snapshot`, `sector_rotation`, `upcoming_events`, `watchlist_risk`, `options_positioning`.
+
+Each `CuratedQuestion` includes `text`, optional `focus`, optional `suggested_tools` (question-driven tool registry names), and optional `requires_symbol` for multi-symbol payloads.
+
+**LLM:** Requires `get_container(llm_config=...)`. When unavailable, `questions` is empty and `meta.llm_unavailable_reason` is a typed enum (`no_llm_config`, `provider_error`, `parse_error`, `rate_limited`, `timeout`).
+
+**Per-call provider override** (for apps with user-supplied API keys):
+
+```python
+block = await container.generate_curated_questions_use_case().execute(
+    GenerateCuratedQuestionsRequest(
+        artifact=ArtifactType.OPTIONS_CHAIN,
+        payload=chain.model_dump(mode="json"),
+        count=5,
+    ),
+    llm_provider_override=user_provider,
+)
+```
+
+**Caching:** Only curated-questions LLM output is cached (not your data fetch). Dashboard-style artifacts use a longer TTL than symbol snapshots.
+
+**Client integration:** [Curated questions (clients)](../developer-guide/curated-questions-integration).
+
 ### Domain types (jobs and results)
 
 | Type | Module | Use |
@@ -800,6 +861,11 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 | `OptionSide` | `copinance_os.domain.models.market` | `CALL`, `PUT`, `ALL` |
 | `MarketNarrativeRequest` | `copinance_os.domain.models.narrative` | `market_index` (default `"SPY"`), `financial_literacy`, `no_cache` |
 | `NarrativeResult` | `copinance_os.domain.models.narrative` | `narrative` (prose string), `literacy`, `market_index`, `generated_at`, `fallback` (`True` when LLM unavailable) |
+| `GenerateCuratedQuestionsRequest` | `copinance_os.domain.models.curated_questions` | `artifact`, `payload`, `count`, `financial_literacy`, `learning_step`, `no_cache` |
+| `CuratedQuestionsBlock` | `copinance_os.domain.models.curated_questions` | `questions`, `meta` (`llm_enabled`, `llm_unavailable_reason`, `cache_hit`, …) |
+| `ArtifactType` | `copinance_os.domain.models.curated_questions` | Payload-shape enum for curated-question generation |
+| `CuratedQuestion` | `copinance_os.domain.models.curated_questions` | Chip: `text`, `focus`, `suggested_tools`, `requires_symbol` |
+| `LLMUnavailableReason` | `copinance_os.domain.models.curated_questions` | Typed fallback when `questions` is empty |
 | `LLMConversationTurn` | `copinance_os.domain.models.llm_conversation` | `role` (`user` / `assistant`), `content`; used for **`conversation_history`** on analyze requests |
 | `MarketDataPoint` | `copinance_os.domain.models.market` | OHLCV + symbol, timestamp |
 | `OptionsChain` | `copinance_os.domain.models.market` | `underlying_symbol`, `expiration_date`, `calls`, `puts`, `underlying_price`, etc. |
@@ -1005,5 +1071,6 @@ asyncio.run(main())
 - [Configuration](configuration) — LLM and FRED setup, env vars, security.
 - [User Guide — CLI](../user-guide/cli) — Full Typer reference, including **`--json`** for machine-readable output.
 - [API Reference](../developer-guide/api-reference) — Data provider interfaces and market point coercion helpers.
+- [Curated questions (clients)](../developer-guide/curated-questions-integration) — Ask AI chips, BFF fallback, and caching.
 - [Architecture](../developer-guide/architecture) — Hexagonal layout, ports, container, and [annotated package tree](../developer-guide/architecture#package-tree-source).
 - [Extending](../developer-guide/extending) — Custom data providers, executors, and tests.

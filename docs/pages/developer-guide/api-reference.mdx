@@ -175,9 +175,50 @@ container.fundamental_data_provider()            # FundamentalDataProvider (yfin
 container.sec_filings_provider()                 # FundamentalDataProvider (EDGAR)
 container.macro_data_provider()                  # MacroeconomicDataProvider (FRED/yfinance)
 container.generate_market_narrative_use_case()   # GenerateMarketNarrativeUseCase
+container.generate_curated_questions_use_case()  # GenerateCuratedQuestionsUseCase
 ```
 
 Full options and examples: [Library Guide — Configuration](../getting-started/library#configuration).
+
+---
+
+## Curated questions use case
+
+`GenerateCuratedQuestionsUseCase` (`research/workflows/curated_questions.py`) turns an **already-fetched** JSON payload into LLM-suggested follow-up questions for Ask AI chips. It does **not** fetch market data.
+
+```python
+from copinance_os import (
+    ArtifactType,
+    CuratedQuestionsBlock,
+    GenerateCuratedQuestionsRequest,
+    FinancialLiteracy,
+)
+from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+
+container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+block: CuratedQuestionsBlock = await container.generate_curated_questions_use_case().execute(
+    GenerateCuratedQuestionsRequest(
+        artifact=ArtifactType.OPTIONS_CHAIN,
+        payload=chain.model_dump(mode="json"),
+        count=5,
+        financial_literacy=FinancialLiteracy.INTERMEDIATE,
+    ),
+    llm_provider_override=user_provider,  # optional per-request LLM
+)
+```
+
+| Symbol | Role |
+|--------|------|
+| `ArtifactType` | Payload shape: `options_chain`, `quote`, `historical_bars`, `instrument`, `fundamentals`, `market_regime`, `macro_snapshot`, `sector_rotation`, `upcoming_events`, `watchlist_risk`, `options_positioning` |
+| `GenerateCuratedQuestionsRequest` | `artifact`, `payload`, `count` (1–10), `financial_literacy`, optional `learning_step`, `no_cache` |
+| `CuratedQuestionsBlock` | `questions: list[CuratedQuestion]`, `meta: CuratedQuestionsMeta` |
+| `CuratedQuestion` | `text`, `focus`, `suggested_tools`, `requires_symbol` |
+| `LLMUnavailableReason` | `no_llm_config`, `provider_error`, `parse_error`, `rate_limited`, `timeout` |
+
+Flow: validate payload → optional cache hit → deterministic context summary (`data/curated_questions/context.py`) → LLM JSON (`ai/llm/resources/curated_questions.json`) → filter `suggested_tools` against `collect_question_driven_tools` names.
+
+Client integration patterns: [Curated questions (clients)](curated-questions-integration).
 
 ---
 
@@ -190,6 +231,8 @@ These standalone functions are re-exported from `copinance_os` root and require 
 | `regime_confidence_score(confidence)` | `copinance_os.domain.models.regime` | Maps `"high"/"medium"/"low"` or float → `int` 0–100 for regime snapshot storage and comparison across snapshots |
 | `signal_agreement_direction(agreement)` | `copinance_os.data.analytics.options.positioning.bias` | Maps `SignalAgreement` string → `"bullish"/"bearish"/"neutral"` tri-state |
 | `iv_percentile_rank(current_iv, history)` | `copinance_os.data.analytics.options.positioning.iv_rank` | IV percentile rank (0–100) from a caller-supplied rolling history sequence |
+
+**Curated questions types** (also on `copinance_os` root): `ArtifactType`, `GenerateCuratedQuestionsRequest`, `CuratedQuestionsBlock`, `CuratedQuestion`, `CuratedQuestionsMeta`, `LLMUnavailableReason` — see [Curated questions use case](#curated-questions-use-case).
 
 ```python
 from copinance_os import regime_confidence_score, signal_agreement_direction, iv_percentile_rank

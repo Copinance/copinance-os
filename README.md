@@ -228,6 +228,32 @@ The CLI is single-turn by design — one question per invocation. See the [libra
 
 ---
 
+## Curated follow-up questions (library)
+
+Generate **Ask AI suggestion chips** from data you already fetched — without blocking the data response on an LLM call. Pass the payload (quote, options chain, positioning, regime snapshot, etc.) to `generate_curated_questions_use_case()`; see [Curated follow-up questions](https://copinance.github.io/copinance-os/getting-started/library#curated-follow-up-questions) and [Curated questions (clients)](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration) for `ArtifactType` values and response fields.
+
+```python
+from copinance_os import ArtifactType, GenerateCuratedQuestionsRequest, FinancialLiteracy
+from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+
+container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+quote = await container.get_quote_use_case().execute(...)  # fetch first
+block = await container.generate_curated_questions_use_case().execute(
+    GenerateCuratedQuestionsRequest(
+        artifact=ArtifactType.QUOTE,
+        payload={**quote.quote, "symbol": quote.symbol},
+        count=5,
+        financial_literacy=FinancialLiteracy.BEGINNER,
+    ),
+    llm_provider_override=user_provider,  # optional per-user key (BFF pattern)
+)
+# block.questions[].text, .suggested_tools, .requires_symbol
+# block.meta.llm_unavailable_reason when LLM unavailable (typed enum)
+```
+
+---
+
 ## Development
 
 ### Setup
@@ -288,6 +314,7 @@ pytest --cov=copinance_os --cov-report=html  # explicit HTML report
   - **[Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/)** — Architecture, Extending, Testing, [API Reference](https://copinance.github.io/copinance-os/developer-guide/api-reference/) (ports and extension interfaces)
 - **[docs/README.md](docs/README.md)** — Build the docs site locally (Nextra)
 - **[Library — Options positioning context](https://copinance.github.io/copinance-os/getting-started/library#options-positioning-context)** — Library integration notes for aggregate positioning and Greek enrichment (I/O contracts, pitfalls, tests)
+- **[Library — Curated follow-up questions](https://copinance.github.io/copinance-os/getting-started/library#curated-follow-up-questions)** · **[Curated questions (clients)](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration)** — Ask AI suggestion chips from payloads you already fetched
 - **[Developer Guide — Agent progress & chat integration (clients)](https://copinance.github.io/copinance-os/developer-guide/agent-progress-client-integration)** — LLM-facing integration guidance for progress events, payload grounding, methodology rendering, and UI patterns
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** · **[GOVERNANCE.md](GOVERNANCE.md)** · **[CHANGELOG.md](CHANGELOG.md)**
 

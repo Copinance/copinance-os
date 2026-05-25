@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Curated follow-up questions (library)**: Standalone `GenerateCuratedQuestionsUseCase` (`container.generate_curated_questions_use_case()`), eleven `ArtifactType` payload shapes with Pydantic validation, deterministic context builders in `data/curated_questions/`, LLM generator with `suggested_tools` / `requires_symbol` and typed `LLMUnavailableReason`, per-call `llm_provider_override`, and OS cache for LLM output only (not data fetches). Public exports: `ArtifactType`, `GenerateCuratedQuestionsRequest`, `CuratedQuestionsBlock`, `CuratedQuestion`, `CuratedQuestionsMeta`, `LLMUnavailableReason`. Docs: library guide, API reference, [Curated questions (clients)](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration).
+
 - **Library — persistence integration + domain utilities (4 API gaps)**: Four additions for library consumers who need richer integration with their own backends:
   - **`storage_backend` on `get_container()`** — pass a custom `Storage` instance (Tier 1: file-format alternatives, SQLite, S3) directly; takes precedence over `storage_type`/`storage_path`. Tier 2 (async Postgres/DB) continues to use `StockRepository` / `AnalysisProfileRepository` ABC overrides.
   - **`GenerateMarketNarrativeUseCase`** (`research/workflows/narrative.py`) — LLM prose summary of current market conditions grounded in deterministic regime data; literacy-adapted (`beginner`/`intermediate`/`advanced`); falls back to a deterministic `TieredCopy` template with `NarrativeResult.fallback=True` when LLM is unavailable or unconfigured. Wired as `container.generate_market_narrative_use_case()`.

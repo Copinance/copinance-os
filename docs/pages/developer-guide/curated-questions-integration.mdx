@@ -1,0 +1,168 @@
+# Curated questions integration (clients)
+
+Generate **Ask AI suggestion chips** from data the client already fetched. The LLM does not run inside market-data use cases — call `GenerateCuratedQuestionsUseCase` **in parallel** after rendering so page load stays on the data path.
+
+---
+
+## When to use this
+
+| Use case | Use curated questions? |
+|----------|------------------------|
+| Dashboard card (regime, macro, sectors, events, watchlist) | Yes — pass the same JSON your UI already has |
+| Options chain / quote / positioning panel | Yes — `model_dump(mode="json")` from domain models |
+| Full question-driven analyze | No — user already typed a question; use `AnalyzeInstrumentRequest` |
+| Static onboarding chips only | Optional — skip LLM when `meta.llm_unavailable_reason` is set |
+
+---
+
+## Container entry point
+
+```python
+from copinance_os import (
+    ArtifactType,
+    CuratedQuestionsBlock,
+    GenerateCuratedQuestionsRequest,
+    FinancialLiteracy,
+)
+from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.infra.di import get_container
+
+container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+uc = container.generate_curated_questions_use_case()
+```
+
+---
+
+## Request and response
+
+```python
+block: CuratedQuestionsBlock = await uc.execute(
+    GenerateCuratedQuestionsRequest(
+        artifact=ArtifactType.QUOTE,
+        payload={"symbol": "SPY", "current_price": 500, "volume": 1_000_000},
+        count=5,
+        financial_literacy=FinancialLiteracy.BEGINNER,
+        learning_step=3,  # optional; dashboard STEP_PROMPTS alignment
+        no_cache=False,
+    ),
+    llm_provider_override=user_provider,  # optional per-user API key
+)
+```
+
+| Field | Notes |
+|-------|--------|
+| `artifact` | `ArtifactType` — payload **shape**, not OS use-case name |
+| `payload` | Already-fetched dict; validated before LLM (see below) |
+| `count` | 1–10, default 3 |
+| `financial_literacy` | Same tiers as analyze; see [Financial literacy (clients)](financial-literacy) |
+| `learning_step` | Optional 1–8 for tier-1 dashboard copy alignment |
+| `no_cache` | Bypass OS cache when debugging |
+
+### `CuratedQuestion` (each chip)
+
+| Field | Purpose |
+|-------|---------|
+| `text` | Suggested user question (max 500 chars) |
+| `focus` | Optional topic tag (`volatility`, `liquidity`, …) |
+| `suggested_tools` | Soft hint: question-driven **tool registry** names (filtered server-side) |
+| `requires_symbol` | For multi-symbol payloads (watchlist, sectors) — attach when sending to chat |
+
+### `meta` (always present)
+
+| Field | Purpose |
+|-------|---------|
+| `artifact` | Echo of request artifact |
+| `requested_count` | Echo of `count` |
+| `llm_enabled` | `True` only when LLM returned parsed questions |
+| `llm_unavailable_reason` | Typed enum when `questions` is empty (see fallback) |
+| `generated_at` | UTC when LLM succeeded |
+| `cache_hit` | `True` when served from OS curated-questions cache |
+| `numeric_grounding_policy` | Echo of `NUMERIC_GROUNDING_POLICY` for client disclaimers |
+
+---
+
+## `ArtifactType` and payloads
+
+| `ArtifactType` | Typical payload source | Validation highlights |
+|----------------|------------------------|------------------------|
+| `options_chain` | `OptionsChain.model_dump(mode="json")` | Full chain model |
+| `quote` | `GetQuoteResponse.quote` + `symbol` | `symbol` required |
+| `historical_bars` | `{symbol, data: [...]}` or `bars` | Non-empty bar list |
+| `instrument` | `Stock.model_dump(mode="json")` | Stock model |
+| `fundamentals` | `StockFundamentals.model_dump(mode="json")` | Fundamentals model |
+| `market_regime` | Your `market_context` / regime card JSON | Flexible dict |
+| `macro_snapshot` | Dashboard macro strip | `indicators` list (may be empty) |
+| `sector_rotation` | Sector treemap API | Non-empty `sectors` |
+| `upcoming_events` | Events timeline API | Non-empty `events` |
+| `watchlist_risk` | Watchlist risk summary | `items` or `symbols` |
+| `options_positioning` | `OptionsPositioningResult` / positioning API | `symbol` required |
+
+Invalid payloads raise domain `ValidationError` — no LLM call.
+
+---
+
+## LLM unavailable fallback (BFF contract)
+
+When the LLM cannot produce questions:
+
+```json
+{
+  "questions": [],
+  "meta": {
+    "llm_enabled": false,
+    "llm_unavailable_reason": "provider_error"
+  }
+}
+```
+
+| `llm_unavailable_reason` | Suggested client behavior |
+|--------------------------|---------------------------|
+| `no_llm_config` | No provider on container; show static chips only |
+| `provider_error` | Bad key, provider down, or failed health check — static chips |
+| `parse_error` | Model returned non-JSON — static chips |
+| `rate_limited` | Back off; do not hammer the endpoint |
+| `timeout` | Retry later or static chips |
+
+**Distinction:** `no_llm_config` means no LLM was wired. `provider_error` means a provider was configured but failed (e.g. invalid API key).
+
+---
+
+## Per-user API keys (`llm_provider_override`)
+
+Apps that swap LLM credentials per user should **not** rebuild the whole container on every request:
+
+```python
+block = await uc.execute(request, llm_provider_override=user_openai_provider)
+```
+
+The container default remains the fallback when `override` is omitted.
+
+---
+
+## Caching
+
+- **OS cache** stores only **curated-questions LLM output** (namespace `curated_questions`), keyed by artifact + payload hash + literacy + count + learning step.
+- **Dashboard artifacts** (regime, macro, sectors, events, watchlist): longer TTL (~5 min).
+- **Symbol snapshots** (quote, chain, positioning): shorter TTL (~90 s).
+- BFFs may add their own cache (e.g. 60 s per user) on top.
+
+Set `no_cache=True` when debugging prompt or payload changes.
+
+---
+
+## Wiring chips into chat
+
+1. Fetch data → render UI immediately.
+2. Fire `generate_curated_questions_use_case` async.
+3. Show static chips first; append LLM chips when `block` arrives (dedupe by `text`).
+4. On chip click: pre-fill composer with `text`; optionally pass `suggested_tools` into question-driven analyze context (additive — not required by core today).
+
+Questions are **prompts for a later** question-driven run — they must not assert numbers absent from the summarized DATA snapshot.
+
+---
+
+## Related docs
+
+- [Using as a Library — Curated questions](../getting-started/library#curated-follow-up-questions)
+- [API Reference — Curated questions use case](api-reference#curated-questions-use-case)
+- [Financial literacy (clients)](financial-literacy)

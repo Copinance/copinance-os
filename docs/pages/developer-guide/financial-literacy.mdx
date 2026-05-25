@@ -20,6 +20,7 @@ The default when nothing is set is **`intermediate`**.
 
 ```
 AnalyzeInstrumentRequest.financial_literacy   ← highest priority
+  (also: AnalyzeMarketRequest, MarketNarrativeRequest, GenerateCuratedQuestionsRequest)
   └─ AnalysisProfile.financial_literacy       ← used when request field is None
        └─ intermediate (DEFAULT)              ← used when no profile is attached
                                                 (logs a WARNING)
@@ -65,6 +66,8 @@ result = await container.analyze_market_use_case().execute(
     )
 )
 ```
+
+The same field applies to **`MarketNarrativeRequest`** and **`GenerateCuratedQuestionsRequest`** (Ask AI chips grounded in a payload you already fetched). See [Curated questions (clients)](curated-questions-integration).
 
 **When to use:** server-side apps where your user model already knows the preference, or any context where you want stateless, per-request control.
 
