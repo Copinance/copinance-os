@@ -6,8 +6,9 @@ from datetime import date
 from typing import Any, Literal
 
 from copinance_os.data.analytics.options.positioning.bias import (
+    MIN_BIAS_COVERAGE,
     bias_probabilities,
-    compute_bias_score,
+    compute_bias_drivers,
     compute_signal_agreement,
 )
 from copinance_os.data.analytics.options.positioning.charm import compute_charm_exposure
@@ -111,6 +112,7 @@ def compose_options_positioning_payload(
     total_vol = max(1, call_vol + put_vol)
 
     call_oi_ratio = call_oi / total_oi
+    call_oi_ratio_score = call_oi_ratio if (call_oi + put_oi) > 0 else None
     put_call_oi_ratio = put_oi / max(1, call_oi)
     put_call_oi_ratio_score = put_oi / call_oi if call_oi > 0 else None
     call_flow_ratio = call_vol / total_vol
@@ -129,29 +131,96 @@ def compose_options_positioning_payload(
         and (oi := contract_oi(p)) is not None
         and oi > 0
     )
+    # Both sides must have real gamma+OI, not just a nonzero combined magnitude — a
+    # tilt computed from calls alone (no put gamma at all) is the same "manufactured
+    # by a missing side" shape as the put_call_oi_ratio / gamma_tilt guards fixed
+    # upstream of this change; it would otherwise report a value that looks like a
+    # genuine skew but is really just "no put-side data".
+    call_gamma_available = any(
+        numeric_greek(c, "gamma") is not None and (contract_oi(c) or 0) > 0 for c in window_calls
+    )
+    put_gamma_available = any(
+        numeric_greek(p, "gamma") is not None and (contract_oi(p) or 0) > 0 for p in window_puts
+    )
+    gamma_available = call_gamma_available and put_gamma_available
     gamma_denom = abs(weighted_gamma_calls) + abs(weighted_gamma_puts)
     gamma_tilt_score = (
-        (weighted_gamma_calls - weighted_gamma_puts) / gamma_denom if gamma_denom > 0.0 else None
+        (weighted_gamma_calls - weighted_gamma_puts) / gamma_denom
+        if gamma_available and gamma_denom > 0.0
+        else None
     )
     gamma_tilt = gamma_tilt_score if gamma_tilt_score is not None else 0.0
 
     dollar_tot_vol = (
         dollar_metrics_dict["dollar_call_volume"] + dollar_metrics_dict["dollar_put_volume"]
     )
+    call_flow_available = dollar_tot_vol > 0.0 or (call_vol + put_vol) > 0
     call_flow_share_score = (
-        dollar_metrics_dict["dollar_call_flow_share"] if dollar_tot_vol > 0.0 else call_flow_ratio
+        (dollar_metrics_dict["dollar_call_flow_share"] if dollar_tot_vol > 0.0 else call_flow_ratio)
+        if call_flow_available
+        else None
     )
 
-    score = compute_bias_score(
-        call_oi_ratio,
+    net_delta_available = any(
+        numeric_greek(c, "delta") is not None for c in (*window_calls, *window_puts)
+    )
+    net_delta_score = delta_exposure_dict["net_delta"] if net_delta_available else None
+
+    dollar_put_call_available = dollar_metrics_dict["dollar_call_oi"] > 0.0
+
+    bias_breakdown = compute_bias_drivers(
+        call_oi_ratio_score,
         call_flow_share_score,
         gamma_tilt_score,
         put_call_oi_ratio_score,
-        dollar_metrics_dict["dollar_put_call_oi_ratio"],
-        delta_exposure_dict["net_delta"],
+        dollar_metrics_dict["dollar_put_call_oi_ratio"] if dollar_put_call_available else None,
+        net_delta_score,
         dollar_metrics_dict["dollar_call_oi"],
         mc.bias,
     )
+    score = bias_breakdown.score
+    bias_drivers_by_key = {d.key: d for d in bias_breakdown.drivers}
+    # call_flow_share's driver value is whichever of the two flow-share display rows
+    # was actually used (dollar-notional preferred; falls back to contract-count) —
+    # stamping needs to know which row that was so only the real source gets credited.
+    flow_share_used_dollar = dollar_tot_vol > 0.0
+
+    def _bias_stamp(key: str) -> dict[str, Any]:
+        d = bias_drivers_by_key.get(key)
+        if d is None:
+            return {"bias_driver_key": None, "bias_contribution": None}
+        return {
+            "bias_driver_key": d.key,
+            "bias_contribution": d.contribution if d.applied else None,
+        }
+
+    _no_stamp = {"bias_driver_key": None, "bias_contribution": None}
+
+    # Coverage over the six-driver catalog only (not the ~15 display-only signals):
+    # a computability test per driver, independent of which duplicate P/C variant
+    # actually voted in the score above (`bias_breakdown.applied` reflects the vote,
+    # not availability — dollar_put_call_oi_ratio can be "available" and still not
+    # applied because put_call_oi_ratio's dollar sibling took the vote instead).
+    driver_available = {
+        "call_oi_ratio": call_oi_ratio_score is not None,
+        "call_flow_share": call_flow_share_score is not None,
+        "gamma_tilt": gamma_tilt_score is not None,
+        "put_call_oi_ratio": put_call_oi_ratio_score is not None,
+        "dollar_put_call_oi_ratio": dollar_put_call_available,
+        "net_delta": net_delta_available,
+    }
+    catalog_weight_total = sum(abs(w) for w in mc.bias.weights.values())
+    available_weight = sum(abs(mc.bias.weights[key]) for key, ok in driver_available.items() if ok)
+    coverage_weight = (
+        min(1.0, available_weight / catalog_weight_total) if catalog_weight_total > 0.0 else 0.0
+    )
+    coverage = {
+        "available": sum(1 for ok in driver_available.values() if ok),
+        "total": len(driver_available),
+        "weight": round(coverage_weight, 4),
+        "sufficient": coverage_weight >= MIN_BIAS_COVERAGE,
+        "drivers_missing": [key for key, ok in driver_available.items() if not ok],
+    }
 
     bullish_probability, bearish_probability, neutral_probability = bias_probabilities(score)
 
@@ -185,6 +254,7 @@ def compose_options_positioning_payload(
                 else "bearish" if call_oi_ratio <= 0.45 else "neutral"
             ),
             "explanation": _pt.expl_call_oi_share(lit),
+            **_bias_stamp("call_oi_ratio"),
         },
         {
             "name": _pt.name_put_call_oi(lit),
@@ -195,6 +265,7 @@ def compose_options_positioning_payload(
                 else "bullish" if put_call_oi_ratio <= 0.9 else "neutral"
             ),
             "explanation": _pt.expl_put_call_oi(lit),
+            **_bias_stamp("put_call_oi_ratio"),
         },
         {
             "name": _pt.name_flow_calls_share(lit),
@@ -205,6 +276,7 @@ def compose_options_positioning_payload(
                 else "bearish" if call_flow_ratio <= 0.47 else "neutral"
             ),
             "explanation": _pt.expl_flow_calls_share(lit),
+            **(_no_stamp if flow_share_used_dollar else _bias_stamp("call_flow_share")),
         },
         {
             "name": _pt.name_gamma_tilt(lit),
@@ -213,18 +285,21 @@ def compose_options_positioning_payload(
                 "bullish" if gamma_tilt > 0.05 else "bearish" if gamma_tilt < -0.05 else "neutral"
             ),
             "explanation": _pt.expl_gamma_tilt(lit),
+            **_bias_stamp("gamma_tilt"),
         },
         {
             "name": _pt.name_dollar_call_flow_share(lit),
             "value": round(dcf, 4),
             "direction": ("bullish" if dcf >= 0.53 else "bearish" if dcf <= 0.47 else "neutral"),
             "explanation": _pt.expl_dollar_call_flow_share(lit),
+            **(_bias_stamp("call_flow_share") if flow_share_used_dollar else _no_stamp),
         },
         {
             "name": _pt.name_dollar_put_call_oi(lit),
             "value": round(dpc, 4),
             "direction": ("bearish" if dpc >= 1.1 else "bullish" if dpc <= 0.9 else "neutral"),
             "explanation": _pt.expl_dollar_put_call_oi(lit),
+            **_bias_stamp("dollar_put_call_oi_ratio"),
         },
     ]
 
@@ -347,6 +422,7 @@ def compose_options_positioning_payload(
                 else "bearish" if delta_exposure_dict["net_delta"] < 0 else "neutral"
             ),
             "explanation": _pt.expl_net_delta_exposure(lit),
+            **_bias_stamp("net_delta"),
         },
     ]
 
@@ -552,4 +628,25 @@ def compose_options_positioning_payload(
         "scenarios": build_scenarios(
             symbol, lit, bullish_probability, bearish_probability, neutral_probability
         ),
+        "bias_attribution": {
+            "score": round(bias_breakdown.score, 6),
+            "applied_weight_total": round(bias_breakdown.applied_weight_total, 4),
+            "drivers": [
+                {
+                    "key": d.key,
+                    "value": d.value,
+                    "normalized": d.normalized,
+                    "centered": d.centered,
+                    "weight_raw": d.weight_raw,
+                    "weight_share": round(d.weight_share, 4),
+                    "contribution": d.contribution,
+                    "range_low": d.range_low,
+                    "range_high": d.range_high,
+                    "applied": d.applied,
+                    "direction": d.direction,
+                }
+                for d in bias_breakdown.drivers
+            ],
+        },
+        "coverage": coverage,
     }

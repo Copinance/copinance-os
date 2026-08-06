@@ -38,6 +38,51 @@ class PositioningMetricModel(ValueObject):
     value: float
     direction: Literal["bullish", "bearish", "neutral"]
     explanation: str
+    # `None` means "not an input to the bias score" (most of the ~21 display signals);
+    # `0.0` means "an input that landed neutral". Only the six BiasConfig.weights keys
+    # ever get a non-None bias_driver_key. See BiasDriverModel / BiasAttributionModel.
+    bias_driver_key: str | None = Field(default=None, alias="biasDriverKey")
+    bias_contribution: float | None = Field(default=None, alias="biasContribution")
+
+
+class BiasDriverModel(ValueObject):
+    """One weighted signal's contribution to the bias score, applied or not."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    key: str
+    value: float | None = None
+    normalized: float | None = None
+    centered: float | None = None
+    weight_raw: float = Field(..., alias="weightRaw")
+    weight_share: float = Field(..., alias="weightShare")
+    contribution: float
+    range_low: float = Field(..., alias="rangeLow")
+    range_high: float = Field(..., alias="rangeHigh")
+    applied: bool
+    direction: Literal["bullish", "bearish", "neutral"]
+
+
+class BiasAttributionModel(ValueObject):
+    """Per-driver breakdown of the bias score — Stage 1 of the positioning redesign."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    score: float
+    drivers: tuple[BiasDriverModel, ...]
+    applied_weight_total: float = Field(..., alias="appliedWeightTotal")
+
+
+class PositioningCoverageModel(ValueObject):
+    """Computability of the six-driver bias catalog — not the ~21 display signals."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    available: int
+    total: int
+    weight: float = Field(..., ge=0, le=1)
+    sufficient: bool
+    drivers_missing: list[str] = Field(default_factory=list, alias="driversMissing")
 
 
 class PositioningScenarioModel(ValueObject):
@@ -255,3 +300,5 @@ class OptionsPositioningResult(ValueObject):
     mispricing: MispricingModel | None = None
     moneyness_summary: MoneynessSummaryModel | None = Field(default=None, alias="moneynessSummary")
     pin_risk: PinRiskModel | None = Field(default=None, alias="pinRisk")
+    bias_attribution: BiasAttributionModel | None = Field(default=None, alias="biasAttribution")
+    coverage: PositioningCoverageModel | None = None

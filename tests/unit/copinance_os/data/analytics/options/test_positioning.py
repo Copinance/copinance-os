@@ -1506,6 +1506,92 @@ def test_window_near_and_mid_select_different_expirations(toy_chain: tuple) -> N
     assert near_result.gex_profile != mid_result.gex_profile
 
 
+@pytest.mark.unit
+def test_bias_driver_contributions_sum_to_score(toy_chain: tuple) -> None:
+    chain, calls, puts = toy_chain
+    quote = {"current_price": 595.0}
+    result = build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+    )
+    assert result.bias_attribution is not None
+    total = sum(d.contribution for d in result.bias_attribution.drivers)
+    assert total == pytest.approx(result.bias_attribution.score, abs=1e-9)
+
+
+@pytest.mark.unit
+def test_bias_driver_weight_share_sums_to_one_across_applied(toy_chain: tuple) -> None:
+    chain, calls, puts = toy_chain
+    quote = {"current_price": 595.0}
+    result = build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+    )
+    assert result.bias_attribution is not None
+    applied = [d for d in result.bias_attribution.drivers if d.applied]
+    assert applied
+    assert sum(d.weight_share for d in applied) == pytest.approx(1.0, abs=1e-6)
+
+
+@pytest.mark.unit
+def test_bias_driver_gamma_tilt_unavailable_without_greeks(toy_chain: tuple) -> None:
+    """An absent-greeks chain must report gamma_tilt as unavailable (None), not the
+    fabricated 0.0 that made a missing put/call side indistinguishable from balance."""
+    chain, calls, puts = toy_chain
+    calls_no_greeks = [c.model_copy(update={"greeks": None}) for c in calls]
+    puts_no_greeks = [p.model_copy(update={"greeks": None}) for p in puts]
+    chain_no_greeks = chain.model_copy(update={"calls": calls_no_greeks, "puts": puts_no_greeks})
+    quote = {"current_price": 595.0}
+    result = build_options_positioning(
+        chain=chain_no_greeks,
+        calls=calls_no_greeks,
+        puts=puts_no_greeks,
+        quote=quote,
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+        enrich_missing_greeks=False,
+    )
+    assert result.bias_attribution is not None
+    gamma_driver = next(d for d in result.bias_attribution.drivers if d.key == "gamma_tilt")
+    assert gamma_driver.applied is False
+    assert gamma_driver.value is None
+    assert gamma_driver.contribution == 0.0
+    assert result.coverage is not None
+    assert "gamma_tilt" in result.coverage.drivers_missing
+
+
+@pytest.mark.unit
+def test_bias_coverage_full_when_all_six_available(toy_chain: tuple) -> None:
+    chain, calls, puts = toy_chain
+    quote = {"current_price": 595.0}
+    result = build_options_positioning(
+        chain=chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+    )
+    assert result.coverage is not None
+    assert result.coverage.available == 6
+    assert result.coverage.total == 6
+    assert result.coverage.weight == pytest.approx(1.0)
+    assert result.coverage.sufficient is True
+    assert result.coverage.drivers_missing == []
+
+
 def test_build_options_positioning_includes_new_sections() -> None:
     exp = date(2026, 3, 20)
     calls = [

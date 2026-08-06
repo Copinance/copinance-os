@@ -22,6 +22,8 @@ Each call returns one **`OptionsChain`** for a single selected expiry (or the pr
 
 The question-driven registry also exposes **`get_options_positioning`** ([market data tools](../analysis-reference/market-data-tools#get_options_positioning)): quote + default full chain, then aggregate surface metrics from **`data.analytics.options.positioning`** (including GEX, vanna/charm, mispricing, moneyness, pin risk when computable) plus a required methodology envelope (`AnalysisMethodology`: `version`, `computed_at`, `specs`, `data_inputs`) for transparent client rendering.
 
+`OptionsPositioningResult.bias_attribution` (`BiasAttributionModel`) breaks the aggregate directional `bias` score down into its six weighted OI/flow/Greek drivers (`BiasDriverModel`: `value`, `normalized`, `centered`, `weight_raw`, `weight_share`, `contribution`, `applied`, `direction`) — driver `contribution`s sum exactly to `bias_attribution.score`. `OptionsPositioningResult.coverage` (`PositioningCoverageModel`) reports how many of those six drivers had usable chain data (`available`/`total`/`weight`/`sufficient`/`drivers_missing`); `sufficient` gates on `weight >= 0.60`. The six display signals in `signal_categories.positioning`/`gamma` that feed the score also carry `bias_driver_key`/`bias_contribution` (both `None` when a signal isn't a score input, distinguishing "not an input" from a driver that legitimately landed neutral at `0.0`).
+
 The default container exposes a composed `MarketDataProvider` (`OptionAnalyticsMarketDataProvider`) that fetches chains and then runs BSM Greek estimation (first- and higher-order fields on **`OptionGreeks`** when inputs are valid). Vendor-only adapters live under `copinance_os.data.providers`.
 
 ### `FundamentalDataProvider`
