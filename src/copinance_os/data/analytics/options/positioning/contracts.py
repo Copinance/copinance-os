@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Literal
 
 from copinance_os.data.analytics.options.positioning.math import safe_float
 from copinance_os.domain.models.market import OptionContract
@@ -123,6 +125,41 @@ def nearest_expirations(sorted_exp: list[str], n: int = 2) -> list[str]:
         return []
     ordered = sorted(sorted_exp, key=expiration_sort_key)
     return ordered[:n]
+
+
+@dataclass(frozen=True, slots=True)
+class WindowConfig:
+    near_dte: tuple[int, int] = (0, 21)
+    mid_dte: tuple[int, int] = (21, 75)
+
+
+DEFAULT_WINDOW_CONFIG = WindowConfig()
+
+
+def select_window_expirations(
+    sorted_exp: list[str],
+    window: Literal["near", "mid"],
+    ref_date: date,
+    config: WindowConfig = DEFAULT_WINDOW_CONFIG,
+) -> list[str]:
+    """Select up to two expirations whose days-to-expiry fall in ``window``'s band.
+
+    Falls back to :func:`nearest_expirations` when the band holds nothing (thin
+    chains), so those keep today's ordinal-position behaviour instead of resolving
+    to no data.
+    """
+    lo, hi = config.near_dte if window == "near" else config.mid_dte
+    banded: list[str] = []
+    for exp in sorted_exp:
+        d = parse_expiration_to_date(exp)
+        if d is None:
+            continue
+        dte = (d - ref_date).days
+        if lo <= dte <= hi:
+            banded.append(exp)
+    if banded:
+        return sorted(banded, key=expiration_sort_key)[:2]
+    return nearest_expirations(sorted_exp, 2)
 
 
 def atm_strike(strikes: list[float], underlying: float) -> float | None:

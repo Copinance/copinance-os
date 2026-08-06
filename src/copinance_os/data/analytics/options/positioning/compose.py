@@ -6,7 +6,6 @@ from datetime import date
 from typing import Any, Literal
 
 from copinance_os.data.analytics.options.positioning.bias import (
-    apply_window_to_bias_score,
     bias_probabilities,
     compute_bias_score,
     compute_signal_agreement,
@@ -14,12 +13,13 @@ from copinance_os.data.analytics.options.positioning.bias import (
 from copinance_os.data.analytics.options.positioning.charm import compute_charm_exposure
 from copinance_os.data.analytics.options.positioning.config import PositioningMethodology
 from copinance_os.data.analytics.options.positioning.contracts import (
+    contract_expiration_iso,
     contract_iv_pct,
     contract_oi,
     contract_strike,
     contract_vol,
-    nearest_expirations,
     numeric_greek,
+    select_window_expirations,
     sorted_expirations,
 )
 from copinance_os.data.analytics.options.positioning.delta import compute_delta_exposure
@@ -82,15 +82,18 @@ def compose_options_positioning_payload(
     underlying = safe_float(up, safe_float(quote.get("current_price")))
 
     sorted_exp = sorted_expirations(calls, puts)
-    near_exps = nearest_expirations(sorted_exp, 2)
-    nearest_exp = near_exps[0] if near_exps else None
-    second_exp = near_exps[1] if len(near_exps) > 1 else None
+    window_exps = select_window_expirations(sorted_exp, window, ref_date)
+    nearest_exp = window_exps[0] if window_exps else None
+    second_exp = window_exps[1] if len(window_exps) > 1 else None
+    window_exp_set = set(window_exps)
+    window_calls = [c for c in calls if contract_expiration_iso(c) in window_exp_set]
+    window_puts = [p for p in puts if contract_expiration_iso(p) in window_exp_set]
 
     mc = methodology
     component_specs = methodology.component_specs()
     data_quality = compute_data_quality(calls, puts, underlying, mc.quality)
-    dollar_metrics_dict = compute_dollar_metrics(calls, puts, mc.dollar)
-    delta_exposure_dict = compute_delta_exposure(calls, puts, underlying, mc.delta)
+    dollar_metrics_dict = compute_dollar_metrics(window_calls, window_puts, mc.dollar)
+    delta_exposure_dict = compute_delta_exposure(window_calls, window_puts, underlying, mc.delta)
     gex_bundle = compute_gex_profile(calls, puts, nearest_exp, underlying, mc.gex)
     oi_enhanced_bundle = oi_clusters_enhanced(calls, puts, nearest_exp, top_n=mc.oi_clusters.top_n)
     vanna_bundle = compute_vanna_exposure(calls, puts, nearest_exp, underlying, mc.vanna)
@@ -99,35 +102,38 @@ def compose_options_positioning_payload(
     moneyness_bundle = compute_moneyness_buckets(calls, puts, mc.moneyness)
     pin_bundle = compute_pin_risk(calls, puts, nearest_exp, underlying, ref_date, mc.pin_risk)
 
-    call_oi = sum(contract_oi(c) or 0 for c in calls)
-    put_oi = sum(contract_oi(p) or 0 for p in puts)
-    call_vol = sum(contract_vol(c) or 0 for c in calls)
-    put_vol = sum(contract_vol(p) or 0 for p in puts)
+    call_oi = sum(contract_oi(c) or 0 for c in window_calls)
+    put_oi = sum(contract_oi(p) or 0 for p in window_puts)
+    call_vol = sum(contract_vol(c) or 0 for c in window_calls)
+    put_vol = sum(contract_vol(p) or 0 for p in window_puts)
 
     total_oi = max(1, call_oi + put_oi)
     total_vol = max(1, call_vol + put_vol)
 
     call_oi_ratio = call_oi / total_oi
     put_call_oi_ratio = put_oi / max(1, call_oi)
+    put_call_oi_ratio_score = put_oi / call_oi if call_oi > 0 else None
     call_flow_ratio = call_vol / total_vol
 
     weighted_gamma_calls = sum(
         g * float(oi)
-        for c in calls
+        for c in window_calls
         if (g := numeric_greek(c, "gamma")) is not None
         and (oi := contract_oi(c)) is not None
         and oi > 0
     )
     weighted_gamma_puts = sum(
         g * float(oi)
-        for p in puts
+        for p in window_puts
         if (g := numeric_greek(p, "gamma")) is not None
         and (oi := contract_oi(p)) is not None
         and oi > 0
     )
-    gamma_tilt = (weighted_gamma_calls - weighted_gamma_puts) / max(
-        1.0, abs(weighted_gamma_calls) + abs(weighted_gamma_puts)
+    gamma_denom = abs(weighted_gamma_calls) + abs(weighted_gamma_puts)
+    gamma_tilt_score = (
+        (weighted_gamma_calls - weighted_gamma_puts) / gamma_denom if gamma_denom > 0.0 else None
     )
+    gamma_tilt = gamma_tilt_score if gamma_tilt_score is not None else 0.0
 
     dollar_tot_vol = (
         dollar_metrics_dict["dollar_call_volume"] + dollar_metrics_dict["dollar_put_volume"]
@@ -139,14 +145,13 @@ def compose_options_positioning_payload(
     score = compute_bias_score(
         call_oi_ratio,
         call_flow_share_score,
-        gamma_tilt,
-        put_call_oi_ratio,
+        gamma_tilt_score,
+        put_call_oi_ratio_score,
         dollar_metrics_dict["dollar_put_call_oi_ratio"],
         delta_exposure_dict["net_delta"],
         dollar_metrics_dict["dollar_call_oi"],
         mc.bias,
     )
-    score = apply_window_to_bias_score(score, window, mc.bias)
 
     bullish_probability, bearish_probability, neutral_probability = bias_probabilities(score)
 

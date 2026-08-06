@@ -44,7 +44,6 @@ class BiasConfig:
             "net_delta": 1.2,
         }
     )
-    mid_window_damping: float = 0.8
 
 
 DEFAULT_BIAS_CONFIG = BiasConfig()
@@ -53,7 +52,7 @@ DEFAULT_BIAS_CONFIG = BiasConfig()
 def bias_methodology(config: BiasConfig) -> MethodologySpec:
     return MethodologySpec(
         id="options.positioning.bias",
-        version="v1",
+        version="v2",
         model_family="weighted_sigmoid_bias",
         assumptions=("Fixed transparent weights across OI/flow/Greek tilts.",),
         limitations=("Heuristic; not execution advice.",),
@@ -61,22 +60,30 @@ def bias_methodology(config: BiasConfig) -> MethodologySpec:
         parameters={
             "weights": str(dict(config.weights)),
             "ranges": str(dict(config.ranges)),
-            "mid_window_damping": str(config.mid_window_damping),
         },
     )
 
 
 def compute_bias_score(
-    call_oi_ratio: float,
-    call_flow_share: float,
-    gamma_tilt: float,
-    put_call_oi_ratio: float,
-    dollar_put_call_oi_ratio: float,
-    net_delta: float,
+    call_oi_ratio: float | None,
+    call_flow_share: float | None,
+    gamma_tilt: float | None,
+    put_call_oi_ratio: float | None,
+    dollar_put_call_oi_ratio: float | None,
+    net_delta: float | None,
     dollar_call_oi: float,
     config: BiasConfig = DEFAULT_BIAS_CONFIG,
 ) -> float:
+    """Weighted sigmoid-input score over the six directional drivers.
+
+    ``put_call_oi_ratio`` and ``dollar_put_call_oi_ratio`` measure the same skew;
+    only one may vote, preferring the dollar-notional variant when it was
+    computable (mirrors ``_collapse_duplicate_ratio_vote``'s preference for the
+    display/agreement tally). Any driver that is ``None`` (not computable from the
+    chain) is skipped rather than fabricated.
+    """
     score = 0.0
+    use_dollar_ratio = dollar_call_oi > 0.0
     for key, weight in config.weights.items():
         if key == "call_oi_ratio":
             val = call_oi_ratio
@@ -85,13 +92,17 @@ def compute_bias_score(
         elif key == "gamma_tilt":
             val = gamma_tilt
         elif key == "put_call_oi_ratio":
+            if use_dollar_ratio:
+                continue
             val = put_call_oi_ratio
         elif key == "dollar_put_call_oi_ratio":
-            if dollar_call_oi <= 0.0:
+            if not use_dollar_ratio:
                 continue
             val = dollar_put_call_oi_ratio
         else:
             val = net_delta
+        if val is None:
+            continue
         lo, hi = config.ranges[key]
         score += (normalize(val, lo, hi) - 0.5) * weight
     return score
@@ -118,12 +129,6 @@ def compute_signal_agreement(
     if dom_bull:
         return cast(SignalAgreement, f"{strength}_bullish")
     return cast(SignalAgreement, f"{strength}_bearish")
-
-
-def apply_window_to_bias_score(score: float, window: str, config: BiasConfig) -> float:
-    if window == "mid":
-        return score * config.mid_window_damping
-    return score
 
 
 def signal_agreement_direction(agreement: str) -> str:

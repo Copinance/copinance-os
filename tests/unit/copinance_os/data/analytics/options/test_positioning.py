@@ -12,12 +12,10 @@ from typing import Any, Literal
 import pytest
 
 from copinance_os.data.analytics.options.positioning import (
-    DEFAULT_POSITIONING_METHODOLOGY,
     build_options_positioning,
 )
 from copinance_os.data.analytics.options.positioning.bias import (
     DEFAULT_BIAS_CONFIG,
-    BiasConfig,
     compute_signal_agreement,
 )
 from copinance_os.data.analytics.options.positioning.charm import compute_charm_exposure
@@ -1448,35 +1446,64 @@ def test_pin_risk_finds_max_strike() -> None:
 
 
 @pytest.mark.unit
-def test_methodology_bias_override_mid_window_changes_score(toy_chain: tuple) -> None:
-    chain, calls, puts = toy_chain
+def test_window_near_and_mid_select_different_expirations(toy_chain: tuple) -> None:
+    """Regression guard for the near/mid window collapse bug: with expiries in both
+    DTE bands, near and mid must resolve to different contracts and different
+    downstream signals, not the same nearest-two-expirations pick."""
+    chain, near_calls, near_puts = toy_chain
+    mid_exp = date(2026, 2, 18)  # ~40 DTE from TOY_AS_OF: falls in the mid band.
+    mid_calls = [
+        c.model_copy(
+            update={
+                "expiration_date": mid_exp,
+                "contract_symbol": f"MID-{c.contract_symbol}",
+                "strike": c.strike + Decimal("20"),
+            }
+        )
+        for c in near_calls
+    ]
+    mid_puts = [
+        p.model_copy(
+            update={
+                "expiration_date": mid_exp,
+                "contract_symbol": f"MID-{p.contract_symbol}",
+                "strike": p.strike + Decimal("20"),
+            }
+        )
+        for p in near_puts
+    ]
+    calls = [*near_calls, *mid_calls]
+    puts = [*near_puts, *mid_puts]
+    combined_chain = chain.model_copy(
+        update={
+            "calls": calls,
+            "puts": puts,
+            "available_expirations": [chain.expiration_date, mid_exp],
+        }
+    )
     quote = {"current_price": 595.0}
-    base = build_options_positioning(
-        chain=chain,
+    near_result = build_options_positioning(
+        chain=combined_chain,
+        calls=calls,
+        puts=puts,
+        quote=quote,
+        symbol="SPY",
+        window="near",
+        as_of_date=TOY_AS_OF,
+    )
+    mid_result = build_options_positioning(
+        chain=combined_chain,
         calls=calls,
         puts=puts,
         quote=quote,
         symbol="SPY",
         window="mid",
         as_of_date=TOY_AS_OF,
-        methodology=DEFAULT_POSITIONING_METHODOLOGY,
     )
-    tuned = build_options_positioning(
-        chain=chain,
-        calls=calls,
-        puts=puts,
-        quote=quote,
-        symbol="SPY",
-        window="mid",
-        as_of_date=TOY_AS_OF,
-        methodology=DEFAULT_POSITIONING_METHODOLOGY.with_overrides(
-            bias=BiasConfig(mid_window_damping=0.5)
-        ),
-    )
-    assert tuned.bullish_probability != base.bullish_probability
-    bias_specs = [s for s in tuned.methodology.specs if s.id == "options.positioning.bias"]
-    assert bias_specs
-    assert bias_specs[0].parameters.get("mid_window_damping") == "0.5"
+    assert near_result.methodology.data_inputs.get(
+        "expirations_used"
+    ) != mid_result.methodology.data_inputs.get("expirations_used")
+    assert near_result.gex_profile != mid_result.gex_profile
 
 
 def test_build_options_positioning_includes_new_sections() -> None:

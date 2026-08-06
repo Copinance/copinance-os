@@ -3,7 +3,7 @@
   "window": "near",
   "methodology": {
     "version": "analysis_methodology_v1",
-    "computed_at": "2026-04-14T12:36:16.272132+00:00",
+    "computed_at": "2026-08-06T12:20:45.231195+00:00",
     "specs": [
       {
         "id": "options.positioning.data_quality",
@@ -26,7 +26,7 @@
       },
       {
         "id": "options.positioning.bias",
-        "version": "v1",
+        "version": "v2",
         "model_family": "weighted_sigmoid_bias",
         "assumptions": [
           "Fixed transparent weights across OI/flow/Greek tilts."
@@ -48,8 +48,7 @@
         ],
         "parameters": {
           "weights": "{'call_oi_ratio': 1.8, 'call_flow_share': 1.6, 'gamma_tilt': 1.4, 'put_call_oi_ratio': -1.2, 'dollar_put_call_oi_ratio': -1.4, 'net_delta': 1.2}",
-          "ranges": "{'call_oi_ratio': (0.35, 0.65), 'call_flow_share': (0.35, 0.65), 'gamma_tilt': (-0.4, 0.4), 'put_call_oi_ratio': (0.7, 1.6), 'dollar_put_call_oi_ratio': (0.7, 1.6), 'net_delta': (-500000.0, 500000.0)}",
-          "mid_window_damping": "0.8"
+          "ranges": "{'call_oi_ratio': (0.35, 0.65), 'call_flow_share': (0.35, 0.65), 'gamma_tilt': (-0.4, 0.4), 'put_call_oi_ratio': (0.7, 1.6), 'dollar_put_call_oi_ratio': (0.7, 1.6), 'net_delta': (-500000.0, 500000.0)}"
         }
       }
     ],
@@ -63,31 +62,31 @@
       "enrich_missing_greeks": "False"
     }
   },
-  "confidence": 0.501,
+  "confidence": 0.4308,
   "market_bias": "bullish",
-  "bullish_probability": 0.5882,
-  "bearish_probability": 0.2059,
-  "neutral_probability": 0.2059,
+  "bullish_probability": 0.5058,
+  "bearish_probability": 0.2471,
+  "neutral_probability": 0.2471,
   "key_levels": [
     590.0,
     600.0,
     580.0
   ],
-  "analyst_summary": "For SPY, the aggregate options surface leans bullish — more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 50% for the next 1-2 weeks horizon.",
+  "analyst_summary": "For SPY, the aggregate options surface leans bullish — more call-heavy OI and flow. That reflects overall market positioning in the chain, not a specific actor; heavy clusters can sometimes line up with large books, but we do not label institutions. Model confidence is 43% for the next 1-2 weeks horizon.",
   "scenarios": [
     {
       "label": "Bullish continuation",
-      "probability": 0.5882,
+      "probability": 0.5058,
       "narrative": "Upside continuation if SPY holds above option-supported levels."
     },
     {
       "label": "Bearish unwind",
-      "probability": 0.2059,
+      "probability": 0.2471,
       "narrative": "Downside pressure if hedging demand rises and calls unwind in SPY."
     },
     {
       "label": "Range-bound",
-      "probability": 0.2059,
+      "probability": 0.2471,
       "narrative": "Mean-reverting regime likely if neither side gains flow dominance."
     }
   ],

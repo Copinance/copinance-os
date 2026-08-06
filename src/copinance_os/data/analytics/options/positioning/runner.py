@@ -16,7 +16,7 @@ from copinance_os.data.analytics.options.positioning.config import (
     PositioningMethodology,
 )
 from copinance_os.data.analytics.options.positioning.contracts import (
-    nearest_expirations,
+    select_window_expirations,
     sorted_expirations,
 )
 from copinance_os.data.analytics.options.positioning.methodology import (
@@ -61,8 +61,8 @@ def build_options_positioning(
         puts_work = list(chain_work.puts or [])
 
     sorted_exp = sorted_expirations(calls_work, puts_work)
-    near_exps = nearest_expirations(sorted_exp, 2)
-    requested_exp = near_exps[0] if near_exps else None
+    window_exps = select_window_expirations(sorted_exp, window, ref_date)
+    requested_exp = window_exps[0] if window_exps else None
     if requested_exp is None:
         raise ValidationError(
             "expiration",
@@ -88,8 +88,8 @@ def build_options_positioning(
         methodology=methodology,
     )
 
-    nearest_exp = near_exps[0] if near_exps else None
-    second_exp = near_exps[1] if len(near_exps) > 1 else None
+    nearest_exp = window_exps[0] if window_exps else None
+    second_exp = window_exps[1] if len(window_exps) > 1 else None
 
     dq = float(payload["data_quality"] or 0.0)
     greek_specs = chain_work.greeks_methodology.specs if chain_work.greeks_methodology else None
