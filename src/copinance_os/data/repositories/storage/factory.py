@@ -20,7 +20,7 @@ class StorageType:
 
 
 def create_storage(
-    storage_type: str = StorageType.FILE,
+    storage_type: str = StorageType.MEMORY,
     base_path: Path | str | None = None,
 ) -> Storage:
     """Create a storage instance.
@@ -31,9 +31,9 @@ def create_storage(
 
     Args:
         storage_type: Type of storage backend ("file" or "memory").
-                     Defaults to "file".
-        base_path: Optional base path for file storage. If None, uses default.
-                  Only used for file storage type.
+                     Defaults to side-effect-free process memory.
+        base_path: Explicit base path for file storage. Required for file storage;
+                  ignored for memory storage.
 
     Returns:
         Storage instance implementing the Storage interface.
@@ -43,7 +43,7 @@ def create_storage(
     """
     if storage_type == StorageType.FILE:
         if base_path is None:
-            return JsonFileStorage()
+            raise ValueError("base_path is required for file storage")
         return JsonFileStorage(base_path=base_path)
     elif storage_type == StorageType.MEMORY:
         return InMemoryStorage()
@@ -58,6 +58,6 @@ def get_default_storage() -> Storage:
     """Get the default storage instance.
 
     Returns:
-        Default Storage instance for the application (file-based).
+        Side-effect-free default storage instance for library use.
     """
-    return JsonFileStorage()
+    return InMemoryStorage()

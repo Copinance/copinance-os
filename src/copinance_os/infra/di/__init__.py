@@ -19,18 +19,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from copinance_os.infra.di.container import (
         Container,
-        container,
-        get_container,
-        reset_container,
-        set_container,
+        create_container,
     )
 
 __all__ = [
     "Container",
-    "container",
-    "get_container",
-    "set_container",
-    "reset_container",
+    "create_container",
 ]
 
 _EXPORTS = frozenset(__all__)
@@ -40,18 +34,12 @@ def __getattr__(name: str) -> Any:
     if name in _EXPORTS:
         from copinance_os.infra.di.container import (  # noqa: PLC0415
             Container,
-            container,
-            get_container,
-            reset_container,
-            set_container,
+            create_container,
         )
 
         # Cache in globals so subsequent accesses are O(1) attribute lookups
         g = globals()
         g["Container"] = Container
-        g["container"] = container
-        g["get_container"] = get_container
-        g["reset_container"] = reset_container
-        g["set_container"] = set_container
+        g["create_container"] = create_container
         return g[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -38,7 +38,8 @@ class TestYFinanceFundamentalProvider:
     """Integration tests for YFinanceFundamentalProvider."""
 
     @pytest.fixture(scope="class")
-    def provider(self) -> YFinanceFundamentalProvider:
+    @classmethod
+    def provider(cls) -> YFinanceFundamentalProvider:
         """Provide a YFinanceFundamentalProvider instance with caching enabled.
 
         Using class scope so all tests in this class share the same provider instance
@@ -47,8 +48,9 @@ class TestYFinanceFundamentalProvider:
         return YFinanceFundamentalProvider(cache_ttl_seconds=3600)
 
     @pytest.fixture(scope="class")
+    @classmethod
     async def cached_fundamentals_aapl_annual(
-        self, provider: YFinanceFundamentalProvider
+        cls, provider: YFinanceFundamentalProvider
     ) -> StockFundamentals:
         """Pre-fetch and cache AAPL annual fundamentals for reuse across tests.
 
@@ -488,7 +490,8 @@ class TestGetStockFundamentalsUseCase:
     """Integration tests for GetStockFundamentalsUseCase with yfinance."""
 
     @pytest.fixture(scope="class")
-    def use_case(self) -> GetStockFundamentalsUseCase:
+    @classmethod
+    def use_case(cls) -> GetStockFundamentalsUseCase:
         """Provide a GetStockFundamentalsUseCase instance with caching enabled.
 
         Using class scope so all tests in this class share the same provider instance

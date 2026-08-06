@@ -25,9 +25,9 @@ from copinance_os import (
     FinancialLiteracy,
 )
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
 uc = container.generate_curated_questions_use_case()
 ```
 

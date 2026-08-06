@@ -20,7 +20,7 @@ class CacheEntry(BaseModel):
 
 
 class CacheBackend(ABC):
-    """Interface for cache backends (local file, S3, etc.)."""
+    """Interface for explicit memory, file, or shared cache backends."""
 
     @abstractmethod
     async def get(self, key: str) -> CacheEntry | None:

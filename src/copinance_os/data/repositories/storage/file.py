@@ -18,20 +18,19 @@ class JsonFileStorage(Storage):
     applications and development.
     """
 
-    def __init__(self, base_path: Path | str = ".copinance") -> None:
+    def __init__(self, base_path: Path | str) -> None:
         """Initialize JSON file storage.
 
         Args:
-            base_path: Base directory for storing JSON files
+            base_path: Explicit base directory for storing JSON files.
         """
         self._root_path = Path(base_path)
-        self._root_path.mkdir(parents=True, exist_ok=True)
         self._base_path = self._root_path
         self._data_path = get_data_dir(self._root_path)
         self._collections: dict[str, dict[UUID, Any]] = {}
         self._file_paths: dict[str, Path] = {}
 
-    def _get_file_path(self, collection_name: str) -> Path:
+    def _get_file_path(self, collection_name: str, *, create_parent: bool = False) -> Path:
         """Get file path for a collection.
 
         Args:
@@ -46,9 +45,11 @@ class JsonFileStorage(Storage):
                 normalized = "default"
             parts = [part.replace("..", "_").replace("/", "_") for part in normalized.split("/")]
             directory = self._data_path.joinpath(*parts[:-1]) if len(parts) > 1 else self._data_path
-            directory.mkdir(parents=True, exist_ok=True)
             self._file_paths[collection_name] = directory / f"{parts[-1]}.json"
-        return self._file_paths[collection_name]
+        path = self._file_paths[collection_name]
+        if create_parent:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        return path
 
     def get_collection(self, collection_name: str, entity_type: type[Any]) -> dict[UUID, Any]:
         """Get or create a collection by name.
@@ -99,7 +100,7 @@ class JsonFileStorage(Storage):
         if collection_name not in self._collections:
             return
 
-        file_path = self._get_file_path(collection_name)
+        file_path = self._get_file_path(collection_name, create_parent=True)
         entities = {
             str(entity_id): entity.model_dump(mode="json")
             for entity_id, entity in self._collections[collection_name].items()

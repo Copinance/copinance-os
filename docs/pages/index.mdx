@@ -109,7 +109,7 @@ In question-driven mode, **tools** are the bridge: they expose **the same data a
 
 ### Where data lives and how it is reused
 
-**Providers** are the sources (markets, macro agencies, filings). **Caching** avoids hammering APIs when the CLI or a repeated analysis asks for the same thing. **Local artifacts** (saved results, cache files) live under a project **`.copinance`** area by default—they are **not** a full product database; you still store user data and long-term history where you choose.
+**Providers** are the sources (markets, macro agencies, filings). **Caching** avoids hammering APIs when the CLI or a repeated analysis asks for the same thing. The CLI stores local artifacts under **`.copinance`** by default. Library containers are disk-free unless the embedding application explicitly supplies file storage or a file cache.
 
 ### Configuration: knobs, not philosophy
 

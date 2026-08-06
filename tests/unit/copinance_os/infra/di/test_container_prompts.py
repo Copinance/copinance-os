@@ -6,27 +6,22 @@ from copinance_os.ai.llm.resources import (
     ANALYZE_QUESTION_DRIVEN_PROMPT_NAME,
     PromptManager,
 )
-from copinance_os.infra.di import get_container, reset_container
+from copinance_os.infra.di import create_container
 
 
 @pytest.mark.unit
 class TestContainerCustomPromptTemplates:
-    """Validate that get_container() injects custom prompt templates correctly."""
+    """Validate that create_container() injects custom prompt templates correctly."""
 
-    def teardown_method(self) -> None:
-        """Reset global container after each test to avoid affecting other tests."""
-        reset_container()
-
-    def test_get_container_with_prompt_templates_injects_overlay(self) -> None:
-        """Passing prompt_templates to get_container() uses overlay; resolved manager has templates."""
-        reset_container()
+    def test_create_container_with_prompt_templates_injects_overlay(self) -> None:
+        """Passing prompt_templates to create_container() uses overlay; resolved manager has templates."""
         custom = {
             ANALYZE_QUESTION_DRIVEN_PROMPT_NAME: {
                 "system_prompt": "Custom system",
                 "user_prompt": "Custom user",
             },
         }
-        container = get_container(
+        container = create_container(
             prompt_templates=custom,
             load_from_env=False,
         )
@@ -46,9 +41,8 @@ class TestContainerCustomPromptTemplates:
         assert system == "Custom system"
         assert user == "Custom user"
 
-    def test_get_container_with_prompt_manager_uses_provided_instance(self) -> None:
-        """Passing prompt_manager to get_container() uses that instance."""
-        reset_container()
+    def test_create_container_with_prompt_manager_uses_provided_instance(self) -> None:
+        """Passing prompt_manager to create_container() uses that instance."""
         my_pm = PromptManager(
             templates={
                 ANALYZE_QUESTION_DRIVEN_PROMPT_NAME: {
@@ -57,7 +51,7 @@ class TestContainerCustomPromptTemplates:
                 },
             }
         )
-        container = get_container(
+        container = create_container(
             prompt_manager=my_pm,
             load_from_env=False,
         )
@@ -74,10 +68,9 @@ class TestContainerCustomPromptTemplates:
         assert system == "My system"
         assert user == "My user"
 
-    def test_get_container_without_prompt_args_uses_default_manager(self) -> None:
+    def test_create_container_without_prompt_args_uses_default_manager(self) -> None:
         """When neither prompt_templates nor prompt_manager is passed, default PromptManager is used."""
-        reset_container()
-        container = get_container(load_from_env=False)
+        container = create_container()
         pm = container.prompt_manager()
 
         assert isinstance(pm, PromptManager)

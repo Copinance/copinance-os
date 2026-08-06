@@ -136,7 +136,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
             )
 
         no_cache = bool(context.get("no_cache"))
-        effective_tool_cache = None if no_cache else self._cache_manager
+        effective_tool_cache = self._cache_manager if not no_cache and self._cache_manager else None
 
         results: dict[str, Any] = {}
         run_id = str(context.get("run_id") or uuid.uuid4())

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 def configure_data_providers(
     llm_config: LLMConfig | None = None,
     fred_api_key: str | None = None,
+    cache_manager: object | None = None,
 ) -> dict[str, providers.Provider]:
     """Configure data provider providers.
 
@@ -33,13 +34,11 @@ def configure_data_providers(
         Dictionary of data provider providers
     """
     import os  # noqa: PLC0415
-    from datetime import timedelta  # noqa: PLC0415
 
     from copinance_os.ai.llm.analyzer_factory import LLMAnalyzerFactory  # noqa: PLC0415
     from copinance_os.data.analytics.options import (  # noqa: PLC0415
         QuantLibBsmGreekEstimator,
     )
-    from copinance_os.data.cache import CacheManager, LocalFileCacheBackend  # noqa: PLC0415
     from copinance_os.data.providers import (  # noqa: PLC0415
         EdgarToolsFundamentalProvider,
         FredMacroeconomicProvider,
@@ -58,12 +57,6 @@ def configure_data_providers(
     option_greeks_estimator = providers.Singleton(QuantLibBsmGreekEstimator)
     # Prefer EDGAR_IDENTITY (edgartools convention); else settings default / COPINANCEOS_EDGAR_IDENTITY
     edgar_identity = os.environ.get("EDGAR_IDENTITY") or settings.edgar_identity
-
-    cache_manager = providers.Singleton(
-        CacheManager,
-        backend=providers.Singleton(LocalFileCacheBackend),
-        default_ttl=timedelta(hours=1),
-    )
 
     return {
         "market_data_provider": providers.Singleton(
@@ -84,7 +77,6 @@ def configure_data_providers(
             rate_limit_delay=settings.fred_rate_limit_delay,
             timeout_seconds=settings.fred_timeout_seconds,
         ),
-        "cache_manager": cache_manager,
         "llm_analyzer": providers.Factory(
             LLMAnalyzerFactory.create,
             provider_name=None,

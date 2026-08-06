@@ -155,19 +155,23 @@ Tools can also be discovered via setuptools entry point group `copinance_os.tool
 ## Container entry points
 
 ```python
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(
+container = create_container(
     llm_config=LLMConfig(...),      # required for question-driven analysis
     fred_api_key="...",             # optional; enables FRED macro data
-    storage_type="memory",          # "file" | "memory"; avoids disk in library use
-    storage_path=None,              # root path for file storage
+    storage_type="memory",          # default; "file" requires storage_path
+    storage_path=None,              # required for file storage
     storage_backend=None,           # custom Storage instance (Tier 1; overrides storage_type/path)
-    cache_enabled=None,             # True / False / None (use settings)
-    cache_manager=None,             # custom CacheManager instance
+    cache_manager=None,             # no-op by default; inject memory/file/shared cache
     prompt_templates=None,          # dict overlay for prompt names
     prompt_manager=None,            # full custom PromptManager
-    load_from_env=True,             # try env vars for LLM if llm_config is None
+    load_from_env=False,            # explicitly opt into env-based LLM config
+    current_profile_path=None,      # explicit file only when profile state should persist
+    market_data_provider=None,      # optional host-owned data-provider adapters
+    fundamental_data_provider=None,
+    sec_filings_provider=None,
+    macro_data_provider=None,
 )
 
 # Entry points
@@ -181,6 +185,15 @@ container.generate_curated_questions_use_case()  # GenerateCuratedQuestionsUseCa
 ```
 
 Full options and examples: [Library Guide — Configuration](../getting-started/library#configuration).
+
+### Cache composition
+
+`CacheManager()` uses `NullCacheBackend` and performs no I/O. Inject
+`InMemoryCacheBackend(max_entries=...)` for bounded process-local caching,
+`LocalFileCacheBackend(explicit_path)` for caller-owned file caching, or a custom
+`CacheBackend` for shared infrastructure. Cache operations fail open by default;
+construct `CacheManager(backend, strict=True)` for fail-fast behavior. Copinance cache
+configuration does not control caches owned internally by yfinance or edgartools.
 
 ---
 
@@ -196,9 +209,9 @@ from copinance_os import (
     FinancialLiteracy,
 )
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
 block: CuratedQuestionsBlock = await container.generate_curated_questions_use_case().execute(
     GenerateCuratedQuestionsRequest(
         artifact=ArtifactType.OPTIONS_CHAIN,

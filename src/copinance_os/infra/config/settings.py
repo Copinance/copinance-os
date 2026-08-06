@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -63,7 +65,7 @@ class Settings(BaseSettings):
     # Cache (tool results and agent prompt cache)
     cache_enabled: bool = Field(
         default=True,
-        description="Enable built-in cache for tool results and agent prompts. Set to false to disable or when using your own cache via get_container(cache_manager=...).",
+        description="Enable the CLI file cache for tool results and agent prompts. Library containers ignore this setting and require an explicit CacheManager.",
     )
 
     # Macroeconomic data (e.g., FRED)
@@ -136,4 +138,4 @@ def get_storage_path_safe() -> str:
     p = raw.strip()
     if not p or p == ".":
         return ".copinance"
-    return p
+    return str(Path(p).expanduser())

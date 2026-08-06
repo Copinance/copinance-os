@@ -76,7 +76,7 @@ copinance analyze equity AMZN --question "Pull the income statement from Amazon'
 
 ## Caching
 
-SEC responses are cached using the same `CacheManager` as other tool outputs, with per-operation TTLs (filing lists vs. filing body content have different lifetimes). Disabling cache or supplying a custom `cache_manager` in `get_container()` applies to EDGAR-backed calls as well.
+SEC responses are cached using the same `CacheManager` as other tool outputs, with per-operation TTLs (filing lists vs. filing body content have different lifetimes). Disabling cache or supplying a custom `cache_manager` in `create_container()` applies to EDGAR-backed calls as well.
 
 ---
 

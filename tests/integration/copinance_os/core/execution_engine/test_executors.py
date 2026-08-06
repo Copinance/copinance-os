@@ -5,7 +5,7 @@ import pytest
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.research.workflows.analyze import (
     INSTRUMENT_DETERMINISTIC_TYPE,
     INSTRUMENT_QUESTION_DRIVEN_TYPE,
@@ -19,7 +19,7 @@ class TestEndToEndExecutors:
     @pytest.mark.asyncio
     async def test_complete_equity_analysis(self) -> None:
         """Test equity analysis execution (one-off)."""
-        container = get_container()
+        container = create_container()
         runner = container.research_orchestrator()
 
         job = Job(
@@ -39,7 +39,7 @@ class TestEndToEndExecutors:
     @pytest.mark.asyncio
     async def test_question_driven_analysis_execution(self) -> None:
         """Test question-driven analysis execution (one-off)."""
-        container = get_container()
+        container = create_container()
         runner = container.research_orchestrator()
 
         job = Job(
@@ -69,7 +69,7 @@ class TestEndToEndExecutors:
         self, fundamental_data_provider: FundamentalDataProvider
     ) -> None:
         """Test equity analysis execution includes fundamentals data."""
-        container = get_container()
+        container = create_container()
         runner = container.research_orchestrator()
 
         job = Job(

@@ -1,78 +1,57 @@
-"""Unit tests for container cache_enabled and cache_manager injection."""
+"""Tests for explicit, side-effect-free container cache composition."""
 
-from unittest.mock import patch
+from pathlib import Path
 
 import pytest
 
-from copinance_os.data.cache import CacheManager
-from copinance_os.infra.di import get_container, reset_container
+from copinance_os.data.cache import CacheManager, InMemoryCacheBackend
+from copinance_os.infra.di import create_container
 
 
 @pytest.mark.unit
 class TestContainerCacheConfig:
-    """Validate that get_container() respects cache_enabled and cache_manager."""
-
-    def teardown_method(self) -> None:
-        """Reset global container after each test to avoid affecting other tests."""
-        reset_container()
-
-    def test_get_container_with_cache_enabled_false_disables_cache(self) -> None:
-        """Passing cache_enabled=False returns a container whose cache_manager() is None."""
-        reset_container()
-        container = get_container(cache_enabled=False, load_from_env=False)
-
-        assert container.cache_manager() is None
-
-    def test_get_container_with_cache_enabled_true_uses_builtin_cache(self) -> None:
-        """Passing cache_enabled=True returns a container with a CacheManager instance."""
-        reset_container()
-        container = get_container(cache_enabled=True, load_from_env=False)
+    def test_independent_container_defaults_to_noop_cache(self) -> None:
+        container = create_container()
 
         cache = container.cache_manager()
-        assert cache is not None
         assert isinstance(cache, CacheManager)
+        assert cache.enabled is False
+        assert cache.get_backend().get_backend_name() == "none"
 
-    def test_get_container_default_uses_builtin_cache(self) -> None:
-        """When cache_enabled is not passed, default container has cache enabled."""
-        reset_container()
-        container = get_container(load_from_env=False)
-
-        cache = container.cache_manager()
-        assert cache is not None
-        assert isinstance(cache, CacheManager)
-
-    def test_get_container_cache_disable_applied_when_container_already_exists(
-        self,
-    ) -> None:
-        """When global container already exists, get_container(cache_enabled=False) still disables cache."""
-        reset_container()
-        # Create container first (e.g. another module did container.something())
-        get_container(load_from_env=False)
-        # Library user then calls with cache disabled; override must apply
-        container = get_container(cache_enabled=False, load_from_env=False)
-
-        assert container.cache_manager() is None
-
-    def test_get_container_with_custom_cache_manager_uses_provided_instance(
-        self,
-    ) -> None:
-        """Passing cache_manager to get_container() uses that instance."""
-        reset_container()
-        custom = CacheManager()
-        container = get_container(
-            cache_manager=custom,
-            load_from_env=False,
-        )
+    def test_custom_cache_manager_is_shared_with_edgar_provider_graph(self) -> None:
+        custom = CacheManager(InMemoryCacheBackend())
+        container = create_container(cache_manager=custom)
 
         assert container.cache_manager() is custom
+        assert container.sec_filings_provider()._cache_manager is custom
 
-    def test_get_container_respects_settings_cache_enabled_when_none(self) -> None:
-        """When cache_enabled=None, get_container() uses settings (e.g. COPINANCEOS_CACHE_ENABLED)."""
-        reset_container()
-        with patch(
-            "copinance_os.infra.di.container.get_settings",
-        ) as get_settings:
-            get_settings.return_value.cache_enabled = False
-            container = get_container(cache_enabled=None, load_from_env=False)
+    def test_host_owned_data_providers_can_replace_bundled_adapters(self) -> None:
+        market = object()
+        fundamentals = object()
+        filings = object()
+        macro = object()
 
-        assert container.cache_manager() is None
+        container = create_container(
+            market_data_provider=market,
+            fundamental_data_provider=fundamentals,
+            sec_filings_provider=filings,
+            macro_data_provider=macro,
+        )
+
+        assert container.market_data_provider() is market
+        assert container.fundamental_data_provider() is fundamentals
+        assert container.sec_filings_provider() is filings
+        assert container.macro_data_provider() is macro
+
+    def test_container_construction_creates_no_files(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        container = create_container()
+        container.storage_backend()
+        container.cache_manager()
+        container.current_profile().get_current_profile_id()
+        container.research_orchestrator()
+
+        assert list(tmp_path.iterdir()) == []

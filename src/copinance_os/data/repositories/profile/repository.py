@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from copinance_os.data.repositories.storage.factory import create_storage
+from copinance_os.data.repositories.storage.factory import StorageType, create_storage
 from copinance_os.domain.models.entities.profile import AnalysisProfile
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
 from copinance_os.domain.ports.storage import Storage
@@ -20,11 +20,11 @@ class AnalysisProfileRepositoryImpl(AnalysisProfileRepository):
         """Initialize repository.
 
         Args:
-            storage: Optional storage backend. If None, creates default storage.
+            storage: Optional storage backend. If None, uses process-local memory.
                      Should implement the Storage interface.
         """
         if storage is None:
-            storage = create_storage()
+            storage = create_storage(storage_type=StorageType.MEMORY)
         self._storage = storage
         self._collection = self._storage.get_collection("analysis/profiles", AnalysisProfile)
 

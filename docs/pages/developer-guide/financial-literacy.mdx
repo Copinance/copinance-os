@@ -40,9 +40,9 @@ from copinance_os import (
     AnalyzeMarketRequest,
     FinancialLiteracy,
 )
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(llm_config=my_llm_config)
+container = create_container(llm_config=my_llm_config)
 
 # Per-request override — maps directly from your user session
 user_literacy = FinancialLiteracy(user.preferred_literacy)  # e.g. "beginner"
@@ -83,9 +83,9 @@ from copinance_os.research.workflows.profile import (
     SetCurrentProfileRequest,
 )
 from copinance_os.domain.models.entities.profile import FinancialLiteracy
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container()
+container = create_container()
 
 # Create once per user
 response = await container.create_profile_use_case().execute(

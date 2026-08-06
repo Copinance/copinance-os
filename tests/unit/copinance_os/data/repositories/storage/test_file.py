@@ -1,7 +1,6 @@
 """Unit tests for JSON file storage implementation."""
 
 import json
-import os
 import tempfile
 from pathlib import Path
 from uuid import uuid4
@@ -25,14 +24,13 @@ class SampleEntity(Entity):
 class TestJsonFileStorage:
     """Test JSON file storage implementation."""
 
-    def test_init_creates_base_directory(self) -> None:
-        """Test that initialization creates the base directory."""
+    def test_init_is_lazy(self) -> None:
+        """Construction does not create the base directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             base_path = Path(tmpdir) / "test_storage"
             JsonFileStorage(base_path=base_path)
 
-            assert base_path.exists()
-            assert base_path.is_dir()
+            assert not base_path.exists()
 
     def test_init_with_string_path(self) -> None:
         """Test initialization with string path."""
@@ -40,20 +38,7 @@ class TestJsonFileStorage:
             base_path = str(Path(tmpdir) / "test_storage")
             JsonFileStorage(base_path=base_path)
 
-            assert Path(base_path).exists()
-
-    def test_init_with_default_path(self) -> None:
-        """Test initialization with default path."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Change to temp directory to test default path
-            old_cwd = Path.cwd()
-            try:
-                os.chdir(tmpdir)
-                JsonFileStorage()
-
-                assert Path(".copinance").exists()
-            finally:
-                os.chdir(old_cwd)
+            assert not Path(base_path).exists()
 
     def test_get_collection_creates_empty_collection(self) -> None:
         """Test that get_collection creates an empty collection if file doesn't exist."""

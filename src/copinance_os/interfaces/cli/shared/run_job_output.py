@@ -37,7 +37,11 @@ _RUN_INFO_KEYS = (
     "llm_synthesis_error",
     "status",
     "message",
+    "error",
 )
+
+_FAILURE_STATUS_VALUES = frozenset({"failed", "error", "failure"})
+_FAILURE_VALUE_KEYS = frozenset({"status", "message", "error", "llm_synthesis_error"})
 
 
 def _is_options_analysis_dict(obj: Any) -> bool:
@@ -202,6 +206,34 @@ def _render_market_analysis_summary(results: dict[str, Any]) -> Group | None:
     return Group(*parts)
 
 
+def _analysis_failed(results: dict[str, Any]) -> bool:
+    """True when the job payload reports a failed analysis status."""
+    status = results.get("status")
+    if isinstance(status, str) and status.lower() in _FAILURE_STATUS_VALUES:
+        return True
+    return bool(results.get("error")) and not results.get("analysis")
+
+
+def _format_run_info_value(key: str, value: Any, *, failed: bool) -> str:
+    """Format a run-info value, highlighting failure-related fields."""
+    if isinstance(value, dict) and key == "llm_usage":
+        parts = [f"{k}: {v}" for k, v in value.items() if isinstance(v, (int, float))]
+        display = ", ".join(parts) if parts else str(value)
+    elif isinstance(value, list):
+        items = value if len(value) <= 8 else value[:8] + [f"...+{len(value) - 8} more"]
+        display = str(items)
+    else:
+        display = str(value)
+
+    if key == "status" and str(value).lower() in _FAILURE_STATUS_VALUES:
+        return f"[bold red]{display}[/bold red]"
+    if key in _FAILURE_VALUE_KEYS - {"status"} and failed and display:
+        return f"[red]{display}[/red]"
+    if key == "synthesis_status" and str(value).lower() in {"partial", "failed", "error"}:
+        return f"[bold yellow]{display}[/bold yellow]"
+    return display
+
+
 def render_run_job_results(response: RunJobResult, *, json_output: bool = False) -> None:
     """Print ``RunJobResult`` to the console or as JSON."""
     console = Console()
@@ -210,12 +242,17 @@ def render_run_job_results(response: RunJobResult, *, json_output: bool = False)
         return
     if not response.success:
         console.print("\n✗ Failed", style="bold red")
-        console.print(f"Error: {response.error_message}")
+        console.print(f"[red]Error:[/red] {response.error_message}")
         return
 
-    console.print("\n✓ Completed", style="bold green")
+    results = response.results or {}
+    failed = bool(results) and _analysis_failed(results)
+    if failed:
+        console.print("\n✗ Failed", style="bold red")
+    else:
+        console.print("\n✓ Completed", style="bold green")
+
     if response.results:
-        results = response.results
         saved = save_analysis_results(results, get_storage_path_safe())
         printed_saved_path = False
 
@@ -227,21 +264,16 @@ def render_run_job_results(response: RunJobResult, *, json_output: bool = False)
             if key not in results:
                 continue
             value = results[key]
-            if isinstance(value, dict) and key == "llm_usage":
-                # Token counts: input_tokens, output_tokens, total_tokens
-                parts = [f"{k}: {v}" for k, v in value.items() if isinstance(v, (int, float))]
-                value = ", ".join(parts) if parts else value
-            elif isinstance(value, list):
-                value = value if len(value) <= 8 else value[:8] + [f"...+{len(value) - 8} more"]
-            run_lines.append(f"  [cyan]{key}[/cyan]: {value}")
+            display = _format_run_info_value(key, value, failed=failed)
+            run_lines.append(f"  [cyan]{key}[/cyan]: {display}")
         if tool_calls_line and isinstance(tool_calls, Sized):
             run_lines.insert(0, f"  [cyan]tool_calls_count[/cyan]: {len(tool_calls)}")
         run_body = "\n".join(run_lines) if run_lines else "  (no metadata)"
         console.print(
             Panel(
                 run_body,
-                title="[bold]Run info[/bold]",
-                border_style="dim",
+                title="[bold red]Run info[/bold red]" if failed else "[bold]Run info[/bold]",
+                border_style="red" if failed else "dim",
                 padding=(0, 1),
             )
         )

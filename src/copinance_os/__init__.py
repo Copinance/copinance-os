@@ -7,9 +7,9 @@ deterministic pipelines and question-driven AI analysis.
 Instrument analysis example::
 
     from copinance_os import AnalyzeInstrumentRequest, FinancialLiteracy
-    from copinance_os.infra.di import get_container
+    from copinance_os.infra.di import create_container
 
-    container = get_container()
+    container = create_container()
     result = await container.analyze_instrument_runner().run(
         AnalyzeInstrumentRequest(
             symbol="AAPL",
@@ -22,9 +22,9 @@ Market narrative (LLM prose summary) example::
 
     from copinance_os import MarketNarrativeRequest, FinancialLiteracy
     from copinance_os.ai.llm.config import LLMConfig
-    from copinance_os.infra.di import get_container
+    from copinance_os.infra.di import create_container
 
-    container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+    container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
     result = await container.generate_market_narrative_use_case().execute(
         MarketNarrativeRequest(
             market_index="SPY",
@@ -41,9 +41,9 @@ Curated follow-up questions (BFF chips; call after data fetch)::
         FinancialLiteracy,
     )
     from copinance_os.ai.llm.config import LLMConfig
-    from copinance_os.infra.di import get_container
+    from copinance_os.infra.di import create_container
 
-    container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+    container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
     quote_resp = await container.get_quote_use_case().execute(...)
     payload = {**quote_resp.quote, "symbol": quote_resp.symbol}
     block = await container.generate_curated_questions_use_case().execute(
@@ -60,24 +60,24 @@ Curated follow-up questions (BFF chips; call after data fetch)::
 Custom persistence backend (Postgres) example::
 
     from copinance_os import StockRepository
-    from copinance_os.infra.di import get_container
+    from copinance_os.infra.di import create_container
     from dependency_injector import providers
 
     class PostgresStockRepository(StockRepository):
         ...  # implement async methods against your DB pool
 
-    container = get_container()
+    container = create_container()
     container.stock_repository.override(providers.Object(PostgresStockRepository(pool=pg_pool)))
 
 Custom file-like storage backend::
 
     from copinance_os import Storage
-    from copinance_os.infra.di import get_container
+    from copinance_os.infra.di import create_container
 
     class S3Storage(Storage):
         ...  # implement get_collection / save / clear
 
-    container = get_container(storage_backend=S3Storage(bucket="my-bucket"))
+    container = create_container(storage_backend=S3Storage(bucket="my-bucket"))
 """
 
 __version__ = "0.1.0"

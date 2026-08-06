@@ -7,7 +7,7 @@ from typing import Any
 
 import structlog
 
-from copinance_os.data.cache.local_file_cache import LocalFileCacheBackend
+from copinance_os.data.cache.null_cache import NullCacheBackend
 from copinance_os.data.loaders.persistence import PERSISTENCE_SCHEMA_VERSION
 from copinance_os.domain.ports.storage import CacheBackend, CacheEntry
 
@@ -22,16 +22,23 @@ class CacheManager:
     """
 
     def __init__(
-        self, backend: CacheBackend | None = None, default_ttl: timedelta | None = None
+        self,
+        backend: CacheBackend | None = None,
+        default_ttl: timedelta | None = None,
+        *,
+        strict: bool = False,
     ) -> None:
         """Initialize cache manager.
 
         Args:
-            backend: Cache backend instance. If None, uses LocalFileCacheBackend.
+            backend: Cache backend instance. If None, caching is disabled with a
+                no-op backend. Persistent caching must always be explicitly configured.
             default_ttl: Default time-to-live for cache entries. If None, no expiration.
+            strict: Raise backend errors instead of treating cache as an optional optimization.
         """
-        self._backend = backend or LocalFileCacheBackend()
+        self._backend = backend or NullCacheBackend()
         self._default_ttl = default_ttl
+        self._strict = strict
         logger.info(
             "Initialized cache manager",
             backend=self._backend.get_backend_name(),
@@ -72,7 +79,13 @@ class CacheManager:
             CacheEntry if found and valid, None otherwise
         """
         cache_key = self._generate_cache_key(tool_name, **kwargs)
-        entry = await self._backend.get(cache_key)
+        try:
+            entry = await self._backend.get(cache_key)
+        except Exception as exc:
+            if self._strict:
+                raise
+            logger.warning("Cache read failed; treating as miss", error=str(exc))
+            return None
 
         if entry is None:
             return None
@@ -96,7 +109,12 @@ class CacheManager:
                         key=cache_key,
                         age_seconds=age.total_seconds(),
                     )
-                    await self._backend.delete(cache_key)
+                    try:
+                        await self._backend.delete(cache_key)
+                    except Exception as exc:
+                        if self._strict:
+                            raise
+                        logger.warning("Failed to remove expired cache entry", error=str(exc))
                     return None
 
         return entry
@@ -131,7 +149,12 @@ class CacheManager:
             metadata=meta,
         )
 
-        await self._backend.set(cache_key, entry)
+        try:
+            await self._backend.set(cache_key, entry)
+        except Exception as exc:
+            if self._strict:
+                raise
+            logger.warning("Cache write failed; continuing without cache", error=str(exc))
 
     async def delete(self, tool_name: str, **kwargs: Any) -> bool:
         """Delete cached entry.
@@ -144,7 +167,13 @@ class CacheManager:
             True if entry was deleted, False if not found
         """
         cache_key = self._generate_cache_key(tool_name, **kwargs)
-        return await self._backend.delete(cache_key)
+        try:
+            return await self._backend.delete(cache_key)
+        except Exception as exc:
+            if self._strict:
+                raise
+            logger.warning("Cache delete failed", error=str(exc))
+            return False
 
     async def clear(self, tool_name: str | None = None) -> int:
         """Clear cache entries.
@@ -156,7 +185,13 @@ class CacheManager:
         Returns:
             Number of entries deleted
         """
-        return await self._backend.clear(tool_name)
+        try:
+            return await self._backend.clear(tool_name)
+        except Exception as exc:
+            if self._strict:
+                raise
+            logger.warning("Cache clear failed", error=str(exc))
+            return 0
 
     async def exists(self, tool_name: str, **kwargs: Any) -> bool:
         """Check if cache entry exists.
@@ -169,7 +204,13 @@ class CacheManager:
             True if entry exists, False otherwise
         """
         cache_key = self._generate_cache_key(tool_name, **kwargs)
-        return await self._backend.exists(cache_key)
+        try:
+            return await self._backend.exists(cache_key)
+        except Exception as exc:
+            if self._strict:
+                raise
+            logger.warning("Cache existence check failed", error=str(exc))
+            return False
 
     def get_backend(self) -> CacheBackend:
         """Get the cache backend instance.
@@ -178,3 +219,12 @@ class CacheManager:
             Cache backend instance
         """
         return self._backend
+
+    @property
+    def enabled(self) -> bool:
+        """Whether this manager has a storing backend."""
+        return self._backend.get_backend_name() != "none"
+
+    def __bool__(self) -> bool:
+        """Return whether caching is enabled."""
+        return self.enabled

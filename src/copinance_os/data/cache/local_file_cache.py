@@ -2,14 +2,15 @@
 
 import hashlib
 import json
+import os
+import re
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
 
-from copinance_os.data.loaders.persistence import PERSISTENCE_SCHEMA_VERSION, get_cache_dir
-from copinance_os.data.repositories.storage.factory import create_storage
-from copinance_os.data.repositories.storage.file import JsonFileStorage
+from copinance_os.data.loaders.persistence import PERSISTENCE_SCHEMA_VERSION
 from copinance_os.domain.ports.storage import CacheBackend, CacheEntry
 
 logger = structlog.get_logger(__name__)
@@ -21,26 +22,15 @@ class LocalFileCacheBackend(CacheBackend):
     Stores cache entries as JSON files in a directory structure.
     """
 
-    def __init__(self, cache_dir: Path | str | None = None) -> None:
+    def __init__(self, cache_dir: Path | str) -> None:
         """Initialize local file cache backend.
 
         Args:
-            cache_dir: Cache directory path. If None, uses the versioned cache subtree under the persistence root.
+            cache_dir: Explicit cache directory. Construction is side-effect free;
+                directories are created lazily by ``set`` only.
         """
-        if cache_dir is None:
-            storage = create_storage()
-            if isinstance(storage, JsonFileStorage) or hasattr(storage, "_root_path"):
-                cache_dir = get_cache_dir(storage._root_path)
-            elif hasattr(storage, "_base_path"):
-                cache_dir = get_cache_dir(storage._base_path)
-            else:
-                cache_dir = get_cache_dir()
-        elif isinstance(cache_dir, str):
-            cache_dir = Path(cache_dir)
-
         self._cache_dir = Path(cache_dir)
-        self._cache_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("Initialized local file cache", cache_dir=str(self._cache_dir))
+        logger.info("Configured local file cache", cache_dir=str(self._cache_dir))
 
     def get_backend_name(self) -> str:
         """Get backend name."""
@@ -50,10 +40,13 @@ class LocalFileCacheBackend(CacheBackend):
         """Extract the tool name from a versioned cache key."""
         parts = key.split(":", 2)
         if len(parts) == 3:
-            return parts[1]
+            # Tool names are metadata, not trusted path components. Preserve a
+            # readable namespace while preventing separators and traversal.
+            normalized = re.sub(r"[^A-Za-z0-9_.-]+", "_", parts[1]).strip("._")
+            return (normalized or "unknown_tool")[:80]
         return "unknown_tool"
 
-    def _get_cache_file_path(self, key: str) -> Path:
+    def _get_cache_file_path(self, key: str, *, create_parent: bool = False) -> Path:
         """Get file path for cache key.
 
         Args:
@@ -63,7 +56,8 @@ class LocalFileCacheBackend(CacheBackend):
             Path to cache file
         """
         tool_dir = self._cache_dir / self._extract_tool_name(key)
-        tool_dir.mkdir(parents=True, exist_ok=True)
+        if create_parent:
+            tool_dir.mkdir(parents=True, exist_ok=True)
         key_hash = hashlib.sha256(key.encode()).hexdigest()
         return tool_dir / f"{key_hash}.json"
 
@@ -119,7 +113,7 @@ class LocalFileCacheBackend(CacheBackend):
             key: Cache key
             entry: Cache entry to store
         """
-        cache_file = self._get_cache_file_path(key)
+        cache_file = self._get_cache_file_path(key, create_parent=True)
         try:
             data = {
                 "schema_version": entry.schema_version,
@@ -130,8 +124,19 @@ class LocalFileCacheBackend(CacheBackend):
                 "metadata": entry.metadata,
             }
 
-            with cache_file.open("w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, default=str)
+            fd, temp_name = tempfile.mkstemp(
+                prefix=f".{cache_file.stem}.", suffix=".tmp", dir=cache_file.parent
+            )
+            temp_path = Path(temp_name)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, default=str)
+                    f.flush()
+                    os.fsync(f.fileno())
+                temp_path.replace(cache_file)
+            finally:
+                if temp_path.exists():
+                    temp_path.unlink()
 
             logger.debug("Cached entry", key=key, tool_name=entry.tool_name)
         except Exception as e:
@@ -169,6 +174,9 @@ class LocalFileCacheBackend(CacheBackend):
             Number of entries deleted
         """
         deleted_count = 0
+
+        if not self._cache_dir.exists():
+            return 0
 
         if tool_name:
             for cache_file in self._cache_dir.rglob("*.json"):

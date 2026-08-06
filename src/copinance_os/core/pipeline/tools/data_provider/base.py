@@ -34,7 +34,7 @@ class BaseDataProviderTool(Tool, Generic[TProvider]):
         """
         self._provider: TProvider = provider
         self._cache_manager = cache_manager
-        self._use_cache = use_cache and cache_manager is not None
+        self._use_cache = use_cache and bool(cache_manager)
 
     async def _execute_with_cache(self, force_refresh: bool = False, **kwargs: Any) -> ToolResult:
         """Execute tool with caching support.

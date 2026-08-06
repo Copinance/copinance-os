@@ -7,7 +7,7 @@ Every heavy vendor library (openai, pandas, google-genai, edgar, yfinance, Quant
 is imported *lazily* — either inside the ``configure_*`` factory functions (which are
 only called when a provider is first resolved) or inside the thin factory helpers
 defined below the class body (prefixed ``_make_``).  Importing this module itself is
-cheap so that ``get_container()`` can be called from CLI command handlers without
+cheap so that ``create_container()`` can be called by a lazy interface bootstrap without
 adding startup latency.
 """
 
@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any
 
 from dependency_injector import containers, providers
 
-from copinance_os.infra.config import get_settings
 from copinance_os.infra.di.data_providers import configure_data_providers
 from copinance_os.infra.di.profile_use_cases import configure_profile_use_cases
 from copinance_os.infra.di.repositories import configure_repositories
@@ -40,6 +39,12 @@ def _make_prompt_manager() -> Any:
     from copinance_os.ai.llm.resources import PromptManager  # noqa: PLC0415
 
     return PromptManager()
+
+
+def _make_null_cache_manager() -> Any:
+    from copinance_os.data.cache import CacheManager  # noqa: PLC0415
+
+    return CacheManager()
 
 
 def _make_prompt_manager_with_templates(templates: dict[str, dict[str, str]]) -> Any:
@@ -97,17 +102,17 @@ class Container(containers.DeclarativeContainer):
 
     To use LLM features, provide llm_config when creating the container:
         from copinance_os.ai.llm.config import LLMConfig
-        from copinance_os.infra.di import get_container
+        from copinance_os.infra.di import create_container
 
         llm_config = LLMConfig(
             provider="gemini",
             api_key="your-api-key",
             model="gemini-1.5-pro"
         )
-        container = get_container(llm_config=llm_config)
+        container = create_container(llm_config=llm_config)
 
     To provide your own FRED API key (for library integrators):
-        container = get_container(fred_api_key="your-fred-api-key")
+        container = create_container(fred_api_key="your-fred-api-key")
 
     Or override after creation:
         container = Container()
@@ -120,7 +125,7 @@ class Container(containers.DeclarativeContainer):
     llm_config = providers.Configuration()
     fred_api_key_config = providers.Configuration()
 
-    # Prompt templates: default manager (package prompts). Override via get_container().
+    # Prompt templates: default manager (package prompts). Override via create_container().
     # Uses _make_prompt_manager so PromptManager is only imported when first resolved.
     prompt_manager = providers.Singleton(_make_prompt_manager)
 
@@ -137,6 +142,10 @@ class Container(containers.DeclarativeContainer):
     _services_config = configure_services(profile_repository)
     profile_management_service = _services_config["profile_management_service"]
 
+    # Side-effect-free cache default. Persistent and memory caches are explicit
+    # composition choices made by create_container().
+    cache_manager = providers.Singleton(_make_null_cache_manager)
+
     # Data providers (singletons, can be overridden).
     # Singleton caches the provider dict so inner Singletons (yfinance, cache, …) are not
     # rebuilt on every use-case resolution.  configure_data_providers itself is only
@@ -144,6 +153,7 @@ class Container(containers.DeclarativeContainer):
     _data_providers_config = providers.Singleton(
         configure_data_providers,
         llm_config=llm_config,
+        cache_manager=cache_manager,
         fred_api_key=providers.Callable(
             lambda key: key if key else None,
             key=fred_api_key_config.provided,
@@ -163,10 +173,6 @@ class Container(containers.DeclarativeContainer):
     )
     macro_data_provider = providers.Callable(
         lambda config: config["macro_data_provider"](),
-        config=_data_providers_config,
-    )
-    cache_manager = providers.Callable(
-        lambda config: config["cache_manager"](),
         config=_data_providers_config,
     )
     llm_analyzer = providers.Callable(
@@ -284,44 +290,27 @@ class Container(containers.DeclarativeContainer):
     )
 
 
-# Global container instance (can be overridden for testing)
-_container: Container | None = None
-
-
-def _storage_override_provider(
-    storage_type_override: str | None,
-    storage_path_override: str | None,
-) -> providers.Singleton:
-    """Build a Singleton provider for storage when overrides are passed to get_container()."""
-
-    def _create() -> object:
-        from copinance_os.data.repositories.storage import create_storage  # noqa: PLC0415
-        from copinance_os.infra.config import get_storage_path_safe  # noqa: PLC0415
-
-        st = (
-            storage_type_override
-            if storage_type_override is not None
-            else get_settings().storage_type
-        )
-        sp = storage_path_override if storage_path_override is not None else get_storage_path_safe()
-        return create_storage(storage_type=st, base_path=sp)
-
-    return providers.Singleton(_create)
-
-
-def get_container(
+def create_container(
     llm_config: LLMConfig | None = None,
     fred_api_key: str | None = None,
-    load_from_env: bool = True,
+    load_from_env: bool = False,
     prompt_templates: dict[str, dict[str, str]] | None = None,
     prompt_manager: PromptManager | None = None,
-    cache_enabled: bool | None = None,
     cache_manager: CacheManager | None = None,
-    storage_type: str | None = None,
+    storage_type: str = "memory",
     storage_path: str | None = None,
     storage_backend: Any | None = None,
+    current_profile_path: str | None = None,
+    market_data_provider: Any | None = None,
+    fundamental_data_provider: Any | None = None,
+    sec_filings_provider: Any | None = None,
+    macro_data_provider: Any | None = None,
 ) -> Container:
-    """Get the global dependency injection container.
+    """Create an independent, library-safe dependency injection container.
+
+    Defaults are deliberately side-effect free: memory repositories, memory
+    profile state, a no-op cache, and no environment-based LLM configuration.
+    File persistence and caching require explicit backends/paths.
 
     Args:
         llm_config: Optional LLM configuration. If None and load_from_env is True,
@@ -329,8 +318,7 @@ def get_container(
         fred_api_key: Optional FRED API key. If None, uses COPINANCEOS_FRED_API_KEY from
                      settings (for CLI users). Library integrators should pass their own
                      API key here.
-        load_from_env: If True and llm_config is None, attempt to load LLM config
-                      from environment variables (CLI convenience).
+        load_from_env: Explicitly opt into environment-based LLM configuration.
         prompt_templates: Optional overlay of prompt templates. Keys are prompt names
             (e.g. ``analyze_question_driven``), values are ``{"system_prompt": str, "user_prompt": str}``.
             Used for question-driven and other analysis executors; missing names fall back to built-in defaults.
@@ -339,129 +327,71 @@ def get_container(
             resolution; ``prompt_templates`` is ignored. If neither this nor
             ``prompt_templates`` is provided, the default PromptManager (package prompts)
             is used.
-        cache_enabled: If False, disable built-in cache (tool results and agent prompts).
-            If None, uses settings (COPINANCEOS_CACHE_ENABLED, default True). Ignored if
-            ``cache_manager`` is provided.
-        cache_manager: Optional custom CacheManager. If provided, used for tool and
-            prompt caching; ``cache_enabled`` is ignored. Pass your own implementation
-            when using the library with your own caching layer. If you want no cache,
-            pass ``cache_enabled=False`` instead.
-        storage_type: Optional storage backend type (e.g. ``"file"`` or ``"memory"``).
-            If provided, overrides settings/env. Use ``"memory"`` to avoid creating
-            a ``.copinance`` directory on disk (repositories and data stay in memory).
-        storage_path: Optional root path for file storage. Only used when
-            ``storage_type`` is ``"file"`` (or when falling back to file from settings).
-            If ``storage_type`` is ``None``, this is ignored unless you also set
-            storage_type explicitly; when both are None, settings are used.
+        cache_manager: Explicit cache manager. Omit for a no-op cache.
+        storage_type: ``"memory"`` (default) or ``"file"``.
+        storage_path: Required when ``storage_type="file"``.
         storage_backend: Optional pre-built ``Storage`` instance. When provided,
             takes precedence over ``storage_type`` and ``storage_path``. Use this
             when you have a custom ``Storage`` implementation (e.g. SQLite, S3) and
             want to inject it directly. For Postgres, prefer overriding individual
             repository providers via ``container.stock_repository.override()`` after
-            this call, since the ``Storage`` ABC is oriented toward collection-based
+            this container, since the ``Storage`` ABC is oriented toward collection-based
             backends (file/memory); a Postgres backend is better expressed as async
             repository implementations.
+        market_data_provider: Optional host-owned market-data provider.
+        fundamental_data_provider: Optional host-owned fundamentals provider.
+        sec_filings_provider: Optional host-owned SEC filings provider.
+        macro_data_provider: Optional host-owned macro-data provider.
 
     Returns:
         Container instance
     """
-    global _container
-    # For library integrators, always create a new container if fred_api_key is provided
-    # (to allow different API keys per instance)
-    if _container is None or fred_api_key is not None:
-        container_instance = Container()
+    container_instance = Container()
 
-        # Load LLM config if not provided — deferred import (LLM SDKs)
-        if llm_config is None and load_from_env:
-            from copinance_os.ai.llm.config_loader import (  # noqa: PLC0415
-                load_llm_config_from_env,
-            )
+    if llm_config is None and load_from_env:
+        from copinance_os.ai.llm.config_loader import load_llm_config_from_env  # noqa: PLC0415
 
-            llm_config = load_llm_config_from_env()
+        llm_config = load_llm_config_from_env()
+    if llm_config is not None:
+        container_instance.llm_config.override(llm_config)
+    if fred_api_key is not None:
+        container_instance.fred_api_key_config.override(fred_api_key)
 
-        if llm_config is not None:
-            container_instance.llm_config.override(llm_config)
+    if prompt_manager is not None:
+        container_instance.prompt_manager.override(providers.Object(prompt_manager))
+    elif prompt_templates is not None:
+        container_instance.prompt_manager.override(
+            providers.Singleton(_make_prompt_manager_with_templates, templates=prompt_templates)
+        )
 
-        # Override FRED API key if provided (for library integrators)
-        if fred_api_key is not None:
-            container_instance.fred_api_key_config.override(fred_api_key)
-
-        # Prompt templates: custom manager or overlay; otherwise default
-        if prompt_manager is not None:
-            container_instance.prompt_manager.override(providers.Object(prompt_manager))
-        elif prompt_templates is not None:
-            container_instance.prompt_manager.override(
-                providers.Singleton(_make_prompt_manager_with_templates, templates=prompt_templates)
-            )
-
-        # Cache: custom manager, or disable if cache_enabled=False
-        if cache_manager is not None:
-            container_instance.cache_manager.override(providers.Object(cache_manager))
-        elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
-            container_instance.cache_manager.override(providers.Object(None))
-
-        # Storage: custom instance takes precedence, then type/path string overrides
-        if storage_backend is not None:
-            container_instance.storage_backend.override(providers.Object(storage_backend))
-        elif storage_type is not None or storage_path is not None:
-            container_instance.storage_backend.override(
-                _storage_override_provider(storage_type, storage_path)
-            )
-
-        if _container is None:
-            _container = container_instance
-        else:
-            # Return new instance for library integrators with custom API key
-            return container_instance
-    # Apply cache overrides to existing container (library use: cache disable was ignored)
     if cache_manager is not None:
-        _container.cache_manager.override(providers.Object(cache_manager))
-    elif cache_enabled is False or (cache_enabled is None and not get_settings().cache_enabled):
-        _container.cache_manager.override(providers.Object(None))
+        container_instance.cache_manager.override(providers.Object(cache_manager))
 
-    # Apply storage overrides when storage_type or storage_path provided
     if storage_backend is not None:
-        _container.storage_backend.override(providers.Object(storage_backend))
-    elif storage_type is not None or storage_path is not None:
-        _container.storage_backend.override(_storage_override_provider(storage_type, storage_path))
+        container_instance.storage_backend.override(providers.Object(storage_backend))
+    else:
+        from copinance_os.data.repositories.storage import create_storage  # noqa: PLC0415
 
-    return _container
+        if storage_type == "file" and storage_path is None:
+            raise ValueError("storage_path is required when storage_type='file'")
+        storage = create_storage(storage_type=storage_type, base_path=storage_path)
+        container_instance.storage_backend.override(providers.Object(storage))
 
+    if current_profile_path is not None:
+        from copinance_os.data.repositories.profile import CurrentProfile  # noqa: PLC0415
 
-def set_container(container: Container) -> None:
-    """Set a custom container (useful for testing).
+        container_instance.current_profile.override(
+            providers.Singleton(CurrentProfile, config_path=current_profile_path)
+        )
 
-    Args:
-        container: Container instance to use
-    """
-    global _container
-    _container = container
+    provider_overrides = (
+        (container_instance.market_data_provider, market_data_provider),
+        (container_instance.fundamental_data_provider, fundamental_data_provider),
+        (container_instance.sec_filings_provider, sec_filings_provider),
+        (container_instance.macro_data_provider, macro_data_provider),
+    )
+    for provider, override in provider_overrides:
+        if override is not None:
+            provider.override(providers.Object(override))
 
-
-def reset_container() -> None:
-    """Reset the global container (useful for testing)."""
-    global _container
-    _container = None
-
-
-class _ContainerProxy:
-    """Lazy proxy for the global container.
-
-    Delegates to get_container() on every attribute access so that:
-    - No container is created at import time (lazy initialization).
-    - Library code that calls get_container(cache_enabled=False) first gets
-      a container created with those options; later access via this proxy
-      returns the same instance.
-    - Explicit cache/LLM/FRED overrides passed to get_container() are applied
-      when returning an existing container, so options are never ignored.
-
-    Does not use __slots__ so that unittest.mock.patch() can set attributes
-    on the proxy (e.g. @patch("...container.cache_manager")).
-    """
-
-    def __getattr__(self, name: str) -> object:
-        return getattr(get_container(), name)
-
-
-# Lazy default container: no creation at import; first use or get_container(...) wins
-container: Container = _ContainerProxy()  # type: ignore[assignment]
+    return container_instance

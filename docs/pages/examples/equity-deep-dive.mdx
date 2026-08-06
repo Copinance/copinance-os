@@ -110,12 +110,12 @@ copinance analyze --json equity AAPL --timeframe mid_term | jq '{
 ```python
 import asyncio
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType
 
 async def equity_analysis():
-    container = get_container(
+    container = create_container(
         llm_config=LLMConfig(provider="gemini", api_key="your-key", model="gemini-1.5-pro"),
         fred_api_key="your-fred-key",
     )

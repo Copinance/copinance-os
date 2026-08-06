@@ -183,7 +183,7 @@ copinance market --json options SPY
 Analyze/export contract (stable top-level keys):
 
 - `analyze --json ...` and root `copinance --json "..."` emit `RunJobResult` with `success`, `results`, `error_message`, `report`, and `report_exclusion_reason`.
-- Deterministic results are also persisted under `.copinance/results/v2/` (when not using memory storage), with the same structured methodology envelope used in JSON output.
+- The CLI also persists deterministic results under `.copinance/results/v2/`, with the same structured methodology envelope used in JSON output. Library runs do not export results unless the host application chooses to do so.
 - `analyze positioning` emits the full aggregate `OptionsPositioningResult` under `results`, with uncomputable metrics preserved as `null` (no synthetic `0.0` fallback values).
 
 ### Shell completion
@@ -226,6 +226,12 @@ Multi-turn question-driven analysis (follow-up questions with memory of prior an
 
 The CLI is single-turn by design — one question per invocation. See the [library guide](https://copinance.github.io/copinance-os/getting-started/library#multi-turn-question-driven-analysis) for the full API.
 
+Library containers are safe to construct in read-only deployments: `create_container()`
+uses memory-backed storage and a no-op cache by default. Persistent storage and file
+caching are explicit opt-ins with caller-owned paths. Process-local caching is available
+through `CacheManager(InMemoryCacheBackend(...))`; deployments that prohibit all vendor
+filesystem activity can inject host-owned data providers. See [Library — Cache](https://copinance.github.io/copinance-os/getting-started/library#cache).
+
 ---
 
 ## Curated follow-up questions (library)
@@ -235,9 +241,9 @@ Generate **Ask AI suggestion chips** from data you already fetched — without b
 ```python
 from copinance_os import ArtifactType, GenerateCuratedQuestionsRequest, FinancialLiteracy
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
 quote = await container.get_quote_use_case().execute(...)  # fetch first
 block = await container.generate_curated_questions_use_case().execute(
     GenerateCuratedQuestionsRequest(

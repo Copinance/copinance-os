@@ -1,7 +1,7 @@
 """LLM prompt resources.
 
 This module provides prompt templates for LLM analysis tasks. Library clients
-can inject their own templates via ``get_container(prompt_templates=...)`` or
+can inject their own templates via ``create_container(prompt_templates=...)`` or
 ``prompt_manager=PromptManager(templates=...)``; otherwise defaults are used.
 """
 

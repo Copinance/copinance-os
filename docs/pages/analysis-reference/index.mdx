@@ -30,9 +30,9 @@ Build and use tools directly from your container:
 ```python
 from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
 from copinance_os.domain.models.pipeline.tool_bundle_context import ToolBundleContext
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(fred_api_key="your-key")
+container = create_container(fred_api_key="your-key")
 ctx = ToolBundleContext(
     market_data_provider=container.market_data_provider(),
     macro_data_provider=container.macro_data_provider(),

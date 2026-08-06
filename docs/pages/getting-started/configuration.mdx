@@ -1,11 +1,11 @@
 # Configuration
 
-Configure **settings** (LLM, FRED, storage, cache, BSM inputs) for CLI via **environment variables** / `.env`, or for library use by passing objects into **`get_container()`**. Configuration does not change domain math; it selects providers, keys, and paths only.
+Configure **settings** (LLM, FRED, storage, cache, BSM inputs) for the CLI via **environment variables** / `.env`. Library containers do not inherit CLI persistence/cache defaults; pass objects into **`create_container()`** explicitly.
 
 ## Configuration Methods
 
 1. **CLI**: Environment variables or a `.env` file.
-2. **Library**: Pass `LLMConfig` and optional `fred_api_key` into `get_container()`. See [Library Integration](#library-integration) below.
+2. **Library**: Pass `LLMConfig` and optional `fred_api_key` into `create_container()`. See [Library Integration](#library-integration) below.
 3. **Logging**: Set `COPINANCEOS_LOG_LEVEL` and optional `COPINANCEOS_LOG_FORMAT` in the environment, or call `configure_logging(...)` once at process startup when embedding the package. See [Logging](#logging).
 
 ## Environment Variables (CLI)
@@ -96,17 +96,17 @@ Reserved `OptionsChain.metadata` keys and profile preferences are documented in 
 ## Storage and Cache
 
 ```bash
-# Storage (optional)
+# CLI storage (optional; library containers do not read these automatically)
 COPINANCEOS_STORAGE_TYPE=file
 COPINANCEOS_STORAGE_PATH=~/.copinance
 
-# Cache (optional, default: true)
+# CLI cache (optional, default: true)
 COPINANCEOS_CACHE_ENABLED=true
 ```
 
-- **Library:** Use `get_container(..., cache_enabled=False)` or `cache_manager=...`. See [Using as a Library](library#cache).
+- **Library:** The default cache is a no-op. Inject `cache_manager=...` to opt into memory, file, or shared caching. CLI-only `COPINANCEOS_CACHE_ENABLED` is not read by library composition. See [Using as a Library](library#cache).
 
-**SEC / edgartools:** Filing metadata and filing content from EDGAR are stored in the same file cache as tool results (versioned under your persistence/cache paths). Disabling cache or using a custom `cache_manager` applies to EDGAR-backed calls as well.
+**SEC / edgartools:** Copinance-level filing metadata and content caching uses the same explicitly injected `CacheManager` as other tools. Note that edgartools and yfinance also have vendor-owned HTTP/cookie caches; configure those packages separately if your deployment enforces a strict filesystem policy.
 
 ## Logging
 
@@ -205,11 +205,12 @@ Never commit `.env`. Add to `.gitignore`:
 
 ## Library Integration
 
-When using Copinance OS as a **library**, pass config into `get_container()` for LLM, FRED, storage, and cache. **`Settings`** still loads **`COPINANCEOS_*`** from the environment (and `.env`) if you use **`get_settings()`**—for example for logging—so env is not “CLI-only” for every knob.
+When using Copinance OS as a **library**, pass config into `create_container()` for LLM, FRED, storage, and cache. **`Settings`** still loads **`COPINANCEOS_*`** from the environment (and `.env`) if you use **`get_settings()`**—for example for logging—so env is not “CLI-only” for every knob.
 
-- **LLMConfig**: Required for question-driven analysis. Example: `get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))`.
-- **FRED**: Optional. `get_container(..., fred_api_key="your-key")`.
-- **Storage**: To avoid creating a `.copinance` directory on disk, use `get_container(..., storage_type="memory")` or set `COPINANCEOS_STORAGE_TYPE=memory` in env. See [Storage and Persistence](library#storage-and-persistence).
+- **LLMConfig**: Required for question-driven analysis. Example: `create_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))`.
+- **FRED**: Optional. `create_container(..., fred_api_key="your-key")`.
+- **Storage**: Library containers already use process memory by default and do not read `COPINANCEOS_STORAGE_TYPE`. Opt into persistence with `create_container(storage_type="file", storage_path="...")` or inject `storage_backend`. See [Storage and Persistence](library#storage-and-persistence).
+- **Cache**: Library containers use a no-op cache by default and do not read `COPINANCEOS_CACHE_ENABLED`. Inject an explicit memory, file, or shared `CacheManager` when caching is useful.
 - **Logging**: Call `configure_logging(get_settings())` or `configure_logging(Settings(...))` once at startup; see [Logging](#logging).
 
 Full container options and examples: [Using as a Library](library).

@@ -56,7 +56,7 @@ class PromptManager:
 
     Use ``PromptManager()`` for defaults only, or pass ``templates`` and/or
     ``resources_dir`` to customize. When using as a library, pass
-    ``prompt_templates`` or ``prompt_manager`` to ``get_container()``.
+    ``prompt_templates`` or ``prompt_manager`` to ``create_container()``.
     """
 
     def __init__(

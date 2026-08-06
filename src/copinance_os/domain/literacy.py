@@ -23,7 +23,7 @@
   may import them.
 - Long prose tables stay in **data** (or **interfaces** for CLI copy), not in domain.
 
-See also: ``.claude/rules/architecture.md`` (Financial literacy and narratives).
+See also: ``docs/pages/developer-guide/financial-literacy.mdx``.
 """
 
 from __future__ import annotations

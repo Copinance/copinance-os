@@ -68,7 +68,7 @@ copinance-os = { path = "../copinance-os", editable = true }
 
 | Concept | Description |
 |--------|-------------|
-| **Container** | Dependency-injection container. You get it via `get_container(...)` and use it to resolve use cases, **`ResearchOrchestrator`**, and data providers. |
+| **Container** | Dependency-injection container. You get it via `create_container(...)` and use it to resolve use cases, **`ResearchOrchestrator`**, and data providers. |
 | **Job** | A single run request: scope (instrument vs market), symbol/index, timeframe, and `execution_type`. Not persisted. |
 | **ResearchOrchestrator** | Preferred entry for running a `Job`: wraps `JobRunner` and keeps orchestration consistent with analyze use cases. |
 | **JobRunner** | Port used under the hood to dispatch jobs to executors; override for queues, retries, or custom routing. |
@@ -79,20 +79,20 @@ copinance-os = { path = "../copinance-os", editable = true }
 
 ## Quick Start: Run an Analysis
 
-1. **Configure the container** — pass **`LLMConfig`** only if you need **question-driven** analysis; for deterministic instrument/market runs you can use `get_container(llm_config=None, load_from_env=False)` so no LLM is wired.
+1. **Configure the container** — pass **`LLMConfig`** only if you need **question-driven** analysis; for deterministic instrument/market runs you can use `create_container(llm_config=None, load_from_env=False)` so no LLM is wired.
 2. **Get `ResearchOrchestrator`** from the container (recommended entry point for jobs).
 3. **Build a `Job`** and run it with `await orchestrator.run_job(job, {})`.
 
 ```python
 import asyncio
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType
 
 async def main():
     # Deterministic-only: no LLM (question-driven routes will not be available)
-    # container = get_container(llm_config=None, load_from_env=False)
+    # container = create_container(llm_config=None, load_from_env=False)
 
     # Question-driven-capable: supply Gemini, OpenAI, or Ollama (see LLMConfig section)
     llm_config = LLMConfig(
@@ -100,7 +100,7 @@ async def main():
         api_key="your-gemini-api-key",
         model="gemini-1.5-pro",
     )
-    container = get_container(llm_config=llm_config)
+    container = create_container(llm_config=llm_config)
 
     orchestrator = container.research_orchestrator()
 
@@ -127,25 +127,29 @@ asyncio.run(main())
 
 ## Configuration
 
-### Container: `get_container()`
+### Container: `create_container()`
 
-Get the global container with optional overrides:
+Create an independent container with explicit capabilities:
 
 ```python
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.ai.llm.config import LLMConfig
 
-container = get_container(
+container = create_container(
     llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"),
     fred_api_key="your-fred-api-key",  # optional; for macro data
-    load_from_env=True,                # default: try env for LLM if llm_config is None
+    load_from_env=False,               # default: do not read LLM config from env
     prompt_templates=None,             # optional; see Prompt templates below
     prompt_manager=None,               # optional; custom PromptManager instance
-    cache_enabled=None,                # optional; True/False or None (use settings)
-    cache_manager=None,                # optional; use your own CacheManager
-    storage_type=None,                 # optional; "file" | "memory" to override settings
-    storage_path=None,                 # optional; root path for file storage
+    cache_manager=None,                # optional; no-op cache when omitted
+    storage_type="memory",             # default; "file" requires storage_path
+    storage_path=None,                 # explicit root for file storage
     storage_backend=None,              # optional; custom Storage instance (Tier 1 persistence)
+    current_profile_path=None,         # optional explicit active-profile state file
+    market_data_provider=None,         # optional host-owned provider adapters
+    fundamental_data_provider=None,
+    sec_filings_provider=None,
+    macro_data_provider=None,
 )
 ```
 
@@ -153,11 +157,12 @@ container = get_container(
 - **`fred_api_key`:** Optional. If provided, macro analysis can use FRED for better economic data.
 - **`load_from_env`:** If `True` and `llm_config` is `None`, the container will try to load LLM settings from env (e.g. `COPINANCEOS_GEMINI_API_KEY`). Prefer passing `llm_config` in library code.
 - **`prompt_templates`** / **`prompt_manager`:** Optional. See [Prompt templates](#prompt-templates) below.
-- **`cache_enabled`** / **`cache_manager`:** Optional. See [Cache](#cache) below.
-- **`storage_type`** / **`storage_path`:** Optional. See [Storage and Persistence](#storage-and-persistence) below. Use `storage_type="memory"` to avoid creating a `.copinance` directory on disk.
+- **`cache_manager`:** Optional. Omitting it uses a no-op cache with no filesystem access. See [Cache](#cache) below.
+- **`storage_type`** / **`storage_path`:** Repositories use memory by default. File storage requires an explicit path; see [Storage and Persistence](#storage-and-persistence).
 - **`storage_backend`:** Optional. Pass a concrete `Storage` instance (Tier 1 persistence — custom file format, SQLite, S3). Takes precedence over `storage_type`/`storage_path`. For async databases (Postgres), implement the `StockRepository` / `AnalysisProfileRepository` ABCs instead and override them on the container after creation (Tier 2).
+- **Data-provider arguments:** Optional. Inject host-owned adapters when your deployment needs to control vendor clients, credentials, networking, or persistence behavior.
 
-**Performance:** The container is created only on first use (lazy proxy), and use cases and providers are singletons created when first requested. See [Architecture — Container and performance](../developer-guide/architecture#container-and-performance) for details.
+**Performance:** `create_container()` creates only the lightweight composition object. Use cases and providers inside it are lazy singletons created when first requested. See [Architecture — Container and performance](../developer-guide/architecture#container-and-performance) for details.
 
 ### Logging
 
@@ -227,21 +232,46 @@ async for event in provider.generate_text_stream("Briefly explain beta."):
 
 ### Cache
 
-The built-in **cache** stores tool results (e.g. quotes, fundamentals), **EDGAR/edgartools responses** (filing lists and filing content), and rendered agent prompts under the configured storage path. Library users can disable it or supply their own cache.
+Caching is an explicit library capability. The default manager is a no-op: it stores nothing, creates nothing, and all requests use their providers. An injected cache is shared by tool results, EDGAR adapter responses, curated questions, and rendered agent prompts.
 
-- **Default:** Cache is enabled (see also `COPINANCEOS_CACHE_ENABLED` in [Configuration](configuration)).
-- **Disable cache:** Pass `cache_enabled=False` to `get_container()`. No tool or prompt caching is used; every request hits the providers.
-- **Use your own cache:** Pass `cache_manager=my_cache_manager` to `get_container()`. Your instance must implement the same interface as `CacheManager` (from `copinance_os.data.cache`). When provided, `cache_enabled` is ignored.
+- **Default:** No-op cache; no filesystem writes and no hidden staleness.
+- **Process-local cache:** Use `CacheManager(InMemoryCacheBackend(...))`.
+- **File cache:** Use `CacheManager(LocalFileCacheBackend(explicit_path))`. Construction and cache reads are side-effect free; the directory is created on the first write.
+- **Shared production cache:** Inject a `CacheManager` backed by your Redis or service adapter.
+- **Failure policy:** Cache operations are fail-open by default because caching is an optimization. Pass `strict=True` to `CacheManager` when backend failures must abort the request.
 
 ```python
-from copinance_os.infra.di import get_container
+from datetime import timedelta
+from pathlib import Path
 
-# Disable cache (e.g. for real-time data only)
-container = get_container(llm_config=llm_config, cache_enabled=False)
+from copinance_os.data.cache import CacheManager, InMemoryCacheBackend, LocalFileCacheBackend
+from copinance_os.infra.di import create_container
 
-# Or inject your own CacheManager (e.g. Redis-backed)
-container = get_container(llm_config=llm_config, cache_manager=my_cache_manager)
+# Default: disabled/no-op
+container = create_container(llm_config=llm_config)
+
+# Opt into bounded process-local caching
+memory_cache = CacheManager(InMemoryCacheBackend(max_entries=1_000), default_ttl=timedelta(minutes=5))
+container = create_container(llm_config=llm_config, cache_manager=memory_cache)
+
+# Opt into file caching at a caller-owned path
+file_cache = CacheManager(LocalFileCacheBackend(Path("/var/cache/my-app/copinance")))
+container = create_container(llm_config=llm_config, cache_manager=file_cache)
+
+# Optional: fail fast on cache backend errors
+strict_file_cache = CacheManager(
+    LocalFileCacheBackend(Path("/var/cache/my-app/copinance")),
+    strict=True,
+)
 ```
+
+`CacheManager` controls Copinance-owned result caching only. Bundled third-party
+adapters such as yfinance and edgartools may manage their own persistence outside
+this interface. In a deployment that prohibits every filesystem write, inject
+host-owned `market_data_provider`, `fundamental_data_provider`,
+`sec_filings_provider`, and `macro_data_provider` adapters (or configure those
+vendor libraries according to their own policies). Disabling the Copinance cache
+does not claim to disable vendor-internal caches.
 
 ### Prompt templates
 
@@ -295,7 +325,7 @@ You can import the constant for the prompt name: `ANALYZE_QUESTION_DRIVEN_PROMPT
 #### Example: overlay a single template (question-driven analysis)
 
 ```python
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.ai.llm.config import LLMConfig
 from copinance_os.ai.llm.resources import ANALYZE_QUESTION_DRIVEN_PROMPT_NAME
 
@@ -306,7 +336,7 @@ prompt_templates = {
     },
 }
 
-container = get_container(
+container = create_container(
     llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"),
     prompt_templates=prompt_templates,
 )
@@ -316,13 +346,13 @@ container = get_container(
 
 ```python
 from pathlib import Path
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.ai.llm.resources import PromptManager
 
 # Load custom prompts from a directory (JSON files: analyze_question_driven.json, etc.)
 pm = PromptManager(resources_dir=Path("config/prompts"), use_package_data=True)
 
-container = get_container(
+container = create_container(
     llm_config=my_llm_config,
     prompt_manager=pm,
 )
@@ -496,7 +526,7 @@ When you need a single operation (e.g. search, quote, profile) instead of a full
 ```python
 from datetime import datetime
 
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.research.workflows.market import (
     SearchInstrumentsRequest,
     GetQuoteRequest,
@@ -505,7 +535,7 @@ from copinance_os.research.workflows.market import (
 )
 from copinance_os.research.workflows.fundamentals import GetStockFundamentalsRequest
 
-container = get_container(llm_config=my_llm_config)
+container = create_container(llm_config=my_llm_config)
 
 # Search by name or symbol
 search_uc = container.search_instruments_use_case()
@@ -599,9 +629,9 @@ market_question_res = await market_uc.execute(
 ```python
 from copinance_os import MarketNarrativeRequest, NarrativeResult, FinancialLiteracy
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(
+container = create_container(
     llm_config=LLMConfig(provider="openai", api_key="sk-..."),
 )
 narrative_uc = container.generate_market_narrative_use_case()
@@ -628,9 +658,9 @@ from copinance_os import (
     FinancialLiteracy,
 )
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
-container = get_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
+container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
 block = await container.generate_curated_questions_use_case().execute(
     GenerateCuratedQuestionsRequest(
         artifact=ArtifactType.QUOTE,
@@ -661,14 +691,14 @@ This section is **Python-only**; the CLI cannot supply **`conversation_history`*
 import asyncio
 
 from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.research.workflows.analyze import (
     AnalyzeInstrumentRequest,
     AnalyzeMode,
 )
 
 async def follow_up_example() -> None:
-    container = get_container(load_from_env=True)
+    container = create_container(load_from_env=True)
     uc = container.analyze_instrument_use_case()
 
     first = await uc.execute(
@@ -704,7 +734,7 @@ asyncio.run(follow_up_example())
 For **options-surface / positioning intelligence** (bias, IV/skew/term, flow-style signals, gamma regime, GEX, vanna/charm exposure, mispricing vs BSM fair value, moneyness buckets, pin risk, max pain, implied move, OI clusters) as a strongly typed result model, use:
 
 - **Import:** `from copinance_os.data.analytics.options.positioning import compute_options_positioning_context`
-- **Data:** `await compute_options_positioning_context(provider, symbol, window)` where `window` is `"near"` or `"mid"`, and `provider` is a **`MarketDataProvider`** (`get_quote`, `get_options_chain`). The usual choice is `container.market_data_provider()` from `get_container(...)`.
+- **Data:** `await compute_options_positioning_context(provider, symbol, window)` where `window` is `"near"` or `"mid"`, and `provider` is a **`MarketDataProvider`** (`get_quote`, `get_options_chain`). The usual choice is `container.market_data_provider()` from `create_container(...)`.
 - **Direct builder:** `build_options_positioning(...)` for already-fetched chain/quote payloads.
 
 Behavior notes:
@@ -714,10 +744,10 @@ Behavior notes:
 ```python
 import asyncio
 from copinance_os.data.analytics.options.positioning import compute_options_positioning_context
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
 async def main():
-    container = get_container(llm_config=None, load_from_env=False)
+    container = create_container(llm_config=None, load_from_env=False)
     provider = container.market_data_provider()
     result = await compute_options_positioning_context(provider, "SPY", "near")
     # result.methodology is AnalysisMethodology (specs + parameters + data_inputs)
@@ -739,7 +769,7 @@ Use this section as a single reference for every option available when using Cop
 
 ### Container entry points
 
-Get the container with `get_container(...)` from `copinance_os.infra.di`. You can pass `prompt_templates` or `prompt_manager` for custom prompts (see [Prompt templates](#prompt-templates)), `cache_enabled` or `cache_manager` for cache control (see [Cache](#cache)), and `storage_type` or `storage_path` to avoid or customize disk usage (see [Storage and Persistence](#storage-and-persistence)). Then call these methods to obtain use cases, **`ResearchOrchestrator`**, analyze runners, and (advanced) **`analysis_executors`**:
+Create an independent container with `create_container(...)` from `copinance_os.infra.di`. Pass `prompt_templates` or `prompt_manager` for custom prompts, an explicit `cache_manager` for caching, and an explicit storage backend/path only when persistence is required. Retain the returned container for the lifetime of your application or tenant.
 
 | Entry point | Method | Returns | Purpose |
 |-------------|--------|---------|--------|
@@ -764,7 +794,7 @@ Get the container with `get_container(...)` from `copinance_os.infra.di`. You ca
 | | `container.set_current_profile_use_case()` | `SetCurrentProfileUseCase` | Set current profile |
 | | `container.delete_profile_use_case()` | `DeleteProfileUseCase` | Delete profile |
 | **Infrastructure** | `container.market_data_provider()` | `MarketDataProvider` | Market data (quote, history, search, options) |
-| | `container.cache_manager()` | `CacheManager` | Cache for tool/CLI data |
+| | `container.cache_manager()` | `CacheManager` | Copinance result cache (no-op by default) |
 
 The **`JobRunner`** port is not exposed as a container method; customize orchestration via **`ResearchOrchestrator`**, executor lists, or a custom **`Container`** (see [Extending](../developer-guide/extending)).
 
@@ -828,7 +858,7 @@ Generate **follow-up question chips** from data you already fetched (no extra ma
 
 Each `CuratedQuestion` includes `text`, optional `focus`, optional `suggested_tools` (question-driven tool registry names), and optional `requires_symbol` for multi-symbol payloads.
 
-**LLM:** Requires `get_container(llm_config=...)`. When unavailable, `questions` is empty and `meta.llm_unavailable_reason` is a typed enum (`no_llm_config`, `provider_error`, `parse_error`, `rate_limited`, `timeout`).
+**LLM:** Requires `create_container(llm_config=...)`. When unavailable, `questions` is empty and `meta.llm_unavailable_reason` is a typed enum (`no_llm_config`, `provider_error`, `parse_error`, `rate_limited`, `timeout`).
 
 **Per-call provider override** (for apps with user-supplied API keys):
 
@@ -874,7 +904,7 @@ block = await container.generate_curated_questions_use_case().execute(
 ### Override points
 
 - **Custom analyze execution:** Implement `AnalyzeInstrumentRunner` or `AnalyzeMarketRunner` and override `container.analyze_instrument_runner` or `container.analyze_market_runner` (see [Custom executors and runners](#custom-executors-and-runners)).
-- **Custom job orchestration:** Implement the **`JobRunner`** port (`copinance_os.domain.ports.analysis_execution`) and wire it when building a **`ResearchOrchestrator`**, or use a custom **`Container`** / `set_container()` so your app owns the wiring. The stock container does not expose `job_runner()` as a getter.
+- **Custom job orchestration:** Implement the **`JobRunner`** port (`copinance_os.domain.ports.analysis_execution`) and wire it when building an application-owned **`ResearchOrchestrator`** or container. The stock container does not expose `job_runner()` as a getter.
 
 ---
 
@@ -897,14 +927,14 @@ By default, analyze uses **runners** that build a `Job` and call **`ResearchOrch
    from copinance_os.domain.ports.analysis_execution import AnalyzeInstrumentRunner
    from copinance_os.domain.models.analysis import AnalyzeInstrumentRequest
    from copinance_os.domain.models.job import RunJobResult
-   from copinance_os.infra.di import get_container
+   from copinance_os.infra.di import create_container
 
    class MyAnalyzeInstrumentRunner(AnalyzeInstrumentRunner):
        async def run(self, request: AnalyzeInstrumentRequest) -> RunJobResult:
            # Your executor or direct implementation; no Job
            return RunJobResult(success=True, results={"analysis": "..."}, error_message=None)
 
-   container = get_container(llm_config=my_llm_config)
+   container = create_container(llm_config=my_llm_config)
    container.analyze_instrument_runner.override(providers.Factory(MyAnalyzeInstrumentRunner))
    # analyze_instrument_use_case() will now use MyAnalyzeInstrumentRunner
    ```
@@ -943,26 +973,28 @@ See [Financial literacy integration guide](../developer-guide/financial-literacy
 
 ## Storage and Persistence
 
-The **`.copinance`** directory (e.g. `data/`, `equities.json`) is created by the **storage** layer used by repositories (instrument lists, profiles, etc.), not by the cache. Cache (when enabled) also uses the same storage path for tool and prompt cache files.
+Library storage is memory-backed by default. Creating a container, resolving repositories, reading active-profile state, and checking the cache do not create directories. The CLI separately opts into `.copinance` persistence through its own composition root.
 
-**Default behavior:** Storage is file-based (settings `COPINANCEOS_STORAGE_TYPE=file`, `COPINANCEOS_STORAGE_PATH=.copinance`), so the CLI and any code using the default container will create `.copinance` on disk unless overridden.
-
-**To avoid creating `.copinance` when integrating the library** (e.g. in a web backend where you want no on-disk usage):
-
-- **In code:** Pass `storage_type="memory"` to `get_container()`. Repositories then use in-memory storage and no directory is created. You can also pass `cache_enabled=False` if you want every request to use fresh data.
+The default is therefore sufficient for a disk-free integration:
 
   ```python
-  container = get_container(
+  container = create_container(
       llm_config=llm_config,
       load_from_env=False,
-      cache_enabled=False,
-      storage_type="memory",
   )
   ```
 
-- **Via environment:** Set `COPINANCEOS_STORAGE_TYPE=memory` so the container uses in-memory storage without changing code.
+For explicit file persistence, supply both the type and a caller-owned path. Active-profile state is separate and is only persisted when `current_profile_path` is supplied:
 
-For a long-running app you may want file persistence: keep the default (or set `storage_type="file"` and optionally `storage_path`). In-memory storage loses data when the process exits.
+```python
+container = create_container(
+    storage_type="file",
+    storage_path="/var/lib/my-app/copinance",
+    current_profile_path="/var/lib/my-app/copinance/state/v2/app.json",
+)
+```
+
+In-memory storage and profile state are instance-local and disappear with the process.
 
 **Two-tier persistence model:**
 
@@ -970,18 +1002,18 @@ Copinance OS is a *computation library*, not a data store. Consumers own persist
 
 | Tier | When to use | How |
 |------|------------|-----|
-| **Tier 1 — custom `Storage`** | File-format alternatives, SQLite, S3 | Implement `Storage` ABC from `copinance_os.domain.ports.storage` and pass it as `storage_backend` to `get_container()`. `save()` must be atomic. |
+| **Tier 1 — custom `Storage`** | File-format alternatives, SQLite, S3 | Implement `Storage` ABC from `copinance_os.domain.ports.storage` and pass it as `storage_backend` to `create_container()`. `save()` must be atomic. |
 | **Tier 2 — async repository** | Postgres, any async DB | Implement `StockRepository` or `AnalysisProfileRepository` ABC from `copinance_os.domain.ports.repositories`. Override on the container after creation via `container.stock_repository.override(providers.Object(my_repo))`. The `Storage` ABC is synchronous and collection-based — it does not fit async databases; use this tier instead. |
 
 ```python
 # Tier 1: custom Storage (e.g. S3-backed)
 from copinance_os import Storage
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 
 class S3Storage(Storage):
     ...  # implement get_collection / save / clear
 
-container = get_container(storage_backend=S3Storage(bucket="my-bucket"))
+container = create_container(storage_backend=S3Storage(bucket="my-bucket"))
 
 # Tier 2: custom async repository (e.g. Postgres)
 from copinance_os import StockRepository
@@ -990,7 +1022,7 @@ from dependency_injector import providers
 class PostgresStockRepository(StockRepository):
     ...  # implement async methods against your DB pool
 
-container = get_container()
+container = create_container()
 container.stock_repository.override(providers.Object(PostgresStockRepository(pool=pg_pool)))
 ```
 
@@ -1025,7 +1057,7 @@ Catch these in your app and map them to your HTTP codes or user messages as need
 ```python
 import asyncio
 from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType
 
@@ -1035,7 +1067,7 @@ async def main():
         api_key="your-api-key",
         model="gemini-1.5-pro",
     )
-    container = get_container(
+    container = create_container(
         llm_config=llm_config,
         fred_api_key="your-fred-key",  # optional
     )

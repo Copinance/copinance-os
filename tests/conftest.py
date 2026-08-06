@@ -1,8 +1,6 @@
 """Pytest configuration and fixtures."""
 
-import tempfile
 import warnings
-from pathlib import Path
 
 import pytest
 
@@ -18,7 +16,7 @@ from copinance_os.data.repositories import (
     AnalysisProfileRepositoryImpl,
     StockRepositoryImpl,
 )
-from copinance_os.data.repositories.storage.factory import create_storage
+from copinance_os.data.repositories.storage.memory import InMemoryStorage
 from copinance_os.domain.ports.data_providers import FundamentalDataProvider
 from copinance_os.domain.ports.repositories import (
     AnalysisProfileRepository,
@@ -29,11 +27,8 @@ from copinance_os.domain.ports.storage import Storage
 
 @pytest.fixture
 def isolated_storage() -> Storage:
-    """Provide isolated storage for each test using a temporary directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        storage = create_storage(base_path=Path(tmpdir))
-        yield storage
-        # Storage is automatically cleaned up when tmpdir is deleted
+    """Provide side-effect-free isolated storage for each test."""
+    return InMemoryStorage()
 
 
 @pytest.fixture

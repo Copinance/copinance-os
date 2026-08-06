@@ -105,7 +105,7 @@ copinance_os/
 | `copinance_os.core.pipeline.tools` | Tool implementations (market data, fundamentals, regime, macro), `ToolRegistry`, and **discovery** (`build_data_provider_tool_registry`, `collect_question_driven_tools`; context type in `domain.models.pipeline.tool_bundle_context`). |
 | `copinance_os.data` | **Providers** (yfinance, FRED; **SEC/EDGAR** in `data.providers.sec` via edgartools), **cache**, **repositories**, **loaders**, **analytics** (`data.analytics.options` for BSM Greeks). |
 | `copinance_os.ai.llm` | LLM provider adapters, configuration, prompt resources. |
-| `copinance_os.infra.di` | Dependency injection: `get_container()`, lazy container proxy, singletons. |
+| `copinance_os.infra.di` | Dependency injection: independent `create_container()` composition and lazy providers within each container. |
 | `copinance_os.interfaces.cli` | Console script → **`main`**: **`dispatch.parse_root_argv`** (Typer vs generic research), lazy Typer **`root`**, **`commands/*`**. |
 | `copinance_os.research.reports` | Re-exports of domain report builders for research-facing imports. |
 
@@ -124,17 +124,17 @@ copinance_os/
 ## Orchestration: what to call
 
 - **Recommended:** `container.research_orchestrator()` then `await orchestrator.run_job(job, context)`. This matches how default analyze runners work.
-- **Advanced:** Implement the **`JobRunner`** port and pass it to **`ResearchOrchestrator(job_runner=...)`**. The stock **`Container`** does not expose `job_runner()` as a getter — custom routing uses a custom orchestrator, a custom `Container` wiring, or `set_container()` (see [Extending](extending)).
+- **Advanced:** Implement the **`JobRunner`** port and pass it to **`ResearchOrchestrator(job_runner=...)`**. The stock **`Container`** does not expose `job_runner()` as a getter; custom routing uses an application-owned orchestrator or container wiring (see [Extending](extending)).
 
 ## Container and performance
 
-The global container from **`get_container()`** is a **lazy proxy**: resolving it (or accessors like `container.research_orchestrator()`) constructs the real `Container` once per process. Heavy dependencies (providers, executors) are created on first use, not at import time. The CLI keeps `copinance --help` fast by **lazy-loading** Typer subcommands (`analyze`, `market`, …) so those modules are not loaded until you run them.
+Each call to **`create_container()`** returns an independent container suitable for one application or tenant. Providers and use cases inside that container remain lazy singletons and are created on first use, not at import time. The CLI owns one explicitly stateful container and keeps `copinance --help` fast by lazy-loading Typer subcommands (`analyze`, `market`, …).
 
 ## Dependency injection and startup
 
-Use **`get_container(...)`** from `copinance_os.infra.di`. Analysis executors are produced by **`AnalysisExecutorFactory.create_all`** (`core.execution_engine.factory`). LLM analyzers are created via **`LLMAnalyzerFactory`** (`ai.llm.analyzer_factory`).
+Use **`create_container(...)`** from `copinance_os.infra.di`. Analysis executors are produced by **`AnalysisExecutorFactory.create_all`** (`core.execution_engine.factory`). LLM analyzers are created via **`LLMAnalyzerFactory`** (`ai.llm.analyzer_factory`).
 
-See [Using as a Library](../getting-started/library#configuration) for `get_container(...)` options (LLM, FRED, cache, storage, prompts).
+See [Using as a Library](../getting-started/library#configuration) for `create_container(...)` options (LLM, FRED, cache, storage, prompts).
 
 ## Extension points (ports)
 

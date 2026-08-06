@@ -3,7 +3,6 @@
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -39,15 +38,16 @@ class TestLocalFileCacheBackend:
             backend = LocalFileCacheBackend(cache_dir=str(tmpdir))
             assert backend._cache_dir == Path(tmpdir)
 
-    @patch("copinance_os.data.cache.local_file_cache.create_storage")
-    def test_init_without_cache_dir(self, mock_create_storage: patch) -> None:
-        """Test initialization without cache directory (uses default)."""
-        mock_storage = MagicMock()
-        mock_storage._root_path = Path(".copinance")
-        mock_create_storage.return_value = mock_storage
+    def test_cache_dir_is_required(self) -> None:
+        with pytest.raises(TypeError):
+            LocalFileCacheBackend()  # type: ignore[call-arg]
 
-        backend = LocalFileCacheBackend()
-        assert backend._cache_dir == Path(".copinance") / "cache" / "v2"
+    def test_init_does_not_create_directory(self, tmp_path: Path) -> None:
+        cache_dir = tmp_path / "not-created"
+
+        LocalFileCacheBackend(cache_dir)
+
+        assert not cache_dir.exists()
 
     def test_get_backend_name(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test getting backend name."""
@@ -65,6 +65,20 @@ class TestLocalFileCacheBackend:
         """Test getting non-existent cache entry."""
         result = await cache_backend.get("nonexistent_key")
         assert result is None
+
+    async def test_get_cache_miss_does_not_create_tool_directory(self, tmp_path: Path) -> None:
+        cache_dir = tmp_path / "cache"
+        backend = LocalFileCacheBackend(cache_dir)
+
+        assert await backend.get("v2:test_tool:key") is None
+        assert not cache_dir.exists()
+
+    def test_tool_name_cannot_escape_cache_root(self, tmp_path: Path) -> None:
+        backend = LocalFileCacheBackend(tmp_path / "cache")
+
+        path = backend._get_cache_file_path("v2:../../outside:key")
+
+        assert path.parent.parent == tmp_path / "cache"
 
     async def test_set_and_get(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test setting and getting cache entry."""
@@ -194,7 +208,7 @@ class TestLocalFileCacheBackend:
     async def test_get_corrupted_file(self, cache_backend: LocalFileCacheBackend) -> None:
         """Test getting cache entry from corrupted file."""
         # Create a corrupted cache file
-        cache_file = cache_backend._get_cache_file_path("corrupted_key")
+        cache_file = cache_backend._get_cache_file_path("corrupted_key", create_parent=True)
         cache_file.write_text("invalid json")
 
         result = await cache_backend.get("corrupted_key")

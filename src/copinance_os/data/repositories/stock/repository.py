@@ -1,6 +1,6 @@
 """Equity instrument repository implementation."""
 
-from copinance_os.data.repositories.storage.factory import create_storage
+from copinance_os.data.repositories.storage.factory import StorageType, create_storage
 from copinance_os.domain.models.entities.stock import Stock
 from copinance_os.domain.models.market import MarketDataPoint
 from copinance_os.domain.ports.repositories import StockRepository
@@ -19,11 +19,11 @@ class StockRepositoryImpl(StockRepository):
         """Initialize repository.
 
         Args:
-            storage: Optional storage backend. If None, creates default storage.
+            storage: Optional storage backend. If None, uses process-local memory.
                      Should implement the Storage interface.
         """
         if storage is None:
-            storage = create_storage()
+            storage = create_storage(storage_type=StorageType.MEMORY)
         self._storage = storage
         self._stocks = self._storage.get_collection("market/instruments/equities", Stock)
         self._market_data: dict[str, list[MarketDataPoint]] = {}

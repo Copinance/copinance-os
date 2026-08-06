@@ -121,12 +121,12 @@ Then re-fetch with `--no-cache` to trigger recomputation with the new inputs.
 
 ```python
 import asyncio
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.domain.models.job import Job, JobScope, JobTimeframe
 from copinance_os.domain.models.market import MarketType
 
 async def options_analysis():
-    container = get_container()  # no LLM needed for deterministic
+    container = create_container()  # no LLM needed for deterministic
     orchestrator = container.research_orchestrator()
     provider = container.market_data_provider()
 

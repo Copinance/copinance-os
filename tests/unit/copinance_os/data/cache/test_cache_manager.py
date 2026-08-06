@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from copinance_os.data.cache.cache_manager import CacheManager
-from copinance_os.data.cache.local_file_cache import LocalFileCacheBackend
+from copinance_os.data.cache.null_cache import NullCacheBackend
 from copinance_os.data.loaders.persistence import PERSISTENCE_SCHEMA_VERSION
 from copinance_os.domain.ports.storage import CacheBackend, CacheEntry
 
@@ -38,9 +38,10 @@ class TestCacheManager:
         assert manager.get_backend() == mock_backend
 
     def test_init_without_backend(self) -> None:
-        """Test CacheManager initialization without backend (uses default)."""
+        """CacheManager defaults to a no-op backend."""
         manager = CacheManager()
-        assert isinstance(manager.get_backend(), LocalFileCacheBackend)
+        assert isinstance(manager.get_backend(), NullCacheBackend)
+        assert manager.enabled is False
 
     def test_init_with_ttl(self, mock_backend: AsyncMock) -> None:
         """Test CacheManager initialization with TTL."""

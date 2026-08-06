@@ -19,9 +19,9 @@ class MarketNarrativeRequest(BaseModel):
     Library usage::
 
         from copinance_os import MarketNarrativeRequest, FinancialLiteracy
-        from copinance_os.infra.di import get_container
+        from copinance_os.infra.di import create_container
 
-        container = get_container(llm_config=my_llm_config)
+        container = create_container(llm_config=my_llm_config)
         use_case = container.generate_market_narrative_use_case()
         result = await use_case.execute(
             MarketNarrativeRequest(

@@ -11,14 +11,13 @@ from copinance_os.domain.models.curated.questions import (
     LLMUnavailableReason,
 )
 from copinance_os.domain.models.entities.profile import FinancialLiteracy
-from copinance_os.infra.di import get_container, reset_container
+from copinance_os.infra.di import create_container
 
 
 @pytest.mark.integration
 async def test_container_generate_curated_questions_quote_payload() -> None:
     """End-to-end wiring: container → use case → validate → generate (no LLM key in CI)."""
-    reset_container()
-    container = get_container()
+    container = create_container()
     use_case = container.generate_curated_questions_use_case()
 
     block = await use_case.execute(
@@ -53,8 +52,7 @@ async def test_container_generate_curated_questions_quote_payload() -> None:
 
 @pytest.mark.integration
 async def test_container_rejects_invalid_sector_payload() -> None:
-    reset_container()
-    use_case = get_container().generate_curated_questions_use_case()
+    use_case = create_container().generate_curated_questions_use_case()
 
     with pytest.raises(ValidationError):
         await use_case.execute(

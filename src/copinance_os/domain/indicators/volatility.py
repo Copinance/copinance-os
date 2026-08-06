@@ -26,7 +26,7 @@ def rolling_volatility_annualized_from_prices(
     if len(log_returns_list) < window:
         return [None] * len(prices)
 
-    arr = np.asarray(log_returns_list, dtype=float)
+    arr = cast(np.ndarray, np.asarray(log_returns_list, dtype=float))
     n = len(arr)
     ann = float(trading_days_per_year) ** 0.5
     rolling_std: list[float | None] = []

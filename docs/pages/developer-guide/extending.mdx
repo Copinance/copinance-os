@@ -1,6 +1,6 @@
 # Extending Copinance OS
 
-Add custom data providers, LLM adapters, executors, and strategies. Keep **I/O and vendor code** in `data` and `infra`; keep **contracts** in `domain.ports`; register replacements through **`get_container()`** overrides so **`ResearchOrchestrator`** and CLI paths stay consistent.
+Add custom data providers, LLM adapters, executors, and strategies. Keep **I/O and vendor code** in `data` and `infra`; keep **contracts** in `domain.ports`; register replacements through **`create_container()`** overrides so **`ResearchOrchestrator`** and CLI paths stay consistent.
 
 ## Adding a Custom Data Provider
 
@@ -100,11 +100,11 @@ class AlphaVantageProvider(MarketDataProvider):
 ### Step 3: Register in Container
 
 ```python
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from dependency_injector import providers
 
-# Use get_container(llm_config=...) if you need question-driven analysis
-container = get_container()
+# Use create_container(llm_config=...) if you need question-driven analysis
+container = create_container()
 container.market_data_provider.override(
     providers.Singleton(AlphaVantageProvider, api_key="your-key")
 )
@@ -136,11 +136,11 @@ class MyCustomAnalyzer(LLMAnalyzer):
 Similar to data providers, override the analyzer in your container:
 
 ```python
-from copinance_os.infra.di import get_container
+from copinance_os.infra.di import create_container
 from copinance_os.ai.llm.config import LLMConfig
 from dependency_injector import providers
 
-container = get_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))
+container = create_container(llm_config=LLMConfig(provider="gemini", api_key="...", model="gemini-1.5-pro"))
 container.llm_analyzer.override(
     providers.Singleton(MyCustomAnalyzer)
 )
@@ -193,18 +193,23 @@ Question-driven (and other LLM) analysis resolves prompts through a **PromptMana
 
 **Template format:** Each template is an object with two string fields: `system_prompt` and `user_prompt`. Use `{variable_name}` placeholders for substitution; escape literal braces as `{{` and `}}`. See [Prompt template format](../getting-started/library#prompt-template-format) in the library guide for the full spec and question-driven prompt variables.
 
-- **Overlay via `get_container()`:** Pass `prompt_templates={ "analyze_question_driven": { "system_prompt": "...", "user_prompt": "..." } }`. Only the keys you provide are overridden; the rest use package defaults.
-- **Custom `PromptManager`:** Pass `prompt_manager=PromptManager(templates=...)` or `PromptManager(resources_dir=Path("..."))` to `get_container()`. With `resources_dir`, use one JSON file per prompt (e.g. `analyze_question_driven.json`) containing `system_prompt` and `user_prompt` strings.
+- **Overlay via `create_container()`:** Pass `prompt_templates={ "analyze_question_driven": { "system_prompt": "...", "user_prompt": "..." } }`. Only the keys you provide are overridden; the rest use package defaults.
+- **Custom `PromptManager`:** Pass `prompt_manager=PromptManager(templates=...)` or `PromptManager(resources_dir=Path("..."))` to `create_container()`. With `resources_dir`, use one JSON file per prompt (e.g. `analyze_question_driven.json`) containing `system_prompt` and `user_prompt` strings.
 - **Prompt name:** The built-in question-driven analyze flow uses the name `analyze_question_driven`; import `ANALYZE_QUESTION_DRIVEN_PROMPT_NAME` from `copinance_os.ai.llm.resources`.
 
 ## Cache
 
-The default container uses a file-based cache for tool results and agent prompts. When using the library you can disable it or supply your own:
+Library containers use a no-op cache by default. Opt into caching by supplying a manager:
 
-- **Disable:** `get_container(..., cache_enabled=False)`.
-- **Custom cache:** `get_container(..., cache_manager=my_cache_manager)`. Your instance must match the `CacheManager` interface (see `copinance_os.data.cache`). The cache is used for tool outputs and for rendered agent prompts.
+- **Memory:** `CacheManager(InMemoryCacheBackend(max_entries=...))`.
+- **File:** `CacheManager(LocalFileCacheBackend(explicit_path))`.
+- **Custom/shared:** `create_container(..., cache_manager=my_cache_manager)`. The manager is shared by tool outputs, EDGAR adapter responses, curated questions, and rendered agent prompts.
 
-You can also set `COPINANCEOS_CACHE_ENABLED=false` (see [Configuration](../getting-started/configuration#storage-and-cache)).
+`COPINANCEOS_CACHE_ENABLED` controls the CLI only; it never changes library behavior.
+Cache errors are treated as misses by default so an optional optimization does not
+break analysis. Construct `CacheManager(..., strict=True)` when a cache failure is
+an application error. File backends require an explicit path and create directories
+only on their first write.
 
 ## Best Practices
 

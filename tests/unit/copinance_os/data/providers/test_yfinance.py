@@ -556,10 +556,10 @@ class TestYFinanceFundamentalProvider:
             assert provider._cache == {}
             mock_logger.info.assert_called_once()
 
-    def test_initialization_default_cache_ttl(self) -> None:
-        """Test provider initialization with default cache TTL."""
+    def test_initialization_disables_private_cache_by_default(self) -> None:
+        """The shared CacheManager is authoritative unless local caching is explicit."""
         provider = YFinanceFundamentalProvider()
-        assert provider._cache_ttl_seconds == 3600
+        assert provider._cache_ttl_seconds is None
 
     def test_get_provider_name(self) -> None:
         """Test getting provider name."""
@@ -827,7 +827,7 @@ class TestYFinanceFundamentalProvider:
         """Test _get_cached_fundamentals when cached."""
         with patch("copinance_os.data.providers.yfinance.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, tzinfo=UTC)
-            provider = YFinanceFundamentalProvider()
+            provider = YFinanceFundamentalProvider(cache_ttl_seconds=3600)
             fundamentals = StockFundamentals(
                 symbol="AAPL",
                 company_name="Apple Inc.",
@@ -875,7 +875,7 @@ class TestYFinanceFundamentalProvider:
         """Test _cache_fundamentals."""
         with patch("copinance_os.data.providers.yfinance.datetime") as mock_datetime:
             mock_datetime.now.return_value = datetime(2024, 1, 1, tzinfo=UTC)
-            provider = YFinanceFundamentalProvider()
+            provider = YFinanceFundamentalProvider(cache_ttl_seconds=3600)
             fundamentals = StockFundamentals(
                 symbol="AAPL",
                 company_name="Apple Inc.",

@@ -599,11 +599,12 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
     For comprehensive fundamentals or SEC filings, plug in a dedicated fundamental data provider.
     """
 
-    def __init__(self, cache_ttl_seconds: int = 3600) -> None:
+    def __init__(self, cache_ttl_seconds: int | None = None) -> None:
         """Initialize yfinance fundamental data provider.
 
         Args:
-            cache_ttl_seconds: Time-to-live for cached data in seconds (default: 1 hour)
+            cache_ttl_seconds: Optional process-local cache TTL. ``None`` disables
+                the provider-private cache so the shared cache policy remains authoritative.
         """
         self._provider_name = "yfinance"
         self._cache_ttl_seconds = cache_ttl_seconds
@@ -1128,6 +1129,9 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
         """
         cache_key = self._get_cache_key(symbol, periods, period_type)
 
+        if self._cache_ttl_seconds is None:
+            return None
+
         if cache_key not in self._cache:
             return None
 
@@ -1159,6 +1163,8 @@ class YFinanceFundamentalProvider(FundamentalDataProvider):
             period_type: Period type (annual/quarterly)
             fundamentals: StockFundamentals to cache
         """
+        if self._cache_ttl_seconds is None:
+            return
         cache_key = self._get_cache_key(symbol, periods, period_type)
         self._cache[cache_key] = (fundamentals, datetime.now(UTC))
         logger.debug("Cached fundamentals", symbol=symbol, cache_key=cache_key)

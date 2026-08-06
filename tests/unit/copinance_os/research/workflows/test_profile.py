@@ -2,7 +2,6 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -46,12 +45,7 @@ def config_file_path(temp_profile_config_path: Path) -> Path:
 @pytest.fixture
 def current_profile(config_file_path: Path) -> CurrentProfile:
     """Provide a CurrentProfile instance with isolated storage."""
-    # Mock the config path to use temp directory
-    with patch(
-        "copinance_os.data.repositories.profile.current_profile._get_config_path"
-    ) as mock_path:
-        mock_path.return_value = config_file_path
-        yield CurrentProfile()
+    return CurrentProfile(config_file_path)
 
 
 @pytest.fixture
