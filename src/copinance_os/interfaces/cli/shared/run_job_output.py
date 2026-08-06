@@ -236,10 +236,10 @@ def _format_run_info_value(key: str, value: Any, *, failed: bool) -> str:
 
 def render_run_job_results(response: RunJobResult, *, json_output: bool = False) -> None:
     """Print ``RunJobResult`` to the console or as JSON."""
-    console = Console()
     if json_output:
         print_run_job_result_json(response)
         return
+    console = Console()
     if not response.success:
         console.print("\n✗ Failed", style="bold red")
         console.print(f"[red]Error:[/red] {response.error_message}")

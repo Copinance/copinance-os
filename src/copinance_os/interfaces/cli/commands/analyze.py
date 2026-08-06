@@ -289,8 +289,11 @@ async def analyze_positioning(
         positioning_window=pos_window,
     )
     try:
-        with console.status("[bold blue]Computing options positioning...[/bold blue]"):
+        if json_output:
             response = await use_case.execute(request)
+        else:
+            with console.status("[bold blue]Computing options positioning...[/bold blue]"):
+                response = await use_case.execute(request)
         render_run_job_results(response, json_output=json_output)
     except Exception as e:
         handle_cli_error(

@@ -11,6 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypeVar
 
+import click
 import structlog
 from pydantic import BaseModel
 
@@ -21,13 +22,17 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def print_run_job_result_json(result: RunJobResult) -> None:
-    """Print ``RunJobResult`` as JSON to stdout (scripting / CI)."""
-    print(json.dumps(result.model_dump(mode="json"), indent=2))
+    """Print ``RunJobResult`` as JSON to stdout (scripting / CI).
+
+    Uses ``click.echo`` so output stays on Click/Typer's stdout even when Rich has
+    wrapped ``sys.stdout`` (e.g. after ``Console.status``).
+    """
+    click.echo(json.dumps(result.model_dump(mode="json"), indent=2))
 
 
 def print_json_stdout(data: Any) -> None:
     """Print a JSON-serializable payload to stdout (``default=str`` for edge types)."""
-    print(json.dumps(data, indent=2, default=str))
+    click.echo(json.dumps(data, indent=2, default=str))
 
 
 def save_analysis_results(results: dict[str, Any], storage_path: str = ".copinance") -> Path | None:
