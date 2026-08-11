@@ -22,6 +22,7 @@ from copinance_os.research.workflows.market import (
     InstrumentSearchMode,
     SearchInstrumentsRequest,
     SearchInstrumentsUseCase,
+    _stock_from_quote,
 )
 
 
@@ -43,6 +44,17 @@ class TestGetInstrumentUseCase:
 
         assert response.instrument is not None
         assert response.instrument.symbol == "AAPL"
+
+
+@pytest.mark.unit
+class TestStockFromQuote:
+    def test_carries_quote_type(self) -> None:
+        stock = _stock_from_quote("SPY", {"symbol": "SPY", "quoteType": "ETF"})
+        assert stock.quote_type == "ETF"
+
+    def test_quote_type_defaults_to_none(self) -> None:
+        stock = _stock_from_quote("AAPL", {"symbol": "AAPL"})
+        assert stock.quote_type is None
 
 
 @pytest.mark.unit

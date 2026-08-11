@@ -208,7 +208,7 @@ class MarketRegimeDetectTrendTool(Tool):
     def get_description(self) -> str:
         """Get tool description."""
         return (
-            "Detect market trend regime (bull, bear, or neutral) for a stock "
+            "Detect market trend regime (bull, bear, or neutral) for an instrument "
             "using moving averages and price momentum analysis."
         )
 
@@ -222,7 +222,7 @@ class MarketRegimeDetectTrendTool(Tool):
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Ticker symbol (e.g., 'AAPL', 'MSFT', 'SPY')",
                     },
                     "lookback_days": {
                         "type": "integer",
@@ -542,7 +542,7 @@ class MarketRegimeDetectVolatilityTool(Tool):
     def get_description(self) -> str:
         """Get tool description."""
         return (
-            "Detect volatility regime (high, normal, or low) for a stock "
+            "Detect volatility regime (high, normal, or low) for an instrument "
             "using rolling volatility analysis."
         )
 
@@ -556,7 +556,7 @@ class MarketRegimeDetectVolatilityTool(Tool):
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Ticker symbol (e.g., 'AAPL', 'MSFT', 'SPY')",
                     },
                     "lookback_days": {
                         "type": "integer",
@@ -743,7 +743,7 @@ class MarketRegimeDetectCyclesTool(Tool):
     def get_description(self) -> str:
         """Get tool description."""
         return (
-            "Detect market cycles and regime transitions for a stock. "
+            "Detect market cycles and regime transitions for an instrument. "
             "Identifies accumulation, markup, distribution, and markdown phases."
         )
 
@@ -757,7 +757,7 @@ class MarketRegimeDetectCyclesTool(Tool):
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "Stock ticker symbol (e.g., 'AAPL', 'MSFT')",
+                        "description": "Ticker symbol (e.g., 'AAPL', 'MSFT', 'SPY')",
                     },
                     "lookback_days": {
                         "type": "integer",

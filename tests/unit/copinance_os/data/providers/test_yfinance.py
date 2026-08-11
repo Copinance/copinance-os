@@ -475,6 +475,35 @@ class TestYFinanceMarketProvider:
             assert result[0]["symbol"] == "AAPL"
 
     @pytest.mark.asyncio
+    async def test_search_instruments_default_includes_mutualfund(self) -> None:
+        """Default quote_types must surface MUTUALFUND results, not just EQUITY/ETF."""
+        mock_search = MagicMock()
+        mock_search.quotes = [
+            {
+                "symbol": "VFIAX",
+                "longname": "Vanguard 500 Index Fund Admiral Shares",
+                "exchange": "NAS",
+                "quoteType": "MUTUALFUND",
+            },
+            {
+                "symbol": "BOND",
+                "longname": "Bond",
+                "exchange": "NYSE",
+                "quoteType": "BOND",
+            },
+        ]
+
+        with (
+            patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
+            patch("asyncio.to_thread", new=AsyncMock(return_value=mock_search)),
+        ):
+            provider = YFinanceMarketProvider()
+            result = await provider.search_instruments("vanguard", limit=10)
+
+            assert len(result) == 1
+            assert result[0]["symbol"] == "VFIAX"
+
+    @pytest.mark.asyncio
     async def test_search_instruments_handles_exception(self) -> None:
         """Test search_instruments handles exceptions gracefully."""
         with (

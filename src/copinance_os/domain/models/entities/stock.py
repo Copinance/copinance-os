@@ -13,6 +13,9 @@ class Stock(Entity):
     symbol: str = Field(..., description="Stock ticker symbol")
     name: str = Field(..., description="Company name")
     exchange: str = Field(..., description="Stock exchange")
+    quote_type: str | None = Field(
+        None, description="Provider quote type (e.g. EQUITY, ETF, MUTUALFUND)"
+    )
     sector: str | None = Field(None, description="Industry sector")
     industry: str | None = Field(None, description="Industry classification")
     market_cap: Decimal | None = Field(None, description="Market capitalization")
