@@ -414,7 +414,7 @@ class YFinanceMarketProvider(MarketDataProvider):
         self,
         query: str,
         limit: int = 10,
-        quote_types: Sequence[str] | None = ("EQUITY", "ETF", ""),
+        quote_types: Sequence[str] | None = ("EQUITY", "ETF", "MUTUALFUND", ""),
     ) -> list[dict[str, Any]]:
         """Search for market instruments by symbol or name using yfinance Search.
 

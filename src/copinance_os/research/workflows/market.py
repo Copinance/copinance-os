@@ -83,6 +83,7 @@ def _stock_from_quote(symbol: str, quote: dict[str, Any]) -> Stock:
         symbol=(quote.get("symbol") or symbol).upper(),
         name=name,
         exchange=str(quote.get("exchange", "") or ""),
+        quote_type=quote.get("quoteType"),
         sector=quote.get("sector"),
         industry=quote.get("industry"),
         market_cap=_dec(quote.get("market_cap")),
