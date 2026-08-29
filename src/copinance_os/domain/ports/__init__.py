@@ -22,6 +22,7 @@ from copinance_os.domain.ports.repositories import (
     StockRepository,
 )
 from copinance_os.domain.ports.storage import Storage
+from copinance_os.domain.ports.tool_spec import ToolSpec
 from copinance_os.domain.ports.tools import (
     Tool,
     ToolParameter,
@@ -69,5 +70,6 @@ __all__ = [
     "ToolParameter",
     "ToolResult",
     "ToolSchema",
+    "ToolSpec",
     "ProgressSink",
 ]

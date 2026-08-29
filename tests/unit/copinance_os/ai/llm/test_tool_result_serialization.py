@@ -3,12 +3,17 @@ tool results in every provider's tool-calling loop."""
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from copinance_os.ai.llm.tool_result_serialization import (
     DEFAULT_MAX_RESULT_CHARS,
+    ToonBlock,
     budget_tool_result,
     compact_json,
+    compact_json_with_toon,
+    per_call_max_chars,
 )
 
 
@@ -123,3 +128,112 @@ def test_toon_output_still_falls_under_truncation_when_still_oversized(toon_enab
     # nothing left to truncate — this exercises the two stages composing safely
     # rather than double-processing the same field.
     assert isinstance(result["calls"], str)
+
+
+# ---------------------------------------------------------------------------
+# Regression: rows must truncate BEFORE encoding, and a TOON block must be
+# spliced into the final message as raw text, never re-escaped inside JSON.
+# Reported: on a 250-contract chain, TOON-on (23,681 chars, 250 escaped
+# newlines) was *larger* than TOON-off (11,844 chars) instead of the expected
+# ~72% reduction, because (a) a fully-encoded TOON string never matched the
+# post-hoc list/dict truncation branches, so a huge table sailed straight
+# through the budget, and (b) json.dumps-ing that string escaped every
+# newline, more than offsetting TOON's own savings.
+# ---------------------------------------------------------------------------
+
+
+def _option_chain_rows(n: int) -> list[dict]:
+    return [
+        {
+            "strike": 100 + i,
+            "bid": round(5.0 - i * 0.01, 2),
+            "ask": round(5.05 - i * 0.01, 2),
+            "volume": 100 + i,
+            "open_interest": 500 + i,
+        }
+        for i in range(n)
+    ]
+
+
+def test_toon_rows_are_truncated_before_encoding_not_after(toon_enabled) -> None:
+    """A TOON block must be bounded by construction — nothing downstream can
+    truncate a string the way it can a list."""
+    data = {"calls": _option_chain_rows(5000)}
+    result = budget_tool_result(data, tool_name="get_options_chain")
+    block = result["calls"]
+    assert isinstance(block, str)
+    # Header declares the row count that was actually encoded, not 5000.
+    row_count = int(block.split("[", 1)[1].split("]", 1)[0])
+    assert row_count <= 80  # head=60 + tail=20 ceiling
+    assert "omitted" in block
+
+
+def test_toon_on_is_smaller_than_toon_off_for_a_large_chain() -> None:
+    """The actual regression scenario: a 250-row chain must come out smaller
+    with TOON on than off, not larger."""
+    data = {"calls": _option_chain_rows(250)}
+
+    off = budget_tool_result(dict(data), tool_name="get_options_chain")
+    off_size = len(compact_json_with_toon(off))
+
+    os.environ["COPINANCEOS_TOON_TABULAR_ENABLED"] = "true"
+    try:
+        on = budget_tool_result(dict(data), tool_name="get_options_chain")
+    finally:
+        del os.environ["COPINANCEOS_TOON_TABULAR_ENABLED"]
+    on_size = len(compact_json_with_toon(on))
+
+    assert on_size < off_size
+
+
+def test_compact_json_with_toon_does_not_escape_the_block() -> None:
+    obj = {"tool": "get_options_chain", "success": True, "data": ToonBlock("calls[1]{a}:\n  1")}
+    rendered = compact_json_with_toon(obj)
+    assert "\\n" not in rendered  # no escaped newline
+    assert "calls[1]{a}:\n  1" in rendered  # real newline, spliced as raw text
+
+
+def test_compact_json_with_toon_degrades_to_plain_compact_json_without_blocks() -> None:
+    obj = {"a": 1, "b": [1, 2]}
+    assert compact_json_with_toon(obj) == compact_json(obj)
+
+
+def test_compact_json_with_toon_finds_a_block_nested_inside_a_list() -> None:
+    obj = {"expirations": [{"data": ToonBlock("x[1]{a}:\n  1")}]}
+    rendered = compact_json_with_toon(obj)
+    assert "\\n" not in rendered
+    assert "x[1]{a}:\n  1" in rendered
+
+
+def test_toon_block_is_a_str_subclass_and_survives_plain_isinstance_checks() -> None:
+    block = ToonBlock("x[1]{a}:\n  1")
+    assert isinstance(block, str)
+
+
+# ---------------------------------------------------------------------------
+# per_call_max_chars: a per-turn budget, not per-call. Parallel execution
+# means N tool calls in one turn can now return at once — a per-call constant
+# applied independently to each lets the turn's total balloon to N x that
+# constant, which is exactly backwards for a "budget."
+# ---------------------------------------------------------------------------
+
+
+def test_per_call_max_chars_single_call_gets_the_full_budget() -> None:
+    assert per_call_max_chars(1) == DEFAULT_MAX_RESULT_CHARS
+    assert per_call_max_chars(0) == DEFAULT_MAX_RESULT_CHARS
+
+
+def test_per_call_max_chars_splits_evenly_across_a_batch() -> None:
+    assert per_call_max_chars(4, total_budget=16_000) == 4_000
+
+
+def test_per_call_max_chars_never_shrinks_below_the_floor() -> None:
+    """A 50-call batch would otherwise get 320 chars each — truncated to the
+    point of uselessness rather than merely compact."""
+    assert per_call_max_chars(50, total_budget=16_000) == 2_000
+
+
+def test_per_call_max_chars_batch_total_stays_near_the_turn_budget() -> None:
+    n = 4
+    total = per_call_max_chars(n) * n
+    assert total <= DEFAULT_MAX_RESULT_CHARS * 1.1  # small floor-driven slack only

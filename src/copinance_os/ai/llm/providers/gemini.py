@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import re
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from decimal import Decimal
 from typing import Any, cast
@@ -24,16 +23,19 @@ from copinance_os.ai.llm.tool_loop_streaming import (
     generate_turn_text_with_stream,
     maybe_emit_tool_round_rollback,
 )
-from copinance_os.ai.llm.tool_result_serialization import budget_tool_result, compact_json
+from copinance_os.ai.llm.tool_repeat_tracking import REPEAT_NOTICE, ToolRepeatTracker
+from copinance_os.ai.llm.tool_result_serialization import budget_tool_result, per_call_max_chars
 from copinance_os.core.execution_engine.question_driven_tool_summary import (
     build_partial_synthesis_message,
     is_tool_call_json_text,
 )
-from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
+from copinance_os.core.pipeline.tools.tool_runtime import ToolCallRequest, ToolRuntime
 from copinance_os.core.progress.emit import maybe_emit_progress
 from copinance_os.domain.models.pipeline.agent_progress import IterationStartedEvent
 from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.progress import ProgressSink
+from copinance_os.domain.ports.tool_spec import ToolSpec
 from copinance_os.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)
@@ -335,15 +337,18 @@ class GeminiProvider(LLMProvider):
             if hasattr(candidate, "content"):
                 content = candidate.content
                 if hasattr(content, "parts") and content.parts:
-                    # Collect all text parts
-                    text_parts = []
-                    for part in content.parts:
-                        if hasattr(part, "text") and part.text:
-                            text_parts.append(part.text)
-                        elif part:
-                            text_parts.append(str(part))
-                    if text_parts:
-                        return "".join(text_parts)
+                    # Collect only text parts — a function_call/function_response
+                    # part has no .text (it's None), and must NOT fall through to
+                    # str(part): that would inject the part's repr as bogus
+                    # "response text" whenever a turn is tool-calls-only. Once
+                    # we've found real parts structure, "no text part present"
+                    # is a definitive answer (a tool-only turn), not a parse
+                    # failure — return "" here rather than falling through to
+                    # the str(response) fallback below.
+                    text_parts = [
+                        part.text for part in content.parts if getattr(part, "text", None)
+                    ]
+                    return "".join(text_parts)
                 elif hasattr(content, "text"):
                     return cast(str, content.text)
 
@@ -468,8 +473,16 @@ class GeminiProvider(LLMProvider):
         contents: list[Any],
         config: dict[str, Any],
         on_stream_event: Callable[[LLMTextStreamEvent], Awaitable[None]],
-    ) -> str:
-        """Single tool-loop generation with native streaming over ``contents``."""
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Single tool-loop generation with native streaming over ``contents``.
+
+        Returns ``(text, function_calls)`` — a streamed turn can carry native
+        ``function_call`` parts the same as a non-streamed one; unlike text
+        (which the API may deliver cumulatively per chunk, see
+        ``_delta_from_cumulative_fragment``), a function call arrives complete
+        in whichever chunk carries it, so collecting one per sighting and
+        deduping is sufficient (no partial-call accumulation needed).
+        """
         if not GEMINI_AVAILABLE:
             raise RuntimeError("google-genai package is not installed")
         if not self._api_key or self._client is None:
@@ -485,6 +498,8 @@ class GeminiProvider(LLMProvider):
                 last_usage: dict[str, int] | None = None
                 for chunk in stream:
                     last_usage = self._extract_usage(chunk)
+                    for fc in self._extract_function_calls_from_response(chunk):
+                        asyncio.run_coroutine_threadsafe(queue.put(("fc", fc)), loop).result()
                     piece = self._extract_response_text(chunk)
                     delta = self._delta_from_cumulative_fragment(piece, acc_ref)
                     if delta:
@@ -496,6 +511,7 @@ class GeminiProvider(LLMProvider):
 
         task = asyncio.create_task(asyncio.to_thread(worker))
         parts: list[str] = []
+        function_calls: list[dict[str, Any]] = []
         try:
             while True:
                 kind, payload = await queue.get()
@@ -508,13 +524,15 @@ class GeminiProvider(LLMProvider):
                             native_streaming=True,
                         )
                     )
+                elif kind == "fc":
+                    function_calls.append(payload)
                 elif kind == "done":
                     break
                 elif kind == "err":
                     raise payload
         finally:
             await task
-        return "".join(parts)
+        return "".join(parts), self._dedupe_function_calls(function_calls)
 
     @staticmethod
     def _make_json_serializable(obj: Any) -> Any:
@@ -544,74 +562,83 @@ class GeminiProvider(LLMProvider):
         except (TypeError, ValueError):
             return str(obj)
 
-    def _convert_tool_to_gemini_function(self, tool: Tool) -> dict[str, Any]:
-        """Convert a Tool to Gemini function declaration format.
+    def _gemini_function_declarations(self, runtime: ToolRuntime) -> list[Any]:
+        """Build native Gemini ``FunctionDeclaration``s from a :class:`ToolRuntime`.
 
-        Args:
-            tool: Tool to convert
-
-        Returns:
-            Gemini function declaration dict
+        ``parameters_json_schema`` takes a plain JSON Schema dict directly (the
+        same one ``tool.get_schema().parameters`` already produces) — no
+        conversion to ``genai.types.Schema`` objects needed. This is what
+        makes function calling native: the model receives real typed
+        declarations and returns structured ``function_call`` parts, instead
+        of us asking it to describe a call as JSON text and hoping it's
+        parseable (see ``_extract_function_calls_from_response``).
         """
-        schema = tool.get_schema()
-        return {
-            "name": schema.name,
-            "description": schema.description,
-            "parameters": schema.parameters,
-        }
+        if not GEMINI_AVAILABLE or genai is None:
+            return []
+        declarations = []
+        for name in runtime.list_tools():
+            tool = runtime.get_tool(name)
+            if tool is None:
+                continue
+            schema = tool.get_schema()
+            declarations.append(
+                genai.types.FunctionDeclaration(
+                    name=schema.name,
+                    description=schema.description,
+                    parameters_json_schema=schema.parameters,
+                )
+            )
+        return declarations
 
-    def _parse_tool_calls_from_response(
-        self, response_text: str, executor: ToolExecutor
-    ) -> list[dict[str, Any]]:
-        """Parse tool calls from LLM response text.
+    @staticmethod
+    def _dedupe_function_calls(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # A dict-valued or list-valued arg (e.g. get_options_chain's
+        # expiration_dates: [...]) is unhashable, so dedup keys are compared
+        # with a linear `in` scan over a list rather than a set — the same
+        # approach the loop-detection `recent_tool_calls` list already uses,
+        # and these lists are always small (one LLM turn's function calls).
+        seen: list[tuple[str, str]] = []
+        out = []
+        for call in calls:
+            key = (call["name"], json.dumps(call.get("args", {}), sort_keys=True, default=str))
+            if key in seen:
+                continue
+            seen.append(key)
+            out.append(call)
+        return out
 
-        Args:
-            response_text: Response text from LLM
-            executor: Tool executor for validation
+    def _extract_function_calls_from_response(self, response: Any) -> list[dict[str, Any]]:
+        """Extract native ``function_call`` parts from a Gemini response.
 
-        Returns:
-            List of parsed tool calls with name and args
+        Replaces the old three-regex text-scraping ``_parse_tool_calls_from_response``:
+        with ``tools=`` declared on the request (see ``_gemini_function_declarations``),
+        the model returns structured ``function_call`` parts rather than JSON embedded
+        in prose, so there is nothing left to regex — a nested-object argument (e.g.
+        ``get_options_chain``'s ``expiration_dates: [...]``) round-trips as a real
+        typed value instead of needing to survive a bespoke JSON-in-text pattern.
         """
-        function_calls = []
-        json_patterns = [
-            r'\{[^{}]*"tool"[^{}]*\}',  # Simple pattern
-            r'\{[^{}]*"tool"[^{}]*"args"[^{}]*\}',  # With args
-            r'\{"tool":\s*"[^"]+",\s*"args":\s*\{[^}]*\}\}',  # More specific
-        ]
+        if response is None:
+            return []
+        calls: list[dict[str, Any]] = []
+        for candidate in getattr(response, "candidates", None) or []:
+            content = getattr(candidate, "content", None)
+            for part in getattr(content, "parts", None) or []:
+                fc = getattr(part, "function_call", None)
+                if fc is not None and getattr(fc, "name", None):
+                    calls.append({"name": fc.name, "args": dict(fc.args or {})})
+        return self._dedupe_function_calls(calls)
 
-        for pattern in json_patterns:
-            json_matches = re.finditer(pattern, response_text, re.DOTALL)
-            for json_match in json_matches:
-                try:
-                    action_data = json.loads(json_match.group())
-                    tool_name = action_data.get("tool")
-                    tool_args = action_data.get("args", {})
-                    if tool_name and tool_name in executor.list_tools():
-                        function_calls.append({"name": tool_name, "args": tool_args})
-                        logger.debug(
-                            "Parsed tool call from response", tool=tool_name, pattern=pattern
-                        )
-                except (json.JSONDecodeError, KeyError):
-                    continue
-
-            if function_calls:
-                break  # Found tool calls, no need to try other patterns
-
-        return function_calls
-
-    def _get_tool_schema_info(
-        self, tool_name: str, executor: ToolExecutor
-    ) -> dict[str, Any] | None:
+    def _get_tool_schema_info(self, tool_name: str, runtime: ToolRuntime) -> dict[str, Any] | None:
         """Get structured tool schema information.
 
         Args:
             tool_name: Name of the tool
-            executor: Tool executor to get tool schema
+            runtime: Tool runtime to get tool schema
 
         Returns:
             Dictionary with tool schema information, or None if tool not found
         """
-        tool = executor.get_tool(tool_name)
+        tool = runtime.get_tool(tool_name)
         if not tool:
             return None
 
@@ -696,22 +723,24 @@ class GeminiProvider(LLMProvider):
                 "llm_synthesis_error": None,
             }
 
-        # Create tool executor
-        executor = ToolExecutor(tools, progress_sink=progress_sink, run_id=run_id)
+        runtime = ToolRuntime(
+            [ToolSpec.from_legacy(t) for t in tools], progress_sink=progress_sink, run_id=run_id
+        )
 
         # Native multi-turn: prior user/model turns + current user task; system via config
         base_cfg = self._build_generation_config(temperature, max_tokens, **kwargs)
         config = dict(base_cfg)
         if system_prompt:
             config["systemInstruction"] = system_prompt
+        function_declarations = self._gemini_function_declarations(runtime)
+        if function_declarations:
+            config["tools"] = [genai.types.Tool(function_declarations=function_declarations)]
 
         tool_calls_made: list[dict[str, Any]] = []
         contents: list[Any] = self._gemini_build_contents(prior_conversation, prompt)
         response_text = ""
         usage_total: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
-        # Track recent tool calls for loop detection
-        recent_tool_calls: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
-        max_recent_history = 3  # Check last 3 calls for loops
+        repeat_tracker: ToolRepeatTracker[ToolResult[Any]] = ToolRepeatTracker()
         iteration_error: Exception | None = None
 
         for iteration in range(max_iterations):
@@ -733,18 +762,16 @@ class GeminiProvider(LLMProvider):
 
                 # Generate with Gemini multi-turn contents (prior turns + in-loop model/user)
                 if stream and on_stream_event:
-                    response_text = await self._gemini_stream_tool_turn(
+                    response_text, function_calls = await self._gemini_stream_tool_turn(
                         contents, config, on_stream_event
                     )
                 else:
                     response = await self._call_gemini_api(contents, config)
                     response_text = self._extract_response_text(response)
+                    function_calls = self._extract_function_calls_from_response(response)
                     u = self._extract_usage(response)
                     for k in usage_total:
                         usage_total[k] += u.get(k, 0)
-
-                # Parse tool calls from response
-                function_calls = self._parse_tool_calls_from_response(response_text, executor)
 
                 await maybe_emit_tool_round_rollback(
                     stream=stream,
@@ -756,62 +783,80 @@ class GeminiProvider(LLMProvider):
                 if not function_calls:
                     break
 
-                # Check for loops: same tool call repeated (before execution)
-                loop_detected = False
-                for func_call in function_calls:
-                    tool_name_check = func_call["name"]
-                    tool_args_check = func_call.get("args", {})
-                    # Create signature: (tool_name, tuple of sorted (key, value) pairs)
-                    sorted_items_check = tuple(sorted(tool_args_check.items()))
-                    call_signature_check: tuple[str, tuple[tuple[str, Any], ...]] = (
-                        tool_name_check,
-                        sorted_items_check,
-                    )
-
-                    # Check if this exact call was made recently
-                    if call_signature_check in recent_tool_calls:
-                        logger.warning(
-                            "Detected tool call loop - same call repeated",
-                            tool_name=tool_name_check,
-                            args=tool_args_check,
-                            iteration=iteration + 1,
-                        )
-                        loop_detected = True
-                        break
-
-                # If we detected a loop, stop iterating
-                if loop_detected:
+                # Track occurrences up front — the count decides whether a call
+                # executes, reuses a remembered result, or stops the loop
+                # (design doc §6: the second identical call reuses the cached
+                # prior result plus a nudge; only a third ends the round).
+                # Recording every call in one iteration before checking
+                # should_stop means a parallel batch of distinct calls never
+                # trips detection just for filling the old fixed-size window.
+                occurrences = [
+                    repeat_tracker.record(fc["name"], fc.get("args", {})) for fc in function_calls
+                ]
+                if any(
+                    repeat_tracker.should_stop(fc["name"], fc.get("args", {}))
+                    for fc in function_calls
+                ):
                     logger.warning(
                         "Stopping iteration due to detected loop",
                         iteration=iteration + 1,
                     )
                     break
 
-                # Execute function calls; then append model + user(tool feedback) for Gemini turns
-                tool_feedback_parts: list[str] = []
-                stop_suffix: str | None = None
+                # Execute function calls as one batch — parallel-safe calls run
+                # concurrently (see ToolRuntime.run_batch) instead of the strict
+                # one-at-a-time loop this replaced. Only first-occurrence calls
+                # actually execute; a repeat is served from the tracker's
+                # remembered result instead of re-running the tool.
+                to_execute = [
+                    (call_idx, func_call)
+                    for call_idx, func_call in enumerate(function_calls)
+                    if occurrences[call_idx] == 1
+                ]
+                executed = (
+                    await runtime.run_batch(
+                        [
+                            ToolCallRequest(
+                                name=func_call["name"],
+                                args=func_call.get("args", {}),
+                                call_index=call_idx,
+                                iteration=iteration + 1,
+                            )
+                            for call_idx, func_call in to_execute
+                        ]
+                    )
+                    if to_execute
+                    else []
+                )
+                batch_results: list[ToolResult[Any]] = [None] * len(function_calls)  # type: ignore[list-item]
+                for (call_idx, executed_call), executed_result in zip(
+                    to_execute, executed, strict=True
+                ):
+                    repeat_tracker.remember(
+                        executed_call["name"], executed_call.get("args", {}), executed_result
+                    )
+                    batch_results[call_idx] = executed_result
                 for call_idx, func_call in enumerate(function_calls):
+                    if occurrences[call_idx] == 1:
+                        continue
+                    cached_result = repeat_tracker.cached(
+                        func_call["name"], func_call.get("args", {})
+                    )
+                    assert cached_result is not None, "occurrence 2 must have a remembered result"
+                    batch_results[call_idx] = cached_result
+
+                function_response_parts: list[Any] = []
+                stop_suffix: str | None = None
+                # A per-turn budget, not per-call: N parallel-safe calls in one
+                # iteration must not return N x DEFAULT_MAX_RESULT_CHARS combined
+                # (see per_call_max_chars) — the old serial loop made a per-call
+                # constant self-limiting; parallel execution does not.
+                per_call_budget = per_call_max_chars(len(function_calls))
+                for call_idx, (func_call, tool_result) in enumerate(
+                    zip(function_calls, batch_results, strict=True)
+                ):
                     tool_name = func_call["name"]
                     tool_args = func_call.get("args", {})
-
-                    logger.info("Executing tool", tool_name=tool_name, args=tool_args)
-                    tool_result = await executor.execute_tool(
-                        tool_name,
-                        progress_iteration=iteration + 1,
-                        progress_call_index=call_idx,
-                        **tool_args,
-                    )
-
-                    # Track this call for loop detection
-                    sorted_items = tuple(sorted(tool_args.items()))
-                    call_signature: tuple[str, tuple[tuple[str, Any], ...]] = (
-                        tool_name,
-                        sorted_items,
-                    )
-                    recent_tool_calls.append(call_signature)
-                    # Keep only recent history
-                    if len(recent_tool_calls) > max_recent_history:
-                        recent_tool_calls.pop(0)
 
                     # Serialize response data for storage, with a real size budget —
                     # applied here so it also reaches the model-facing result_data
@@ -819,7 +864,9 @@ class GeminiProvider(LLMProvider):
                     response_data = None
                     if tool_result.success and tool_result.data is not None:
                         response_data = budget_tool_result(
-                            self._make_json_serializable(tool_result.data), tool_name=tool_name
+                            self._make_json_serializable(tool_result.data),
+                            tool_name=tool_name,
+                            max_chars=per_call_budget,
                         )
 
                     tool_calls_made.append(
@@ -880,13 +927,21 @@ class GeminiProvider(LLMProvider):
                     # Prepare result data for next iteration (generic JSON format)
                     if not tool_result.success:
                         error_msg = tool_result.error or "Unknown error"
-                        # Include tool schema info for parameter validation errors
+                        # Include tool schema info for parameter validation errors.
+                        # ToolRuntime validates args via each tool's Pydantic
+                        # args_model (see ToolSpec) before the legacy hand-rolled
+                        # checker ever runs, so its error text ("validation
+                        # error for ...") replaced the old "must be one of" /
+                        # "Missing required parameter" phrasing this used to key
+                        # off of — match both so the hint doesn't silently stop
+                        # firing for every tool now that it validates natively.
                         tool_schema = None
                         if (
                             "must be one of" in error_msg
                             or "Missing required parameter" in error_msg
+                            or "validation error" in error_msg
                         ):
-                            tool_schema = self._get_tool_schema_info(tool_name, executor)
+                            tool_schema = self._get_tool_schema_info(tool_name, runtime)
 
                         result_data = {
                             "tool": tool_name,
@@ -934,10 +989,21 @@ class GeminiProvider(LLMProvider):
                                 invalid_params=has_invalid_params,
                             )
 
-                    # Collect tool result JSON for the following user turn
+                    if occurrences[call_idx] == 2:
+                        result_data["warning"] = (
+                            f"{result_data.get('warning', '')} {REPEAT_NOTICE}".strip()
+                        )
+
+                    # Native function_response part for the following turn — a
+                    # structured reply the model treats as authoritative tool
+                    # output, not prose it has to re-parse (see the module's
+                    # move away from JSON-embedded-in-text feedback).
                     serializable_data = self._make_json_serializable(result_data)
-                    tool_result_json = compact_json(serializable_data)
-                    tool_feedback_parts.append(f"Tool execution result:\n{tool_result_json}")
+                    function_response_parts.append(
+                        genai.types.Part.from_function_response(
+                            name=tool_name, response=serializable_data
+                        )
+                    )
 
                     # If we got empty results or invalid params, suggest stopping to avoid loops
                     # But respect tool metadata that indicates retry is allowed
@@ -961,22 +1027,33 @@ class GeminiProvider(LLMProvider):
                                 "or explain that you cannot answer the question with the available tools."
                             )
 
-                if tool_feedback_parts and GEMINI_AVAILABLE and genai is not None:
-                    contents.append(
-                        genai.types.Content(
-                            role="model",
-                            parts=[genai.types.Part.from_text(text=response_text)],
+                if function_response_parts and GEMINI_AVAILABLE and genai is not None:
+                    # Model turn: any narration text alongside the native
+                    # function_call parts it actually issued (not re-derived
+                    # from function_calls — a call the loop filtered out via
+                    # loop detection never reaches here, so this always
+                    # matches what execution_batch below just ran).
+                    model_parts: list[Any] = []
+                    if response_text:
+                        model_parts.append(genai.types.Part.from_text(text=response_text))
+                    model_parts.extend(
+                        genai.types.Part.from_function_call(
+                            name=func_call["name"], args=func_call.get("args", {})
                         )
+                        for func_call in function_calls
                     )
-                    user_blob = "\n\n".join(tool_feedback_parts)
+                    contents.append(genai.types.Content(role="model", parts=model_parts))
+                    # Function responses are their own turn — one Content per
+                    # Gemini's expected function-calling contract, not mixed
+                    # into the model's turn or muddied with the stop nudge.
+                    contents.append(genai.types.Content(role="user", parts=function_response_parts))
                     if stop_suffix:
-                        user_blob = f"{user_blob}\n\n{stop_suffix}"
-                    contents.append(
-                        genai.types.Content(
-                            role="user",
-                            parts=[genai.types.Part.from_text(text=user_blob)],
+                        contents.append(
+                            genai.types.Content(
+                                role="user",
+                                parts=[genai.types.Part.from_text(text=stop_suffix)],
+                            )
                         )
-                    )
 
             except Exception as e:
                 iteration_error = e

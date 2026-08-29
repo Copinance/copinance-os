@@ -24,6 +24,8 @@ def load_llm_config_from_env() -> LLMConfig | None:
         COPINANCEOS_OPENAI_BASE_URL: OpenAI base URL
         COPINANCEOS_OLLAMA_BASE_URL: Ollama base URL
         COPINANCEOS_OLLAMA_MODEL: Ollama model name
+        COPINANCEOS_ANTHROPIC_API_KEY: Anthropic API key
+        COPINANCEOS_ANTHROPIC_MODEL: Anthropic model name
         COPINANCEOS_LLM_TEMPERATURE: Temperature (default: 0.7)
         COPINANCEOS_LLM_MAX_TOKENS: Max tokens
         COPINANCEOS_LLM_PROVIDERS: Comma-separated execution_type:provider mappings
@@ -43,6 +45,7 @@ def load_llm_config_from_env() -> LLMConfig | None:
             "COPINANCEOS_OPENAI_API_KEY",
             "COPINANCEOS_OLLAMA_BASE_URL",
             "COPINANCEOS_OLLAMA_MODEL",
+            "COPINANCEOS_ANTHROPIC_API_KEY",
         ]
     )
 
@@ -64,6 +67,9 @@ def load_llm_config_from_env() -> LLMConfig | None:
     elif provider_lower == "ollama":
         base_url = os.getenv("COPINANCEOS_OLLAMA_BASE_URL", "http://localhost:11434")
         model = os.getenv("COPINANCEOS_OLLAMA_MODEL", "llama2")
+    elif provider_lower == "anthropic":
+        api_key = os.getenv("COPINANCEOS_ANTHROPIC_API_KEY")
+        model = os.getenv("COPINANCEOS_ANTHROPIC_MODEL", "claude-opus-5")
 
     # Parse execution_type:provider mapping
     execution_type_providers: dict[str, str] = {}

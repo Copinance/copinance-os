@@ -12,6 +12,11 @@ from copinance_os.core.pipeline.tools.discovery import (
 )
 from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
 from copinance_os.core.pipeline.tools.tool_registry import ToolRegistry
+from copinance_os.core.pipeline.tools.tool_runtime import (
+    ToolCallRequest,
+    ToolRunMetric,
+    ToolRuntime,
+)
 
 __all__ = [
     "DATA_PROVIDER_TOOL_BUNDLE_SPECS",
@@ -20,6 +25,9 @@ __all__ = [
     "TOOL_BUNDLE_ENTRY_GROUP",
     "ToolRegistry",
     "ToolExecutor",
+    "ToolRuntime",
+    "ToolCallRequest",
+    "ToolRunMetric",
     "build_data_provider_tool_registry",
     "collect_question_driven_tools",
     "load_tools_from_plugin_specs",

@@ -26,16 +26,23 @@ from copinance_os.ai.llm.tool_loop_streaming import (
     generate_turn_text_with_stream,
     maybe_emit_tool_round_rollback,
 )
-from copinance_os.ai.llm.tool_result_serialization import budget_tool_result, compact_json
+from copinance_os.ai.llm.tool_repeat_tracking import REPEAT_NOTICE, ToolRepeatTracker
+from copinance_os.ai.llm.tool_result_serialization import (
+    budget_tool_result,
+    compact_json_with_toon,
+    per_call_max_chars,
+)
 from copinance_os.core.execution_engine.question_driven_tool_summary import (
     build_partial_synthesis_message,
     is_tool_call_json_text,
 )
-from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
+from copinance_os.core.pipeline.tools.tool_runtime import ToolCallRequest, ToolRuntime
 from copinance_os.core.progress.emit import maybe_emit_progress
 from copinance_os.domain.models.pipeline.agent_progress import IterationStartedEvent
 from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.progress import ProgressSink
+from copinance_os.domain.ports.tool_spec import ToolSpec
 from copinance_os.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)
@@ -557,8 +564,9 @@ class OllamaProvider(LLMProvider):
                 "llm_synthesis_error": None,
             }
 
-        # Create tool executor
-        executor = ToolExecutor(tools, progress_sink=progress_sink, run_id=run_id)
+        runtime = ToolRuntime(
+            [ToolSpec.from_legacy(t) for t in tools], progress_sink=progress_sink, run_id=run_id
+        )
 
         # Provider-native multi-turn: Ollama /api/chat messages
         tool_calls_made: list[dict[str, Any]] = []
@@ -568,9 +576,7 @@ class OllamaProvider(LLMProvider):
             prompt,
         )
         response_text = ""
-        # Track recent tool calls for loop detection
-        recent_tool_calls: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
-        max_recent_history = 3  # Check last 3 calls for loops
+        repeat_tracker: ToolRepeatTracker[ToolResult[Any]] = ToolRepeatTracker()
         iteration_error: Exception | None = None
 
         for iteration in range(max_iterations):
@@ -665,7 +671,7 @@ class OllamaProvider(LLMProvider):
                     tool_name = obj.get("tool") or obj.get("action")
                     tool_params = obj.get("args") or obj.get("parameters")
 
-                    if tool_name and tool_params is not None and tool_name in executor.list_tools():
+                    if tool_name and tool_params is not None and tool_name in runtime.list_tools():
                         function_calls.append({"name": tool_name, "args": tool_params})
                         logger.debug("Found tool call in response", tool=tool_name)
 
@@ -679,62 +685,78 @@ class OllamaProvider(LLMProvider):
                 if not function_calls:
                     break
 
-                # Check for loops: same tool call repeated (before execution)
-                loop_detected = False
-                for func_call in function_calls:
-                    tool_name_check = func_call["name"]
-                    tool_args_check = func_call.get("args", {})
-                    # Create signature: (tool_name, tuple of sorted (key, value) pairs)
-                    sorted_items_check = tuple(sorted(tool_args_check.items()))
-                    call_signature_check: tuple[str, tuple[tuple[str, Any], ...]] = (
-                        tool_name_check,
-                        sorted_items_check,
-                    )
-
-                    # Check if this exact call was made recently
-                    if call_signature_check in recent_tool_calls:
-                        logger.warning(
-                            "Detected tool call loop - same call repeated",
-                            tool_name=tool_name_check,
-                            args=tool_args_check,
-                            iteration=iteration + 1,
-                        )
-                        loop_detected = True
-                        break
-
-                # If we detected a loop, stop iterating
-                if loop_detected:
+                # Track occurrences up front — the count decides whether a call
+                # executes, reuses a remembered result, or stops the loop
+                # (design doc §6: the second identical call reuses the cached
+                # prior result plus a nudge; only a third ends the round).
+                occurrences = [
+                    repeat_tracker.record(fc["name"], fc.get("args", {})) for fc in function_calls
+                ]
+                if any(
+                    repeat_tracker.should_stop(fc["name"], fc.get("args", {}))
+                    for fc in function_calls
+                ):
                     logger.warning(
                         "Stopping iteration due to detected loop",
                         iteration=iteration + 1,
                     )
                     break
 
+                # Execute function calls as one batch — parallel-safe calls run
+                # concurrently (see ToolRuntime.run_batch) instead of the strict
+                # one-at-a-time loop this replaced. Only first-occurrence calls
+                # actually execute; a repeat is served from the tracker's
+                # remembered result instead of re-running the tool.
+                to_execute = [
+                    (call_idx, func_call)
+                    for call_idx, func_call in enumerate(function_calls)
+                    if occurrences[call_idx] == 1
+                ]
+                executed = (
+                    await runtime.run_batch(
+                        [
+                            ToolCallRequest(
+                                name=func_call["name"],
+                                args=func_call.get("args", {}),
+                                call_index=call_idx,
+                                iteration=iteration + 1,
+                            )
+                            for call_idx, func_call in to_execute
+                        ]
+                    )
+                    if to_execute
+                    else []
+                )
+                batch_results: list[ToolResult[Any]] = [None] * len(function_calls)  # type: ignore[list-item]
+                for (call_idx, executed_call), executed_result in zip(
+                    to_execute, executed, strict=True
+                ):
+                    repeat_tracker.remember(
+                        executed_call["name"], executed_call.get("args", {}), executed_result
+                    )
+                    batch_results[call_idx] = executed_result
+                for call_idx, func_call in enumerate(function_calls):
+                    if occurrences[call_idx] == 1:
+                        continue
+                    cached_result = repeat_tracker.cached(
+                        func_call["name"], func_call.get("args", {})
+                    )
+                    assert cached_result is not None, "occurrence 2 must have a remembered result"
+                    batch_results[call_idx] = cached_result
+
                 # Execute function calls; append assistant + user(tool feedback) for next chat turn
                 tool_feedback_parts: list[str] = []
                 stop_suffix: str | None = None
-                for call_idx, func_call in enumerate(function_calls):
+                # A per-turn budget, not per-call: N parallel-safe calls in one
+                # iteration must not return N x DEFAULT_MAX_RESULT_CHARS combined
+                # (see per_call_max_chars) — the old serial loop made a per-call
+                # constant self-limiting; parallel execution does not.
+                per_call_budget = per_call_max_chars(len(function_calls))
+                for call_idx, (func_call, tool_result) in enumerate(
+                    zip(function_calls, batch_results, strict=True)
+                ):
                     tool_name = func_call["name"]
                     tool_args = func_call.get("args", {})
-
-                    logger.info("Executing tool", tool_name=tool_name, args=tool_args)
-                    tool_result = await executor.execute_tool(
-                        tool_name,
-                        progress_iteration=iteration + 1,
-                        progress_call_index=call_idx,
-                        **tool_args,
-                    )
-
-                    # Track this call for loop detection
-                    sorted_items = tuple(sorted(tool_args.items()))
-                    call_signature: tuple[str, tuple[tuple[str, Any], ...]] = (
-                        tool_name,
-                        sorted_items,
-                    )
-                    recent_tool_calls.append(call_signature)
-                    # Keep only recent history
-                    if len(recent_tool_calls) > max_recent_history:
-                        recent_tool_calls.pop(0)
 
                     # Serialize response data for storage, with a real size budget —
                     # applied here so it also reaches the model-facing result_data
@@ -742,7 +764,9 @@ class OllamaProvider(LLMProvider):
                     response_data = None
                     if tool_result.success and tool_result.data is not None:
                         response_data = budget_tool_result(
-                            make_json_serializable(tool_result.data), tool_name=tool_name
+                            make_json_serializable(tool_result.data),
+                            tool_name=tool_name,
+                            max_chars=per_call_budget,
                         )
 
                     tool_calls_made.append(
@@ -847,8 +871,13 @@ class OllamaProvider(LLMProvider):
                                 invalid_params=has_invalid_params,
                             )
 
+                    if occurrences[call_idx] == 2:
+                        result_data["warning"] = (
+                            f"{result_data.get('warning', '')} {REPEAT_NOTICE}".strip()
+                        )
+
                     serializable_data = make_json_serializable(result_data)
-                    tool_result_json = compact_json(serializable_data)
+                    tool_result_json = compact_json_with_toon(serializable_data)
                     tool_feedback_parts.append(f"Tool execution result:\n{tool_result_json}")
 
                     should_stop = (is_empty_result or has_invalid_params) and iteration >= 1

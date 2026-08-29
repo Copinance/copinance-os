@@ -28,16 +28,23 @@ from copinance_os.ai.llm.tool_loop_streaming import (
     generate_turn_text_with_stream,
     maybe_emit_tool_round_rollback,
 )
-from copinance_os.ai.llm.tool_result_serialization import budget_tool_result, compact_json
+from copinance_os.ai.llm.tool_repeat_tracking import REPEAT_NOTICE, ToolRepeatTracker
+from copinance_os.ai.llm.tool_result_serialization import (
+    budget_tool_result,
+    compact_json_with_toon,
+    per_call_max_chars,
+)
 from copinance_os.core.execution_engine.question_driven_tool_summary import (
     build_partial_synthesis_message,
     is_tool_call_json_text,
 )
-from copinance_os.core.pipeline.tools.tool_executor import ToolExecutor
+from copinance_os.core.pipeline.tools.tool_runtime import ToolCallRequest, ToolRuntime
 from copinance_os.core.progress.emit import maybe_emit_progress
 from copinance_os.domain.models.pipeline.agent_progress import IterationStartedEvent
 from copinance_os.domain.models.pipeline.llm_conversation import LLMConversationTurn
+from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.progress import ProgressSink
+from copinance_os.domain.ports.tool_spec import ToolSpec
 from copinance_os.domain.ports.tools import Tool
 
 logger = structlog.get_logger(__name__)
@@ -57,11 +64,11 @@ def _make_json_serializable(obj: Any) -> Any:
     return str(obj)
 
 
-def _openai_tool_definitions(executor: ToolExecutor) -> list[dict[str, Any]]:
-    """Build OpenAI ``tools`` payload from a :class:`ToolExecutor`."""
+def _openai_tool_definitions(runtime: ToolRuntime) -> list[dict[str, Any]]:
+    """Build OpenAI ``tools`` payload from a :class:`ToolRuntime`."""
     out: list[dict[str, Any]] = []
-    for name in executor.list_tools():
-        tool = executor.get_tool(name)
+    for name in runtime.list_tools():
+        tool = runtime.get_tool(name)
         if not tool:
             continue
         schema = tool.get_schema()
@@ -111,14 +118,14 @@ def _tool_calls_to_openai_dicts(raw: Any) -> list[dict[str, Any]]:
 
 
 def _parse_function_calls_from_tool_calls(
-    raw: list[dict[str, Any]], executor: ToolExecutor
+    raw: list[dict[str, Any]], runtime: ToolRuntime
 ) -> list[dict[str, Any]]:
     """Parse OpenAI ``tool_calls`` into ``{\"name\", \"args\"}`` for the tool loop."""
     calls: list[dict[str, Any]] = []
     for tc in raw:
         fn = tc.get("function") or {}
         name = fn.get("name")
-        if not name or name not in executor.list_tools():
+        if not name or name not in runtime.list_tools():
             continue
         raw_args = fn.get("arguments") or "{}"
         try:
@@ -435,14 +442,21 @@ class OpenAIProvider(LLMProvider):
                 "llm_synthesis_error": None,
             }
 
-        executor = ToolExecutor(tools, progress_sink=progress_sink, run_id=run_id)
-        oai_tools = _openai_tool_definitions(executor)
+        runtime = ToolRuntime(
+            [ToolSpec.from_legacy(t) for t in tools], progress_sink=progress_sink, run_id=run_id
+        )
+        oai_tools = _openai_tool_definitions(runtime)
         messages = self._build_messages(system_prompt, prior_conversation, prompt)
 
         tool_calls_made: list[dict[str, Any]] = []
         usage_total: dict[str, int] = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
-        recent_tool_calls: list[tuple[str, tuple[tuple[str, Any], ...]]] = []
-        max_recent_history = 3
+        # Counts occurrences of each (name, args) signature across the whole
+        # loop and remembers results — the second occurrence reuses the first
+        # result instead of re-running (and re-charging) the tool; only a
+        # third stops the loop. See tool_repeat_tracking's module docstring
+        # for why "any repeat, immediately" broke once native function
+        # calling made same-turn parallel calls common.
+        repeat_tracker: ToolRepeatTracker[ToolResult[Any]] = ToolRepeatTracker()
         iteration_error: Exception | None = None
         response_text = ""
 
@@ -492,26 +506,40 @@ class OpenAIProvider(LLMProvider):
                 if not tool_call_dicts:
                     break
 
-                function_calls = _parse_function_calls_from_tool_calls(tool_call_dicts, executor)
-
+                # Parse every call up front; calls that fail to parse get their
+                # error message queued immediately (no execution needed). Each
+                # parseable call's occurrence count (across the whole loop, not
+                # just this batch) decides its fate: 1st -> execute; 2nd -> reuse
+                # the first occurrence's result instead of re-running it; 3rd ->
+                # this is a genuine unproductive loop, stop the whole run. See
+                # tool_repeat_tracking's module docstring.
+                n_calls = len(tool_call_dicts)
+                func_calls_by_pos: list[dict[str, Any] | None] = [None] * n_calls
+                occurrence_by_pos: list[int] = [0] * n_calls
+                error_msgs_by_pos: list[dict[str, Any] | None] = [None] * n_calls
                 loop_detected = False
-                for func_call in function_calls:
-                    tool_name_check = func_call["name"]
-                    tool_args_check = func_call.get("args", {})
-                    sorted_items_check = tuple(sorted(tool_args_check.items()))
-                    sig: tuple[str, tuple[tuple[str, Any], ...]] = (
-                        tool_name_check,
-                        sorted_items_check,
-                    )
-                    if sig in recent_tool_calls:
+                for pos, tc_dict in enumerate(tool_call_dicts):
+                    parsed_one = _parse_function_calls_from_tool_calls([tc_dict], runtime)
+                    if not parsed_one:
+                        fn = tc_dict.get("function") or {}
+                        error_msgs_by_pos[pos] = {
+                            "tool": fn.get("name", ""),
+                            "success": False,
+                            "error": "Tool not found or invalid JSON arguments",
+                        }
+                        continue
+                    func_call = parsed_one[0]
+                    func_calls_by_pos[pos] = func_call
+                    tool_args = func_call.get("args", {})
+                    occurrence_by_pos[pos] = repeat_tracker.record(func_call["name"], tool_args)
+                    if repeat_tracker.should_stop(func_call["name"], tool_args):
                         logger.warning(
-                            "Detected tool call loop - same call repeated",
-                            tool_name=tool_name_check,
-                            args=tool_args_check,
+                            "Detected tool call loop - same call repeated too many times",
+                            tool_name=func_call["name"],
+                            args=tool_args,
                             iteration=iteration + 1,
                         )
                         loop_detected = True
-                        break
                 if loop_detected:
                     break
 
@@ -523,48 +551,81 @@ class OpenAIProvider(LLMProvider):
                 messages.append(assistant_msg)
 
                 tool_feedback_stop: str | None = None
-                for call_idx, tc_dict in enumerate(tool_call_dicts):
-                    parsed_one = _parse_function_calls_from_tool_calls([tc_dict], executor)
-                    if not parsed_one:
-                        fn = tc_dict.get("function") or {}
-                        err_name = fn.get("name", "")
+
+                # Calls that parse and are on their first occurrence batch into
+                # one ToolRuntime.run_batch — its parallel-safe calls run
+                # concurrently instead of the strict one-at-a-time loop this
+                # replaced. A second occurrence never reaches run_batch at all.
+                requests: list[ToolCallRequest] = []
+                request_positions: list[int] = []
+                for pos, maybe_call in enumerate(func_calls_by_pos):
+                    if maybe_call is None or occurrence_by_pos[pos] != 1:
+                        continue
+                    logger.info(
+                        "Executing tool", tool_name=maybe_call["name"], args=maybe_call.get("args")
+                    )
+                    requests.append(
+                        ToolCallRequest(
+                            name=maybe_call["name"],
+                            args=maybe_call.get("args", {}),
+                            call_index=pos,
+                            iteration=iteration + 1,
+                        )
+                    )
+                    request_positions.append(pos)
+
+                executed = await runtime.run_batch(requests) if requests else []
+                results_by_pos: dict[int, ToolResult[Any]] = {}
+                for pos, executed_result in zip(request_positions, executed, strict=True):
+                    executed_call = func_calls_by_pos[pos]
+                    assert executed_call is not None
+                    repeat_tracker.remember(
+                        executed_call["name"], executed_call.get("args", {}), executed_result
+                    )
+                    results_by_pos[pos] = executed_result
+                for pos, maybe_call in enumerate(func_calls_by_pos):
+                    if maybe_call is None or occurrence_by_pos[pos] == 1:
+                        continue
+                    cached_result = repeat_tracker.cached(
+                        maybe_call["name"], maybe_call.get("args", {})
+                    )
+                    assert cached_result is not None, "occurrence 2 must have a remembered result"
+                    results_by_pos[pos] = cached_result
+
+                # A per-turn budget, not per-call: N parallel-safe calls in one
+                # iteration must not return N x DEFAULT_MAX_RESULT_CHARS combined
+                # (see per_call_max_chars) — the old serial loop made a per-call
+                # constant self-limiting; parallel execution does not.
+                per_call_budget = per_call_max_chars(
+                    sum(1 for fc in func_calls_by_pos if fc is not None)
+                )
+
+                for pos, tc_dict in enumerate(tool_call_dicts):
+                    error_msg = error_msgs_by_pos[pos]
+                    if error_msg is not None:
                         messages.append(
                             {
                                 "role": "tool",
                                 "tool_call_id": tc_dict.get("id", ""),
-                                "content": json.dumps(
-                                    {
-                                        "tool": err_name,
-                                        "success": False,
-                                        "error": "Tool not found or invalid JSON arguments",
-                                    }
-                                ),
+                                "content": json.dumps(error_msg),
                             }
                         )
                         continue
 
-                    func_call = parsed_one[0]
+                    parsed_call = func_calls_by_pos[pos]
+                    assert parsed_call is not None
+                    func_call = parsed_call
+                    tool_result = results_by_pos[pos]
                     tool_name = func_call["name"]
                     tool_args = func_call.get("args", {})
                     tc_id = func_call.get("_tool_call_id") or tc_dict.get("id", "")
 
-                    logger.info("Executing tool", tool_name=tool_name, args=tool_args)
-                    tool_result = await executor.execute_tool(
-                        tool_name,
-                        progress_iteration=iteration + 1,
-                        progress_call_index=call_idx,
-                        **tool_args,
-                    )
-
-                    sorted_items = tuple(sorted(tool_args.items()))
-                    recent_tool_calls.append((tool_name, sorted_items))
-                    if len(recent_tool_calls) > max_recent_history:
-                        recent_tool_calls.pop(0)
-
                     response_data = None
                     if tool_result.success and tool_result.data is not None:
                         response_data = budget_tool_result(
-                            _make_json_serializable(tool_result.data), tool_name=tool_name
+                            _make_json_serializable(tool_result.data),
+                            tool_name=tool_name,
+                            max_chars=per_call_budget,
                         )
 
                     tool_calls_made.append(
@@ -644,7 +705,12 @@ class OpenAIProvider(LLMProvider):
                                 )
                             result_data["warning"] = warning_msg
 
-                    tool_result_json = compact_json(_make_json_serializable(result_data))
+                    if occurrence_by_pos[pos] == 2:
+                        result_data["warning"] = (
+                            f"{result_data.get('warning', '')} {REPEAT_NOTICE}".strip()
+                        )
+
+                    tool_result_json = compact_json_with_toon(_make_json_serializable(result_data))
                     messages.append(
                         {"role": "tool", "tool_call_id": tc_id, "content": tool_result_json}
                     )

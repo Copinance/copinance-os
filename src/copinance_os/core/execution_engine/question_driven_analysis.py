@@ -20,6 +20,7 @@ from copinance_os.core.execution_engine.base import BaseAnalysisExecutor
 from copinance_os.core.execution_engine.llm_stream_stdout import stdout_llm_stream_handler
 from copinance_os.core.pipeline.tools.context_tools import GetCurrentDateTool
 from copinance_os.core.pipeline.tools.discovery import collect_question_driven_tools
+from copinance_os.core.pipeline.tools.tool_gating import select_tools_for_job_scope
 from copinance_os.core.progress.emit import maybe_emit_progress
 from copinance_os.core.progress.recording_sink import RecordingProgressSink
 from copinance_os.domain.literacy import financial_literacy_prompt_value
@@ -207,7 +208,7 @@ class QuestionDrivenAnalysisExecutor(BaseAnalysisExecutor):
                 count=len(extra_tools),
                 cache_enabled=effective_tool_cache is not None,
             )
-        tools: list = [GetCurrentDateTool(), *extra_tools]
+        tools: list = select_tools_for_job_scope([GetCurrentDateTool(), *extra_tools], job.scope)
 
         if not tools:
             results["status"] = "failed"

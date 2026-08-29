@@ -592,19 +592,22 @@ class TestGeminiProvider:
                     assert result == "content text"
 
     @pytest.mark.asyncio
-    async def test_generate_text_extracts_from_candidates_content_part_str(self) -> None:
-        """Test that generate_text extracts text from candidates.content.parts[0] as string."""
+    async def test_generate_text_ignores_non_text_parts_instead_of_stringifying_them(self) -> None:
+        """A part with no usable text (e.g. a function_call-only part on a real
+        google-genai Part object, which always has a .text field defaulting to
+        None) must contribute nothing — not str(part) garbage. This matters
+        beyond generate_text: generate_with_tools' native function-calling
+        loop shares this same extractor, and a turn that only requests tools
+        has no text part at all."""
         with patch("copinance_os.ai.llm.providers.gemini.GEMINI_AVAILABLE", True):
             mock_client = MagicMock()
             mock_response = MagicMock()
             mock_response.text = None
 
-            # Create candidates structure with part that has no text attribute
             mock_candidate = MagicMock()
             mock_content = MagicMock()
             mock_part = MagicMock()
-            del mock_part.text  # Remove text attribute
-            mock_part.__str__ = MagicMock(return_value="part string")
+            mock_part.text = None  # real Part shape: attribute exists, value is None
             mock_content.parts = [mock_part]
             mock_candidate.content = mock_content
             mock_response.candidates = [mock_candidate]
@@ -623,7 +626,7 @@ class TestGeminiProvider:
 
                 with patch.object(loop, "run_in_executor", side_effect=run_in_executor_mock):
                     result = await provider.generate_text("test")
-                    assert result == "part string"
+                    assert result == ""
 
     @pytest.mark.asyncio
     async def test_generate_text_extracts_from_response_string(self) -> None:

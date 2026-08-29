@@ -5,6 +5,7 @@ from typing import Any
 import structlog
 
 from copinance_os.ai.llm.config import LLMConfig
+from copinance_os.ai.llm.providers.anthropic import AnthropicProvider
 from copinance_os.ai.llm.providers.base import LLMProvider
 from copinance_os.ai.llm.providers.gemini import GeminiProvider
 from copinance_os.ai.llm.providers.ollama import OllamaProvider
@@ -107,10 +108,20 @@ class LLMProviderFactory:
                 disable_native_text_stream=disable_native_text_stream,
             )
 
+        elif provider_name_lower == "anthropic":
+            return AnthropicProvider(
+                api_key=api_key,
+                model_name=model_name or "claude-opus-5",
+                temperature=temperature or 0.7,
+                max_output_tokens=max_output_tokens,
+                text_streaming_mode=resolved_streaming,
+                disable_native_text_stream=disable_native_text_stream,
+            )
+
         else:
             raise ValueError(
                 f"Unsupported LLM provider: {provider_name}. "
-                f"Supported providers: gemini, ollama, openai"
+                f"Supported providers: gemini, ollama, openai, anthropic"
             )
 
     @staticmethod
