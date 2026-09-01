@@ -7,13 +7,13 @@ This section covers everything the system can compute and analyze: market data r
 | Page | What it covers |
 |------|----------------|
 | [Market Data Tools](market-data-tools) | Quotes, history, search, options chains, **`get_options_positioning`**, fundamentals — the tool layer wrapping providers |
-| [Macro & Market Regime](macro-regime) | Trend, volatility, cycle detection; VIX, breadth, sector rotation; 47+ FRED macro indicators |
+| [Macro & Market Regime](macro-regime) | Trend, volatility, cycle detection; VIX, breadth, sector rotation; FRED macro indicators (~38 series) |
 | [Options & Greeks](options-and-greeks) | QuantLib BSM Greek estimation (first- and higher-order), implied vol normalization, metadata contract; aggregate **positioning** (`data.analytics.options.positioning`) |
 | [SEC Filings](sec-filings) | EDGAR filing lists, content, entity profiles, XBRL statements, insiders, 13F holdings |
 
 ## How tools are used
 
-Tools are invoked automatically in **question-driven** analysis (the LLM selects which to call) and composed into deterministic pipelines (e.g. `copinance analyze macro`). They always return structured JSON — the LLM sees tool results, not raw dataframes.
+Tools are invoked automatically in **question-driven** analysis (the LLM selects which to call) and composed into deterministic pipelines (e.g. `copinance analyze macro`). They always return structured JSON — the LLM sees tool results, not raw dataframes. A small **`get_current_date`** context tool is always available so models do not invent “today.”
 
 In question-driven mode, the tool registry is built from the container's providers. Enable all capabilities at once:
 

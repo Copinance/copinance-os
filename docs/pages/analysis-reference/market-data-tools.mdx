@@ -18,7 +18,7 @@ Search by symbol or display name. Returns matching instruments with exchange and
 
 ### `get_options_chain`
 
-Options chain for an underlying: expiration dates, calls, puts, strike, last price, implied volatility, open interest, volume, and BSM Greeks when QuantLib is available. See [Options & Greeks](options-and-greeks) for how Greeks are computed.
+Options chain for an underlying: expiration dates, calls, puts, strike, last price, implied volatility, open interest, volume, and BSM Greeks (QuantLib is a core dependency). See [Options & Greeks](options-and-greeks) for how Greeks are computed.
 
 **Parameters:** `underlying_symbol` (required); optional `expiration_date` (single YYYY-MM-DD), optional **`expiration_dates`** (array of YYYY-MM-DD)—when both are set they are merged and deduplicated. Omit both to use the provider default expiry. Optional `option_side` (`call` / `put` / `all`).
 
@@ -42,7 +42,7 @@ If the selected positioning window has no contracts (for example, no usable expi
 
 Narrative labels that accompany deterministic analysis surfaces are literacy-tiered through `financial_literacy`; clients should use stable numeric/enum fields for logic and treat text as presentation-level copy.
 
-**Parameters:** `symbol` (required, underlying ticker); optional **`window`**: `near` (default) or `mid` — same horizon damping as the [Library — Options positioning context](../getting-started/library#options-positioning-context) helper.
+**Parameters:** `symbol` (required, underlying ticker); optional **`window`**: `near` (default) or `mid`. `near` uses expiries with **0–21** days to expiry; `mid` uses **21–75** DTE (up to two dates in-band; falls back to the nearest two listed expiries if the band is empty). Same selection as [Library — Options positioning context](../getting-started/library#options-positioning-context).
 
 **Data:** Fetches quote + full chain (`get_options_chain` with `expiration_date=None`) via the wired **`MarketDataProvider`**.
 
@@ -91,6 +91,30 @@ Recent Form 4 insider filings for an issuer: structured ownership summaries and 
 ### `get_sec_13f_institutional_holdings`
 
 Latest 13F-HR portfolio for an institutional filer (manager CIK or ticker you specify): position tables and optional quarter-over-quarter comparison. Values are reported in **thousands of dollars** per SEC convention. Note: this returns one filer's portfolio, not all institutions holding a given stock.
+
+### Registered funds (mutual funds / ETFs)
+
+These tools resolve **fund series / companies / share classes**, not common-stock 10-Ks.
+
+### `find_sec_funds`
+
+Search SEC-registered funds by name fragment (`search_type`: `series` / `company` / `class`). Use an id from a row with the tools below.
+
+### `get_sec_fund_entity`
+
+Resolve a fund ticker, series id, or CIK to hierarchy (company, series, classes).
+
+### `get_sec_fund_filings`
+
+Fund filings for a resolved entity (default form **NPORT-P**). Optional `series_only` narrows via EFTS.
+
+### `get_sec_fund_portfolio`
+
+Holdings from a fund NPORT-P (or related) report.
+
+### `get_sec_fund_latest_report`
+
+Latest available portfolio-style report for a fund identifier.
 
 ## Using tools programmatically
 

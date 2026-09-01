@@ -49,6 +49,16 @@ SEC tools are registered when the container wires `EdgarToolsFundamentalProvider
 
 **`get_sec_13f_institutional_holdings`** — Latest 13F-HR portfolio for an institutional filer (manager CIK or ticker). Position tables with optional quarter-over-quarter comparison. Values are in **thousands of dollars** per SEC convention. Returns one filer's holdings — not all institutions holding a given stock.
 
+### Registered funds
+
+**`find_sec_funds`** — Search mutual funds and ETFs by name (`series` / `company` / `class`).
+
+**`get_sec_fund_entity`** — Resolve ticker, series id, or CIK to fund hierarchy.
+
+**`get_sec_fund_filings`** — Filings for that entity (default **NPORT-P**).
+
+**`get_sec_fund_portfolio`** / **`get_sec_fund_latest_report`** — Holdings / latest portfolio-style report for a fund identifier.
+
 ---
 
 ## Example prompts
@@ -67,6 +77,9 @@ copinance analyze equity TSLA --question "What recent insider Form 4 transaction
 
 # Institutional holders
 copinance analyze equity NVDA --question "What does the latest 13F for Vanguard show?"
+
+# Registered fund (NPORT)
+copinance analyze equity SPY --question "Find the Vanguard S&P 500 fund series and summarize the latest NPORT-P holdings."
 
 # XBRL statement
 copinance analyze equity AMZN --question "Pull the income statement from Amazon's most recent 10-K."

@@ -3,7 +3,7 @@
 Two complementary analysis layers describe market conditions:
 
 - **Market regime tools** classify price and volatility behavior from historical series (trend, cycles, VIX, breadth, sector rotation). Rule-based; fast and interpretable.
-- **Macro indicators** aggregate observable economic series — rates, credit, labor, housing, manufacturing, consumer, global — into structured signals. 47+ series via FRED (with yfinance fallbacks).
+- **Macro indicators** aggregate observable economic series — rates, credit, labor, housing, manufacturing, consumer, global — into structured signals. About **38 FRED series** when a FRED key is set, plus yfinance proxies (ETFs, FX) where FRED is unavailable.
 
 Both are used together in `copinance analyze macro` and are available to the LLM in question-driven runs. Regime labels and macro signals are **heuristic** contextual inputs — treat them as backdrop, not as forecasts.
 Deterministic regime/macro narration is literacy-tiered (`financial_literacy`) while numeric fields remain unchanged.
@@ -64,9 +64,9 @@ Identifies Wyckoff-style cycle phases — accumulation, markup, distribution, ma
 
 Returns `phase`, `confidence`, and structural observations. Surface `potential_regime_change: true` prominently when detected.
 
-### `detect_market_regime_indicators`
+### `get_market_regime_indicators`
 
-Aggregates VIX level, market breadth, and sector rotation into a composite regime signal for the broad market.
+Aggregates VIX level, market breadth, and sector rotation into a composite regime signal for the broad market. This tool is **not** part of `create_rule_based_regime_tools`; it is registered separately for question-driven and `analyze macro` pipelines.
 
 **Inputs used:** VIX (^VIX), the 11 S&P sector ETFs (XLK, XLE, XLI, XLV, XLF, XLP, XLY, XLU, XLB, XLC, XLRE), and the reference index (default SPY).
 
@@ -85,14 +85,15 @@ from copinance_os.core.pipeline.tools.analysis import create_rule_based_regime_t
 from copinance_os.data.providers import YFinanceMarketProvider
 
 tools = create_rule_based_regime_tools(YFinanceMarketProvider())
-# tools is list[Tool]: detect_market_trend, detect_volatility_regime, detect_market_cycles, detect_market_regime_indicators
+# tools: detect_market_trend, detect_volatility_regime, detect_market_cycles
+# VIX / breadth / rotation: get_market_regime_indicators (separate class)
 ```
 
 ---
 
 ## Macro indicator tool
 
-The `macro_regime_indicators` tool aggregates 47+ economic series into nine categories. Numbers are fetched via `MacroeconomicDataProvider` (FRED when configured, yfinance proxies otherwise) — the LLM interprets tool output, it does not compute economic prints.
+The **`get_macro_regime_indicators`** tool aggregates about 38 FRED series into nine categories (plus yfinance proxies when FRED is missing). Numbers are fetched via `MacroeconomicDataProvider` (FRED when configured, yfinance otherwise) — the LLM interprets tool output, it does not compute economic prints.
 
 ### Categories and series
 
@@ -128,7 +129,7 @@ New home sales (HSN1F), existing home sales (EXHOSLUSM495S), Case-Shiller 20-cit
 
 **Manufacturing**
 
-Industrial production (INDPRO), capacity utilization (TCU), manufacturing IP (IPMAN), durable goods orders (NEWORDER), factory orders (AMTMTI).
+Industrial production (INDPRO), capacity utilization (TCU), manufacturing IP (IPMAN), durable goods orders (NEWORDER), factory orders (AMTMTI), manufacturing employment (DMANEMP).
 
 **Consumer**
 

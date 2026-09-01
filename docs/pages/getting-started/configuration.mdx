@@ -19,7 +19,7 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 
 ## LLM Provider Setup
 
-**Implemented backends:** **`gemini`**, **`openai`** (Chat Completions), and **`ollama`**. The factory rejects unknown provider names (see [Using as a Library — LLMConfig](library#llmconfig-required-for-question-driven-analysis)).
+**Implemented backends:** **`gemini`**, **`openai`**, **`anthropic`**, and **`ollama`**. Unknown provider names raise **`ValueError`**. See [Using as a Library — LLMConfig](library#llmconfig-required-for-question-driven-analysis).
 
 ### Gemini (Cloud)
 
@@ -27,10 +27,10 @@ COPINANCEOS_GEMINI_API_KEY=your-api-key-here
 2. Set in `.env`: `COPINANCEOS_GEMINI_API_KEY=your-key`
 3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
 
-**Model selection (optional):**
+**Model selection (optional):** If `COPINANCEOS_GEMINI_MODEL` is unset, the loader uses **`gemini-1.5-pro`**. Set a different id when you want speed or a newer snapshot:
+
 ```bash
-COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro   # default
-COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash # faster
+COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash
 ```
 
 **Text streaming (CLI):** For question-driven runs, pass **`--stream`** on the **`analyze`** group (before the subcommand) or **`--stream`** on generic research (`copinance --stream "…"`). **`--json`** disables streaming. Output prints to stdout as tokens arrive; run metadata and saved JSON still appear after. See [Using as a Library — LLM text streaming](library#llm-text-streaming-library--llmprovider) for **`LLMConfig`** and programmatic use.
@@ -48,6 +48,22 @@ COPINANCEOS_OPENAI_MODEL=gpt-4o-mini
 ```
 3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
 
+### Anthropic (Cloud)
+
+1. Get an API key from [Anthropic Console](https://console.anthropic.com).
+2. Set in `.env`:
+```bash
+COPINANCEOS_LLM_PROVIDER=anthropic
+COPINANCEOS_ANTHROPIC_API_KEY=sk-ant-...
+# Optional; code default if unset is claude-opus-5
+# COPINANCEOS_ANTHROPIC_MODEL=claude-opus-5
+```
+3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
+
+The Anthropic adapter uses native tool use. Plain **`generate_text_stream`** is **buffered** (no native token stream yet); question-driven **`generate_with_tools`** still streams synthesis deltas when the loop emits them.
+
+**Per-execution-type provider (optional):** `COPINANCEOS_LLM_PROVIDERS=instrument_analysis:ollama,question_driven_analysis:gemini` maps job `execution_type` to a provider name. Temperature / max tokens: `COPINANCEOS_LLM_TEMPERATURE` (default `0.7`), `COPINANCEOS_LLM_MAX_TOKENS`.
+
 ### Ollama (Local)
 
 1. Install from [ollama.ai](https://ollama.ai) and run `ollama pull` for a model you have locally (e.g. `llama3.2` or `llama3.1`).
@@ -59,6 +75,10 @@ COPINANCEOS_OLLAMA_MODEL=llama3.2
 ```
 3. Verify: `copinance analyze equity AAPL --question "What is the current price?"`
 
+### Compact tool results (optional TOON)
+
+Question-driven loops send tool payloads as compact JSON. Set **`COPINANCEOS_TOON_TABULAR_ENABLED=true`** to encode large uniform tables (chains, bar series, filing lists) as TOON. Nested-object tools stay JSON. Off by default.
+
 ## FRED API (Macro Data)
 
 Optional. Improves macro analysis; yfinance fallback is used without it.
@@ -66,6 +86,8 @@ Optional. Improves macro analysis; yfinance fallback is used without it.
 1. Get a free key at [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html).
 2. Set: `COPINANCEOS_FRED_API_KEY=your-fred-api-key`
 3. Verify: `copinance analyze macro` (results should show `"source": "fred"` where applicable).
+
+Optional knobs (defaults match `.env.example`): `COPINANCEOS_FRED_BASE_URL`, `COPINANCEOS_FRED_RATE_LIMIT_DELAY`, `COPINANCEOS_FRED_TIMEOUT_SECONDS`.
 
 ## SEC EDGAR (edgartools)
 
@@ -81,7 +103,7 @@ Responses are **cached** under the same cache as other tools (see below), with p
 
 ## Option Greek estimation (BSM)
 
-Optional. Affects analytic delta/gamma/theta/vega/rho attached to options chains when QuantLib is installed.
+Optional. Affects analytic delta/gamma/theta/vega/rho attached to options chains (QuantLib is required by the package).
 
 ```bash
 # Annual risk-free rate (decimal e.g. 0.045). Omit to use built-in default.
@@ -98,7 +120,8 @@ Reserved `OptionsChain.metadata` keys and profile preferences are documented in 
 ```bash
 # CLI storage (optional; library containers do not read these automatically)
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinance
+# Persistence root relative to the process cwd; empty or "." becomes .copinance
+COPINANCEOS_STORAGE_PATH=.copinance
 
 # CLI cache (optional, default: true)
 COPINANCEOS_CACHE_ENABLED=true
@@ -120,6 +143,8 @@ Structured logging uses **structlog** over the standard library `logging` module
 | `COPINANCEOS_LOG_FORMAT` | `console` | `console` (human-readable, aligned level tags) or `json` (one JSON object per line). |
 
 `Settings` reads these from the environment (and from `.env` when present), same as other `COPINANCEOS_*` fields.
+
+Job timeout for executors: **`COPINANCEOS_DEFAULT_ANALYSIS_TIMEOUT`** (seconds, default `300`). `COPINANCEOS_ENABLE_AGENT_ANALYSIS` is loaded but **unused** (question-driven is gated by LLM config, not this flag). `COPINANCEOS_APP_NAME` / `COPINANCEOS_ENVIRONMENT` are metadata only.
 
 ### CLI
 
@@ -153,12 +178,13 @@ If you skip `configure_logging`, third-party defaults may apply; Copinance logge
 ```bash
 COPINANCEOS_LLM_PROVIDER=gemini
 COPINANCEOS_GEMINI_API_KEY=AIzaSy...your-key
-COPINANCEOS_GEMINI_MODEL=gemini-1.5-pro
+# Optional — omit to use gemini-1.5-pro
+# COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash
 COPINANCEOS_FRED_API_KEY=your-fred-key
 # Optional — SEC/EDGAR (edgartools); override default identity for production
 # EDGAR_IDENTITY="Your Name you@company.com"
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinance
+COPINANCEOS_STORAGE_PATH=.copinance
 # Optional — logging (see Logging section)
 # COPINANCEOS_LOG_LEVEL=INFO
 # COPINANCEOS_LOG_FORMAT=console
@@ -170,7 +196,7 @@ COPINANCEOS_LLM_PROVIDER=openai
 COPINANCEOS_OPENAI_API_KEY=sk-...
 COPINANCEOS_OPENAI_MODEL=gpt-4o-mini
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinance
+COPINANCEOS_STORAGE_PATH=.copinance
 # Optional — logging (see Logging section)
 # COPINANCEOS_LOG_LEVEL=INFO
 # COPINANCEOS_LOG_FORMAT=console
@@ -182,10 +208,19 @@ COPINANCEOS_LLM_PROVIDER=ollama
 COPINANCEOS_OLLAMA_BASE_URL=http://localhost:11434
 COPINANCEOS_OLLAMA_MODEL=llama3.2
 COPINANCEOS_STORAGE_TYPE=file
-COPINANCEOS_STORAGE_PATH=~/.copinance
+COPINANCEOS_STORAGE_PATH=.copinance
 # Optional — logging (see Logging section)
 # COPINANCEOS_LOG_LEVEL=INFO
 # COPINANCEOS_LOG_FORMAT=console
+```
+
+**Anthropic:**
+```bash
+COPINANCEOS_LLM_PROVIDER=anthropic
+COPINANCEOS_ANTHROPIC_API_KEY=sk-ant-...
+# COPINANCEOS_ANTHROPIC_MODEL=claude-opus-5
+COPINANCEOS_STORAGE_TYPE=file
+COPINANCEOS_STORAGE_PATH=.copinance
 ```
 
 ## Security
@@ -202,6 +237,7 @@ Never commit `.env`. Add to `.gitignore`:
 - **"Gemini not available"**: `pip install google-genai`
 - **"Gemini API key is not configured"**: No quotes around the key; exact name `COPINANCEOS_GEMINI_API_KEY`.
 - **OpenAI errors / "openai package is not installed"**: Ensure project deps are installed (`pip install -e .`); the `openai` library is declared in `pyproject.toml`. Check `COPINANCEOS_OPENAI_API_KEY` when using env-based CLI config.
+- **Anthropic errors**: `anthropic` is a core dependency. Check `COPINANCEOS_LLM_PROVIDER=anthropic` and `COPINANCEOS_ANTHROPIC_API_KEY`.
 
 ## Library Integration
 

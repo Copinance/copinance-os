@@ -50,7 +50,7 @@ Full `src/copinance_os/` layout. For a product-oriented overview, see the [READM
 ```
 copinance_os/
 ├── ai/
-│   └── llm/                            # Providers (Gemini, OpenAI, Ollama), analyzer, prompts, resources
+│   └── llm/                            # Providers (Gemini, OpenAI, Anthropic, Ollama), analyzer, prompts, eval
 │       ├── analyzer_factory.py         # LLMAnalyzerFactory (wires LLMProvider → LLMAnalyzer port)
 │       └── providers/factory.py        # LLMProviderFactory
 ├── core/
@@ -58,6 +58,7 @@ copinance_os/
 │   │   ├── factory.py                  # AnalysisExecutorFactory — builds executor list for DI
 │   │   └── backtest/                   # Simple long-only executor wiring
 │   ├── orchestrator/                   # ResearchOrchestrator, DefaultJobRunner, analyze runners
+│   ├── progress/                       # ProgressSink helpers, RecordingProgressSink, redaction
 │   └── pipeline/tools/                 # ToolRegistry, tool executor, context tools, discovery/
 │       ├── discovery/                  # PluginSpec bundles, entry points (copinance_os.tool_bundles), package scan
 │       ├── bundles/                    # Scan targets: modules exporting tool_bundle_factory
@@ -70,6 +71,8 @@ copinance_os/
 ├── data/
 │   ├── analytics/options/              # QuantLib BSM Greek estimation (`greeks/`) + aggregate positioning (`positioning/`)
 │   ├── cache/
+│   ├── curated_questions/              # Deterministic context builders for Ask AI chips
+│   ├── literacy/                       # Tiered copy for regime, macro, reports, options
 │   ├── loaders/
 │   ├── providers/                      # yfinance, FRED, market/ (option analytics), sec/edgartools
 │   ├── repositories/
@@ -79,7 +82,7 @@ copinance_os/
 │   ├── indicators/                     # Trend, volatility, oscillators, returns
 │   ├── models/                         # common, entities, market, analysis, job, pipeline, options, curated, regime
 │   ├── plugins/                        # PluginSpec, PluginRegistry
-│   ├── ports/                          # Data, tools, execution, analytics, storage, tool bundles
+│   ├── ports/                          # Data, tools, execution, analytics, storage, progress, use cases
 │   ├── services/                       # Analysis report builders (instrument, market, question-driven)
 │   ├── strategies/                     # Protocols for screening / valuation / future workflows
 │   └── validation/
@@ -91,7 +94,7 @@ copinance_os/
 │   └── cli/                            # `__main__`→`main`; `dispatch/` (Typer vs generic research); `root` (lazy Typer); `commands/`; `shared/`
 └── research/
     ├── reports/                        # Re-exports of domain report builders
-    └── workflows/                      # analyze, market, profile, fundamentals, backtest use cases
+    └── workflows/                      # analyze, market, profile, fundamentals, narrative, curated questions, backtest
 ```
 
 ## Package layout (source)
@@ -99,7 +102,7 @@ copinance_os/
 | Area | Role |
 |------|------|
 | `copinance_os.domain` | Entities and value objects (`Job`, `Stock`, market types, profiles). **Ports**: data providers, repositories, storage, `JobRunner`, `AnalysisExecutor`, tools, analytics estimators, `LLMAnalyzer`. Strategy protocols for screening / valuation extensions. |
-| `copinance_os.research.workflows` | Application-facing **use cases** (analyze, market, profile, fundamentals, backtest). DTOs live in **`domain.models.analysis`** and **`domain.models.market.requests`** (re-exported from workflow modules). |
+| `copinance_os.research.workflows` | Application-facing **use cases** (analyze, market, profile, fundamentals, market narrative, curated questions, backtest). DTOs live in **`domain.models.analysis`** and **`domain.models.market.requests`** (re-exported from workflow modules). |
 | `copinance_os.core.orchestrator` | **`ResearchOrchestrator`**: `run_job` and helpers. **`DefaultJobRunner`** resolves **`Job`** → **`AnalysisExecutor`**. |
 | `copinance_os.core.execution_engine` | Executors: deterministic instrument/market analysis, question-driven analysis. |
 | `copinance_os.core.pipeline.tools` | Tool implementations (market data, fundamentals, regime, macro), `ToolRegistry`, and **discovery** (`build_data_provider_tool_registry`, `collect_question_driven_tools`; context type in `domain.models.pipeline.tool_bundle_context`). |
@@ -123,7 +126,7 @@ copinance_os/
 
 ## Orchestration: what to call
 
-- **Recommended:** `container.research_orchestrator()` then `await orchestrator.run_job(job, context)`. This matches how default analyze runners work.
+- **Recommended:** `container.research_orchestrator()` then `await orchestrator.run_job(job, context)`. This matches how default analyze runners work. For a deterministic long-only backtest (library-only): `orchestrator.run_simple_long_only_backtest(...)` — [API Reference](api-reference#deterministic-long-only-backtest).
 - **Advanced:** Implement the **`JobRunner`** port and pass it to **`ResearchOrchestrator(job_runner=...)`**. The stock **`Container`** does not expose `job_runner()` as a getter; custom routing uses an application-owned orchestrator or container wiring (see [Extending](extending)).
 
 ## Container and performance
@@ -142,11 +145,13 @@ Implementations live in `data`, `ai`, and `infra`; contracts live under `copinan
 
 - **Data:** `MarketDataProvider`, `FundamentalDataProvider`, `MacroeconomicDataProvider`, `AlternativeDataProvider`
 - **Analytics:** `OptionsChainGreeksEstimator` (default QuantLib BSM path)
-- **AI:** `LLMAnalyzer`
-- **Execution:** `JobRunner`, `AnalysisExecutor`
+- **AI:** `LLMAnalyzer` (adapters: Gemini, OpenAI, Anthropic, Ollama)
+- **Execution:** `JobRunner`, `AnalysisExecutor`, `AnalyzeInstrumentRunner`, `AnalyzeMarketRunner`
+- **Application:** `UseCase[TRequest, TResponse]`
+- **Progress:** `ProgressSink`
 - **Persistence:** `StockRepository`, `AnalysisProfileRepository`, `Storage`, cache backends
-- **Tools:** `Tool`, `ToolSchema`, `ToolParameter`; **bundles:** `ToolBundleFactory` / `ToolBundleContext` (`domain.models.pipeline.tool_bundle_context`, `domain.ports.tool_bundles`)
-- **Strategies:** screening, due diligence, valuation, risk, thematic, monitoring (protocols for extensions)
+- **Tools:** `Tool`, `ToolSchema`, `ToolParameter`, `ToolSpec`; **bundles:** `ToolBundleFactory` / `ToolBundleContext`
+- **Strategies:** screening, due diligence, valuation, risk, thematic, monitoring — **`domain.strategies.protocols`** (re-exported from `domain.ports`)
 
 Step-by-step: [Extending](extending). Interface listing: [API Reference](api-reference) and `src/copinance_os/domain/ports/`.
 

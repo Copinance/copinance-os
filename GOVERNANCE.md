@@ -4,15 +4,15 @@ This document outlines the governance model for the Copinance OS project.
 
 ## Project Mission
 
-Copinance OS aims to democratize financial research by providing an open-source, extensible framework that makes institutional-grade market research accessible to everyone, regardless of their financial resources or technical expertise.
+Copinance OS is an **open-source research engine** (library + CLI) whose purpose is to make institutional-grade market analysis **auditable, literacy-aware, and reusable** in many applications. It is not a trading venue, not a data vendor, and not a complete product UI.
 
-See our [MANIFESTO.md](MANIFESTO.md) for the complete vision.
+See [MANIFESTO.md](MANIFESTO.md) for the full vision (Copinance OS vs the Copinance product).
 
 ## Project Status
 
-**Current Phase**: Early Development (v0.1.x - Alpha)
+**Current phase:** Early development (package version `0.1.0`, alpha).
 
-As an early-stage project, we are currently establishing our governance structure. This document will evolve as the community grows.
+There are **no versioned package releases** yet. The [changelog](CHANGELOG.md) tracks work under `[Unreleased]` until the project is stable enough for Semantic Versioning on a public index. This governance document will evolve with the community.
 
 ## Core Principles
 
@@ -146,7 +146,7 @@ When consensus cannot be reached, we use voting:
 **Technical Decisions** (architecture, major features):
 - **Who votes**: Committers and Maintainers
 - **Threshold**: 2/3 majority
-- **Example**: "Should we adopt GraphQL for the API?"
+- **Example**: "Should we add a new analysis executor type?"
 
 **Governance Decisions** (roles, policies):
 - **Who votes**: Maintainers only
@@ -181,35 +181,24 @@ Some decisions can be made quickly:
 
 **Who Decides**: Maintainers with input from committers
 
-**Process**:
-1. Create an Architecture Decision Record (ADR) in `docs/adr/`
-2. Discuss for minimum 7 days
-3. Vote if no consensus
-
-**Recent ADRs**: (To be populated)
+**Process**: Open a GitHub issue or discussion, then implement via pull request. Significant, lasting choices should be summarized in the PR and [CHANGELOG](CHANGELOG.md). A dedicated `docs/adr/` tree can be added later if the volume of decisions warrants it.
 
 ### Roadmap and Priorities
 
 **Who Decides**: Maintainers with community input
 
-**Process**:
-1. Community discussions on priorities
-2. Maintainers synthesize into roadmap
-3. Published quarterly in `ROADMAP.md`
+**Process**: Priorities live in [GitHub Issues](https://github.com/copinance/copinance-os/issues) and [Discussions](https://github.com/copinance/copinance-os/discussions). A separate `ROADMAP.md` may be published when the project has a stable release cadence.
 
 ### Release Management
 
 **Who Decides**: Maintainers
 
-**Process**:
+**Process** (once releases begin):
 - Follow [Semantic Versioning](https://semver.org/)
 - Release notes required for all releases
-- Security releases can skip normal discussion period
+- Security releases can skip the normal discussion period
 
-**Release Cadence**:
-- **Major** (X.0.0): When breaking changes accumulate (no fixed schedule)
-- **Minor** (0.X.0): Monthly or when significant features are ready
-- **Patch** (0.0.X): As needed for bug fixes and security issues
+Until then, treat `main` as the source of truth and `[Unreleased]` in CHANGELOG as the log of record.
 
 ### Code Review
 
@@ -301,8 +290,7 @@ This governance model is inspired by:
 5. Merge → Main branch
    └─ Added to next release
 
-6. Release → Published to PyPI
-   └─ Announced in release notes
+6. Release → (when versioned releases begin) announced with notes; until then, `main` is the distribution
 ```
 
 ### Example: Bug Fix
@@ -331,6 +319,6 @@ This governance model is inspired by:
 
 ---
 
-**Last Updated**: December 20, 2025
+**Last Updated**: August 29, 2026
 **Version**: 1.0
 **Status**: Living Document

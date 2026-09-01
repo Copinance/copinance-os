@@ -74,19 +74,10 @@ A commit message template is available in [`.gitmessage`](.gitmessage).
 
 ## Architecture guidelines
 
-### Layer responsibilities
-
-| Layer | Path | Responsibility |
-|-------|------|----------------|
-| **Domain** | `domain/` | Entities, value objects, ports (interfaces), domain services. No I/O. |
-| **Research** | `research/workflows/` | Use cases (analyze, market, profile, fundamentals, backtest). Thin — delegate to orchestrator. |
-| **Data** | `data/` | Providers, cache, repositories, analytics adapters. Implements domain ports. |
-| **Core** | `core/` | Orchestrator (`ResearchOrchestrator`, `DefaultJobRunner`), execution engine, pipeline tools. |
-| **AI** | `ai/` | LLM provider adapters, streaming, prompt templates. Explanation/summarization — not numerical truth. |
-| **Infra** | `infra/` | Settings, logging, DI composition root (`infra/di/`). The only place all layers are imported together. |
-| **Interfaces** | `interfaces/cli/` | CLI entry (`main`, `dispatch`, lazy Typer `root`, `commands/`). Maps user input to use cases and the container. |
+Hexagonal layout and the package tree are documented in [Developer Guide — Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture).
 
 Key rules:
+
 - `domain/` imports nothing from this project except other domain modules
 - `infra/di/` is the composition root — the only place all layers are wired together; no business logic here
 - `core/` must not import `research/`; workflow request types that executors need belong in `domain/models/`
@@ -98,7 +89,7 @@ Key rules:
 3. **Data / core / ai**: Implement adapters, executors, or LLM wiring as appropriate
 4. **Interfaces**: Add CLI commands if needed
 5. **Tests**: Mirror package layout under `tests/unit/copinance_os/`
-6. **Documentation**: Update relevant docs in `docs/pages/` and docstrings; for cross-cutting integrator notes (e.g. options positioning I/O, curated Ask AI chips), add or extend MDX under **`docs/pages/developer-guide/`** (or legacy **`docs/integration/`** if present) and link from the root **README** if end-users need it
+6. **Documentation**: Update the relevant pages under `docs/pages/` and docstrings. Integrator guides live in **`docs/pages/developer-guide/`**. Link from the root README only when the change is an entry-point for new users.
 
 ## Pull request process
 
@@ -215,7 +206,11 @@ class MyStandaloneTool(Tool):
 
 ## Adding data providers
 
-See [Developer Guide — Extending](https://copinance.github.io/copinance-os/developer-guide/extending) for step-by-step instructions including the `domain/ports/` interface selection, container registration, and test patterns.
+See [Developer Guide — Extending](https://copinance.github.io/copinance-os/developer-guide/extending) for step-by-step instructions (ports under `domain/ports/` and strategy protocols under `domain/strategies/`, container registration, tests).
+
+## LLM eval tests (opt-in)
+
+Fake-provider eval tests run with the normal suite. Tests marked `@pytest.mark.llm` call a real model when an API key is set (`COPINANCEOS_GEMINI_API_KEY`, `COPINANCEOS_OPENAI_API_KEY`, or `COPINANCEOS_ANTHROPIC_API_KEY`); otherwise they skip. To run only those: `pytest -m llm`.
 
 ## Questions?
 

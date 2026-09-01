@@ -362,7 +362,7 @@ copinance analyze --json positioning SPY -w near
 ```
 
 **Options:**
-- **`--window` / `-w`**: `near` (default) or `mid` — horizon damping for the positioning score (see [Library — Options positioning context](../getting-started/library#options-positioning-context)).
+- **`--window` / `-w`**: `near` (default) or `mid` — DTE band for which expiries feed the aggregate (`near` 0–21 days, `mid` 21–75; see [Library — Options positioning context](../getting-started/library#options-positioning-context)).
 - **`--json`** (group, before `positioning`): machine **`RunJobResult`** JSON.
 - `--timeframe`, `--profile-id`, `--no-cache`, `--include-prompt`: same semantics as other **`analyze`** subcommands where applicable.
 

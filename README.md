@@ -5,7 +5,7 @@
 </p>
 
 <h1 align="center">Copinance OS</h1>
-<h3 align="center">Open-source market analysis platform and financial research operating system</h3>
+<h3 align="center">Open-source financial research engine — deterministic analysis, literacy-aware explanation</h3>
 
 <p align="center">
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
@@ -26,9 +26,11 @@
 
 ## Why Copinance OS?
 
-Copinance OS treats **financial computation and research orchestration as first-class concerns**. Numbers, indicators, and regime logic live in a **deterministic domain layer** with explicit data contracts — not in prompt text. LLMs sit in an **explanation and question-driven layer**: they reason over tool outputs and narrative context, while prices, macro series, and filing-derived facts come from **providers and domain code** you can test and audit.
+**Copinance OS is the engine.** The Copinance product is one application that can sit on top of it. This repository is a **library plus CLI**, not a hosted terminal or trading platform: you own the UI, identity, and persistence.
 
-Deterministic narration is now literacy-tiered across instrument summaries, market-regime labels, macro interpretation labels, and report-envelope fallback copy. Provide `financial_literacy` (`beginner` / `intermediate` / `advanced`) via profile or run context; uncomputable metrics stay `null` (no legacy fallback synthesis).
+Numbers, indicators, and regime logic live in a **deterministic domain layer** with explicit data contracts — not in prompt text. LLMs sit in an **explanation and question-driven layer**: they reason over tool outputs, while prices, macro series, and filing-derived facts come from **providers and domain code** you can test and audit.
+
+Output wording follows `financial_literacy` (`beginner` / `intermediate` / `advanced`) via profile or request. Uncomputable metrics stay `null` (no synthetic zeros).
 
 <table align="center">
 <tr>
@@ -110,10 +112,12 @@ pip install -e ".[ollama]"
 
 Question-driven analysis (`--question`, natural-language root) requires an LLM backend. Add one of the following to a `.env` file in the project root:
 
-**Gemini (recommended):**
+**Gemini:**
 ```bash
 COPINANCEOS_LLM_PROVIDER=gemini
 COPINANCEOS_GEMINI_API_KEY=your-key   # from https://aistudio.google.com
+# Optional; code default if unset is gemini-1.5-pro
+# COPINANCEOS_GEMINI_MODEL=gemini-2.5-flash
 ```
 
 **OpenAI:**
@@ -121,6 +125,14 @@ COPINANCEOS_GEMINI_API_KEY=your-key   # from https://aistudio.google.com
 COPINANCEOS_LLM_PROVIDER=openai
 COPINANCEOS_OPENAI_API_KEY=sk-...
 COPINANCEOS_OPENAI_MODEL=gpt-4o-mini
+```
+
+**Anthropic:**
+```bash
+COPINANCEOS_LLM_PROVIDER=anthropic
+COPINANCEOS_ANTHROPIC_API_KEY=sk-ant-...
+# Optional; code default if unset is claude-opus-5
+# COPINANCEOS_ANTHROPIC_MODEL=claude-opus-5
 ```
 
 **Ollama (local):**
@@ -220,43 +232,11 @@ Full reference: [User Guide — CLI](https://copinance.github.io/copinance-os/us
 
 ---
 
-## Multi-turn conversations (library)
+## Using as a library
 
-Multi-turn question-driven analysis (follow-up questions with memory of prior answers) is supported through the library API. Pass `conversation_history` (`list[LLMConversationTurn]`) on `AnalyzeInstrumentRequest` or `AnalyzeMarketRequest`. Successful runs include `conversation_turns` in results for chaining.
+`create_container()` is the composition root. Defaults are **memory storage** and a **no-op cache** (safe for read-only hosts). File storage, file cache, and host-owned providers are explicit opt-ins.
 
-The CLI is single-turn by design — one question per invocation. See the [library guide](https://copinance.github.io/copinance-os/getting-started/library#multi-turn-question-driven-analysis) for the full API.
-
-Library containers are safe to construct in read-only deployments: `create_container()`
-uses memory-backed storage and a no-op cache by default. Persistent storage and file
-caching are explicit opt-ins with caller-owned paths. Process-local caching is available
-through `CacheManager(InMemoryCacheBackend(...))`; deployments that prohibit all vendor
-filesystem activity can inject host-owned data providers. See [Library — Cache](https://copinance.github.io/copinance-os/getting-started/library#cache).
-
----
-
-## Curated follow-up questions (library)
-
-Generate **Ask AI suggestion chips** from data you already fetched — without blocking the data response on an LLM call. Pass the payload (quote, options chain, positioning, regime snapshot, etc.) to `generate_curated_questions_use_case()`; see [Curated follow-up questions](https://copinance.github.io/copinance-os/getting-started/library#curated-follow-up-questions) and [Curated questions (clients)](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration) for `ArtifactType` values and response fields.
-
-```python
-from copinance_os import ArtifactType, GenerateCuratedQuestionsRequest, FinancialLiteracy
-from copinance_os.ai.llm.config import LLMConfig
-from copinance_os.infra.di import create_container
-
-container = create_container(llm_config=LLMConfig(provider="openai", api_key="sk-..."))
-quote = await container.get_quote_use_case().execute(...)  # fetch first
-block = await container.generate_curated_questions_use_case().execute(
-    GenerateCuratedQuestionsRequest(
-        artifact=ArtifactType.QUOTE,
-        payload={**quote.quote, "symbol": quote.symbol},
-        count=5,
-        financial_literacy=FinancialLiteracy.BEGINNER,
-    ),
-    llm_provider_override=user_provider,  # optional per-user key (BFF pattern)
-)
-# block.questions[].text, .suggested_tools, .requires_symbol
-# block.meta.llm_unavailable_reason when LLM unavailable (typed enum)
-```
+The CLI is **single-turn**. Multi-turn question-driven analysis (`conversation_history`), curated Ask AI chips, agent progress events, and custom `JobRunner` wiring are library-only — see [Using as a Library](https://copinance.github.io/copinance-os/getting-started/library/).
 
 ---
 
@@ -311,17 +291,9 @@ pytest --cov=copinance_os --cov-report=html  # explicit HTML report
 
 ## Documentation
 
-- **[Manifesto](MANIFESTO.md)** — Vision and philosophy
-- **[Documentation site](https://copinance.github.io/copinance-os/)** — Introduction (home), then the sections below in sidebar order
-  - **[Getting Started](https://copinance.github.io/copinance-os/getting-started/installation/)** — Installation, Quick Start, Configuration, Using as a Library
-  - **[User Guide](https://copinance.github.io/copinance-os/user-guide/cli/)** — CLI Reference, Analysis Modes
-  - **[Analysis Reference](https://copinance.github.io/copinance-os/analysis-reference/)** — Market Data Tools, Macro & Market Regime, Options & Greeks (BSM, higher-order Greeks, chain metadata, aggregate positioning), SEC Filings (EDGAR)
-  - **[Examples](https://copinance.github.io/copinance-os/examples/)** — Equity Deep Dive, Macro Dashboard, Options Session
-  - **[Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture/)** — Architecture, Extending, Testing, [API Reference](https://copinance.github.io/copinance-os/developer-guide/api-reference/) (ports and extension interfaces)
-- **[docs/README.md](docs/README.md)** — Build the docs site locally (Nextra)
-- **[Library — Options positioning context](https://copinance.github.io/copinance-os/getting-started/library#options-positioning-context)** — Library integration notes for aggregate positioning and Greek enrichment (I/O contracts, pitfalls, tests)
-- **[Library — Curated follow-up questions](https://copinance.github.io/copinance-os/getting-started/library#curated-follow-up-questions)** · **[Curated questions (clients)](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration)** — Ask AI suggestion chips from payloads you already fetched
-- **[Developer Guide — Agent progress & chat integration (clients)](https://copinance.github.io/copinance-os/developer-guide/agent-progress-client-integration)** — LLM-facing integration guidance for progress events, payload grounding, methodology rendering, and UI patterns
+- **[Manifesto](MANIFESTO.md)** — Why this exists (clarity gap, literacy tiers, OS vs product)
+- **[Documentation site](https://copinance.github.io/copinance-os/)** — Install, CLI, analysis reference, library and integrator guides
+- **[docs/README.md](docs/README.md)** — Run the Nextra site locally
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** · **[GOVERNANCE.md](GOVERNANCE.md)** · **[CHANGELOG.md](CHANGELOG.md)**
 
 ---

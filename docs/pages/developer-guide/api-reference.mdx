@@ -1,6 +1,6 @@
 # API Reference
 
-Extension interfaces and module entry points for integrating or extending Copinance OS. All contracts are defined as `typing.Protocol` under `copinance_os.domain.ports`; implementations live in `data`, `ai`, and `infra`.
+Extension interfaces and module entry points for integrating or extending Copinance OS. Contracts live under `copinance_os.domain.ports` as **ABCs** (data, execution, tools, storage) plus a few **`typing.Protocol`** types (`ToolBundleFactory`, `ProgressSink`, `OptionsChainGreeksEstimator`). Implementations live in `data`, `ai`, and `infra`.
 
 ## Data providers
 
@@ -14,9 +14,11 @@ Extends `DataProvider` (`is_available`, `get_provider_name`).
 get_quote(symbol: str) -> dict[str, Any]
 get_historical_data(symbol, start_date, end_date, interval) -> list[MarketDataPoint]
 get_intraday_data(symbol, interval) -> list[MarketDataPoint]
-search_instruments(query, limit) -> list[dict[str, Any]]
+search_instruments(query, limit, quote_types=...) -> list[dict[str, Any]]
 get_options_chain(underlying_symbol, expiration_date=None) -> OptionsChain
 ```
+
+`quote_types` filters provider `quoteType` values (`None` disables filtering). The Yahoo adapter default includes **`EQUITY`**, **`ETF`**, and **`MUTUALFUND`**.
 
 Each call returns one **`OptionsChain`** for a single selected expiry (or the provider default when `expiration_date` is omitted). The LLM-facing **`get_options_chain`** tool in [Market data tools](../analysis-reference/market-data-tools#get_options_chain) can pass **`expiration_dates`** and performs multiple provider calls when needed.
 
@@ -49,6 +51,8 @@ Built-in implementations:
 ```
 get_time_series(series_id, start_date, end_date, *, frequency=None) -> list[MacroDataPoint]
 ```
+
+The built-in **`FredMacroeconomicProvider`** also implements **`get_release_dates`** (not on the port): parent release for a series, then `/release/dates`. Use it when you need FRED publication calendars; other adapters need not implement it.
 
 ### `AlternativeDataProvider`
 
@@ -96,7 +100,7 @@ generate_text_stream(prompt, ...) -> AsyncGenerator[LLMTextStreamEvent, None]
 
 **`LLMTextStreamEvent`** fields: `kind` (`text_delta` / `done` / `error` / `rollback`), `text_delta`, `native_streaming`, optional `usage`.
 
-**`LLMProviderFactory`** (`ai.llm.providers.factory`) builds `gemini`, `openai`, and `ollama` adapters from `LLMConfig`. **`LLMAnalyzerFactory`** (`ai.llm.analyzer_factory`) wraps a provider as the `LLMAnalyzer` port for question-driven wiring.
+**`LLMProviderFactory`** (`ai.llm.providers.factory`) builds `gemini`, `openai`, `anthropic`, and `ollama` adapters from `LLMConfig`. **`LLMAnalyzerFactory`** (`ai.llm.analyzer_factory`) wraps a provider as the `LLMAnalyzer` port for question-driven wiring.
 
 Streaming detail: [Library — LLM text streaming](../getting-started/library#llm-text-streaming-library--llmprovider).
 
@@ -133,6 +137,10 @@ from copinance_os.domain.models.analysis import (
 ```
 
 `execution_type_from_scope_and_mode(scope, mode)` derives the string discriminator that selects which executor runs.
+
+### Deterministic long-only backtest
+
+There is **no CLI** for this. Call **`ResearchOrchestrator.run_simple_long_only_backtest`** with a **`SimpleLongOnlyWorkflowRequest`** (prices + `StrategySignal` weights + `SimpleBacktestConfig`). YAML/JSON files: `copinance_os.research.workflows.backtest_config.run_simple_long_only_from_config_file`. Domain math: `copinance_os.domain.backtest`.
 
 ---
 
@@ -277,11 +285,15 @@ All extension contracts live in `src/copinance_os/domain/ports/`:
 | `data_providers.py` | `MarketDataProvider`, `FundamentalDataProvider`, `MacroeconomicDataProvider`, `AlternativeDataProvider` |
 | `analytics.py` | `OptionsChainGreeksEstimator` |
 | `analyzers.py` | `LLMAnalyzer` |
-| `analysis_execution.py` | `JobRunner`, `AnalysisExecutor` |
+| `analysis_execution.py` | `JobRunner`, `AnalysisExecutor`, `AnalyzeInstrumentRunner`, `AnalyzeMarketRunner` |
 | `repositories.py` | `StockRepository`, `AnalysisProfileRepository` |
 | `storage.py` | `Storage`, `CacheBackend` |
 | `tools.py` | `Tool`, `ToolSchema`, `ToolParameter` |
+| `tool_spec.py` | `ToolSpec` |
 | `tool_bundles.py` | `ToolBundleFactory` |
-| `strategies.py` | Screening, due diligence, valuation, risk, thematic, monitoring protocols |
+| `progress.py` | `ProgressSink` |
+| `use_cases.py` | `UseCase` |
+
+Strategy protocols (`ScreeningStrategy`, `ValuationStrategy`, and related) live in **`copinance_os.domain.strategies.protocols`** and are re-exported from `copinance_os.domain.ports`.
 
 Step-by-step implementation: [Extending](extending).

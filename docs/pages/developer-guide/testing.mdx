@@ -40,6 +40,9 @@ pytest -m unit
 # Integration tests only
 pytest -m integration
 
+# Opt-in real-model evals (skip without API key; still collected)
+pytest -m llm
+
 # Explicit coverage HTML (also on by default unless --no-cov)
 pytest --cov=copinance_os --cov-report=html
 ```
@@ -106,6 +109,10 @@ def test_unit_example():
 @pytest.mark.integration
 async def test_integration_example():
     pass
+
+@pytest.mark.llm
+async def test_real_model_smoke():
+    pass  # skip unless COPINANCEOS_*_API_KEY is set
 ```
 
 ## Best Practices

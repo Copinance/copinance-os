@@ -30,7 +30,7 @@ This guide is for developers who want to integrate Copinance OS into their own P
 ## Requirements
 
 - **Python 3.11+**
-- For **question-driven (AI) analysis**: an LLM provider (**Gemini**, **OpenAI** Chat Completions, or local **Ollama**)
+- For **question-driven (AI) analysis**: an LLM provider (**Gemini**, **OpenAI**, **Anthropic**, or local **Ollama**)
 - For **macro analysis** (optional): FRED API key for higher-quality economic data
 - For **SEC filing tools** in question-driven analysis (optional): set **`EDGAR_IDENTITY`** or **`COPINANCEOS_EDGAR_IDENTITY`** (name + email, SEC requirement); see [Configuration — SEC EDGAR](configuration)
 
@@ -94,7 +94,7 @@ async def main():
     # Deterministic-only: no LLM (question-driven routes will not be available)
     # container = create_container(llm_config=None, load_from_env=False)
 
-    # Question-driven-capable: supply Gemini, OpenAI, or Ollama (see LLMConfig section)
+    # Question-driven-capable: supply Gemini, OpenAI, Anthropic, or Ollama (see LLMConfig section)
     llm_config = LLMConfig(
         provider="gemini",
         api_key="your-gemini-api-key",
@@ -181,14 +181,14 @@ Details, valid levels, `json` vs `console`, and per-logger tuning: [Configuratio
 
 For **question-driven** analysis you must supply `LLMConfig` when creating the container.
 
-**Implemented providers:** **`LLMProviderFactory`** supports **`gemini`**, **`ollama`**, and **`openai`** (requires the **`openai`** Python package; it is a core dependency of this project). Unknown provider names raise **`ValueError`** (there is no **`anthropic`** adapter in-tree yet).
+**Implemented providers:** **`LLMProviderFactory`** supports **`gemini`**, **`openai`**, **`anthropic`**, and **`ollama`**. Unknown provider names raise **`ValueError`**. `openai` and `anthropic` are core dependencies.
 
 ```python
 from copinance_os.ai.llm.config import LLMConfig
 
 llm_config = LLMConfig(
-    provider="gemini",            # "gemini" | "ollama" | "openai"
-    api_key="your-api-key",       # required for Gemini and OpenAI; optional for Ollama
+    provider="gemini",            # "gemini" | "openai" | "anthropic" | "ollama"
+    api_key="your-api-key",       # required for Gemini, OpenAI, and Anthropic; optional for Ollama
     model="gemini-1.5-pro",       # optional; provider default if omitted
     temperature=0.7,
     max_tokens=4096,
@@ -207,12 +207,12 @@ For **plain text** generation (no tool-calling loop), each backend implements **
 
 | `stream_mode` / `text_streaming_mode` | Behavior |
 |---------------------------------------|----------|
-| **`auto`** (default) | Use **native** HTTP/API streaming when the provider supports it (**Gemini**, **OpenAI**, and **Ollama** do); if native streaming fails, fall back to a single **`generate_text`** call and emit one delta. |
+| **`auto`** (default) | Use **native** HTTP/API streaming when the provider supports it (**Gemini**, **OpenAI**, and **Ollama** do; **Anthropic** uses the buffered path for `generate_text_stream`); if native streaming fails, fall back to a single **`generate_text`** call and emit one delta. |
 | **`native`** | Require native streaming; raises if disabled or unsupported, or emits an **`error`** event if the stream fails after starting. |
 | **`buffered`** | Always call **`generate_text`** once, then emit one **`text_delta`** and **`done`** (works for any model; `native_streaming=False` on events). |
 
 - **Default mode** on the provider comes from **`LLMConfig.text_streaming_mode`**. You can override per call: `await provider.generate_text_stream("…", stream_mode="buffered")`.
-- **Disable native streaming** (e.g. model or proxy quirks): set **`provider_config={"disable_native_text_stream": True}`** in **`LLMConfig`**, or construct **`GeminiProvider`** / **`OpenAIProvider`** / **`OllamaProvider`** with **`disable_native_text_stream=True`**. In **`auto`** mode, the provider then uses the buffered path only.
+- **Disable native streaming** (e.g. model or proxy quirks): set **`provider_config={"disable_native_text_stream": True}`** in **`LLMConfig`**, or construct **`GeminiProvider`** / **`OpenAIProvider`** / **`OllamaProvider`** / **`AnthropicProvider`** with **`disable_native_text_stream=True`**. In **`auto`** mode, the provider then uses the buffered path only.
 - **Question-driven analysis** uses **`generate_with_tools`** with optional **`stream=True`** and **`on_stream_event`** (the CLI sets **`stream`** via job context and uses a stdout handler). Results include **`analysis_streamed`** when streaming was enabled. You can still call **`generate_text_stream`** on the **`LLMProvider`** directly for plain-text-only use cases.
 
 ```python
@@ -516,6 +516,8 @@ When you need a single operation (e.g. search, quote, profile) instead of a full
 | Get fundamentals | `get_stock_fundamentals_use_case()` | Fundamentals for a symbol (financials, ratios) |
 | **Analyze instrument** | `analyze_instrument_use_case()` | Progressive instrument analysis (deterministic or question-driven) |
 | **Analyze market** | `analyze_market_use_case()` | Progressive market analysis (deterministic or question-driven) |
+| **Market narrative** | `generate_market_narrative_use_case()` | Literacy-aware prose summary of current conditions (LLM, with deterministic fallback) |
+| **Curated questions** | `generate_curated_questions_use_case()` | Ask AI chips from a payload you already fetched |
 | Create profile | `create_profile_use_case()` | Create analysis profile |
 | Get / list profiles | `get_profile_use_case()`, `list_profiles_use_case()` | Read profiles |
 | Current profile | `get_current_profile_use_case()`, `set_current_profile_use_case()` | Get/set current profile |
@@ -679,7 +681,7 @@ BFF patterns (static-chip fallback, caching, chip → chat): [Curated questions 
 
 ### Multi-turn question-driven analysis
 
-This section is **Python-only**; the CLI cannot supply **`conversation_history`** (see the note at the top of this page). Use this when the user’s **new** question should see **prior** user/assistant messages from an earlier run (same symbol / market scope). Each LLM provider maps history to its native chat API (**Gemini** `Content` list + **systemInstruction**; **OpenAI** Chat Completions **`messages`**; **Ollama** `/api/chat` **`messages`**).
+This section is **Python-only**; the CLI cannot supply **`conversation_history`** (see the note at the top of this page). Use this when the user’s **new** question should see **prior** user/assistant messages from an earlier run (same symbol / market scope). Each LLM provider maps history to its native chat API (**Gemini** `Content` list + **systemInstruction**; **OpenAI** Chat Completions **`messages`**; **Anthropic** Messages **`messages`** + system; **Ollama** `/api/chat` **`messages`**).
 
 - Set **`conversation_history`** to a list of **`LLMConversationTurn`** that **alternates** `user` → `assistant` → … and **ends with `assistant`**.
 - Set **`question`** to the **new** user message only (do not duplicate the latest user turn inside `conversation_history`).
@@ -759,7 +761,7 @@ asyncio.run(main())
 
 Integrators with a non-`MarketDataProvider` source can adapt it with a small shim that implements `get_quote` / `get_options_chain` and register it only where your composition root allows.
 
-**Repository notes:** [Options positioning — library integration](https://github.com/copinance/copinance-os/blob/main/docs/integration/options-positioning-library-integration.md) (metadata alignment, literacy, test paths); [LLM agent integration guide](https://github.com/copinance/copinance-os/blob/main/docs/integration/llm-agent-features-integration-guide.md) (tool usage, grounding, methodology UX).
+For literacy-aware copy, methodology rendering, and chat UX, use [Financial literacy (clients)](../developer-guide/financial-literacy) and [Agent progress & chat (clients)](../developer-guide/agent-progress-client-integration).
 
 ---
 
@@ -1102,7 +1104,7 @@ asyncio.run(main())
 
 - [Configuration](configuration) — LLM and FRED setup, env vars, security.
 - [User Guide — CLI](../user-guide/cli) — Full Typer reference, including **`--json`** for machine-readable output.
-- [API Reference](../developer-guide/api-reference) — Data provider interfaces and market point coercion helpers.
+- [API Reference](../developer-guide/api-reference) — Ports, container, [deterministic backtest](../developer-guide/api-reference#deterministic-long-only-backtest).
 - [Curated questions (clients)](../developer-guide/curated-questions-integration) — Ask AI chips, BFF fallback, and caching.
 - [Architecture](../developer-guide/architecture) — Hexagonal layout, ports, container, and [annotated package tree](../developer-guide/architecture#package-tree-source).
 - [Extending](../developer-guide/extending) — Custom data providers, executors, and tests.

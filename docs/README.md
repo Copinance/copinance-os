@@ -1,20 +1,10 @@
 # Documentation site
 
-This site is built with [Nextra](https://nextra.site/) on Next.js. **Page content** lives in `docs/pages/` as MDX; navigation titles and order are set in `_meta.tsx` files per folder.
+This site is built with [Nextra](https://nextra.site/) on Next.js. Page content lives in `docs/pages/` as MDX; sidebar titles and order are in `_meta.tsx` files per folder.
 
-## What the docs cover
+The site is the **product documentation** for the `copinance_os` package: how to install and run the CLI, how to embed the library, and how analysis (deterministic vs question-driven) actually works. Vision and “why” live in the repo [MANIFESTO](../MANIFESTO.md). Architecture and ports live under [Developer Guide](https://copinance.github.io/copinance-os/developer-guide/architecture).
 
-The docs track the `copinance_os` package:
-
-- **Domain** contracts (models, ports, strategy protocols)
-- **Data providers** — yfinance, FRED, SEC/EDGAR (`data.providers.sec`), QuantLib BSM Greeks (first- and higher-order on `OptionGreeks` when valid), and modular **`data/analytics/options`** analytics: `greeks/` + `positioning/` with `build_options_positioning` / `compute_options_positioning_context` (bias, GEX, vanna/charm, mispricing, moneyness, pin risk, surface/flow, …). Methodology is structured via `AnalysisMethodology` on result models. Integrator references: [Library — Options positioning context](https://copinance.github.io/copinance-os/getting-started/library#options-positioning-context), [Curated questions (clients)](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration), [Developer guide — Agent progress & chat (clients)](https://copinance.github.io/copinance-os/developer-guide/agent-progress-client-integration).
-- **Core orchestration** — `ResearchOrchestrator`, `DefaultJobRunner`, `AnalysisExecutorFactory`, execution engine, pipeline tools, tool bundle discovery (`core.pipeline.tools.discovery`)
-- **AI/LLM** — provider adapters (Gemini, OpenAI, Ollama), streaming, tool-calling loop; **curated follow-up questions** (`generate_curated_questions_use_case`) for Ask AI chips from client-held payloads ([library](https://copinance.github.io/copinance-os/getting-started/library#curated-follow-up-questions), [client integration](https://copinance.github.io/copinance-os/developer-guide/curated-questions-integration))
-- **Infra** — independent library containers, explicit cache/storage composition, plugin loading, settings
-- **Interfaces/CLI** — `main` → `dispatch` (Typer vs natural-language root); `--json` and `--stream` flags; multi-turn conversation (library-only via `conversation_history`); **`analyze options`**: repeat `-e` / `--expiration` for multiple expiries (library: `expiration_dates` on `AnalyzeInstrumentRequest`); **`analyze positioning`** for deterministic aggregate surface metrics; library: optional **`positioning_window`** on `AnalyzeInstrumentRequest` for options runs
-- **Literacy-tiered narration** — deterministic instrument/market/macro/question-driven envelopes adapt text output by `financial_literacy` tier while preserving stable machine fields for integrations
-
-Deterministic finance stays in `data` and `domain`; LLMs explain and route, they do not replace pricing engines. The canonical package tree is in [Architecture](https://copinance.github.io/copinance-os/developer-guide/architecture#package-tree-source).
+Deterministic finance stays in `data` and `domain`. LLMs explain, route, and narrate; they do not replace pricing engines. LLM backends in-tree: **Gemini**, **OpenAI**, **Anthropic**, and **Ollama**.
 
 ## Local development
 
@@ -24,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). From the repo root you can use `make docs-serve`.
 
 ## Production build
 
@@ -33,19 +23,15 @@ cd docs
 npm run build
 ```
 
-Static output is written to `docs/out/`.
+Static output is written to `docs/out/`. GitHub Pages uses base path `/copinance-os` (`next.config.mjs`).
 
 ## Configuration files
 
 | File | Purpose |
 |------|---------|
-| `next.config.mjs` | Next.js / Nextra, base path for GitHub Pages (`/copinance-os`) |
+| `next.config.mjs` | Next.js / Nextra, GitHub Pages base path |
 | `theme.config.tsx` | Theme (logo, footer, search) |
 | `package.json` | Scripts and dependencies |
 | `tsconfig.json` | TypeScript |
 
-## Customization
-
-- **Theme**: `theme.config.tsx`
-- **Sidebar**: `_meta.tsx` under `pages/` and subfolders
-- **Styling**: Nextra uses Tailwind CSS
+Sidebar: `_meta.tsx` under `pages/` and each section folder.
