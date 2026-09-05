@@ -15,6 +15,7 @@ from copinance_os.domain.models.regime.macro import (
     MacroSeriesMetadata,
     ManufacturingData,
     RatesData,
+    VolatilityData,
 )
 from copinance_os.domain.models.regime.market_regime import (
     AnalysisMetadata,
@@ -49,6 +50,7 @@ __all__ = [
     "ConsumerData",
     "GlobalData",
     "AdvancedData",
+    "VolatilityData",
     "MarketRegimeIndicatorsResult",
     "MarketRegimeIndicatorsData",
     "MarketRegimeDetectionResult",

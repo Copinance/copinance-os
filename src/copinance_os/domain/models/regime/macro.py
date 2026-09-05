@@ -154,6 +154,20 @@ class AdvancedData(BaseModel):
     metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
 
 
+class VolatilityData(BaseModel):
+    """VIX term-structure series (9-day, 3-month, VVIX) as MacroSeriesData nodes."""
+
+    available: bool = Field(..., description="Whether volatility-term data is available")
+    source: str = Field(..., description="Data source (e.g., 'yfinance')")
+    series: dict[str, MacroSeriesData] = Field(
+        default_factory=dict, description="Individual volatility series data"
+    )
+    interpretation: dict[str, Any] = Field(
+        default_factory=dict, description="Human-readable interpretation"
+    )
+    metadata: MacroSeriesMetadata = Field(..., description="Analysis metadata")
+
+
 class MacroRegimeIndicatorsData(BaseModel):
     """Complete macro regime indicators data structure."""
 
@@ -166,6 +180,9 @@ class MacroRegimeIndicatorsData(BaseModel):
     consumer: ConsumerData | None = Field(None, description="Consumer analysis")
     global_data: GlobalData | None = Field(None, description="Global market analysis")
     advanced: AdvancedData | None = Field(None, description="Advanced economic indicators")
+    volatility: VolatilityData | None = Field(
+        None, description="VIX term structure (VIX9D, VIX3M, VVIX)"
+    )
 
 
 # Import ToolResult from the tool results

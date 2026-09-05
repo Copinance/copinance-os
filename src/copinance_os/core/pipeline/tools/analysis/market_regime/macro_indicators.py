@@ -192,6 +192,11 @@ class MacroRegimeIndicatorsTool(Tool):
                         "description": "Include advanced economic indicators (default: true)",
                         "default": True,
                     },
+                    "include_volatility": {
+                        "type": "boolean",
+                        "description": "Include VIX term-structure series (default: true)",
+                        "default": True,
+                    },
                     "financial_literacy": {
                         "type": "string",
                         "description": "Literacy tier: beginner|intermediate|advanced",
@@ -218,6 +223,7 @@ class MacroRegimeIndicatorsTool(Tool):
             include_consumer = bool(validated.get("include_consumer", True))
             include_global = bool(validated.get("include_global", True))
             include_advanced = bool(validated.get("include_advanced", True))
+            include_volatility = bool(validated.get("include_volatility", True))
             lit = resolve_financial_literacy(validated.get("financial_literacy"))
 
             end_date = datetime.now(UTC)
@@ -273,6 +279,11 @@ class MacroRegimeIndicatorsTool(Tool):
                     await self._get_advanced_block(start_date, end_date), lit
                 )
 
+            if include_volatility:
+                data["volatility"] = self._resolve_block_literacy(
+                    await self._get_volatility_block(start_date, end_date), lit
+                )
+
             return ToolResult(success=True, data=data, metadata={"lookback_days": lookback_days})
         except Exception as e:
             logger.error("Failed to get macro regime indicators", error=str(e), exc_info=True)
@@ -317,6 +328,8 @@ class MacroRegimeIndicatorsTool(Tool):
             "10y_nominal": ("DGS10", "percent"),
             "2y_nominal": ("DGS2", "percent"),
             "3m_nominal": ("DGS3MO", "percent"),
+            "sofr": ("SOFR", "percent"),
+            "30y_nominal": ("DGS30", "percent"),
             "10y_real": ("DFII10", "percent"),
             "10y_breakeven": ("T10YIE", "percent"),
             "10y2y_spread": (
@@ -1060,6 +1073,19 @@ class MacroRegimeIndicatorsTool(Tool):
                 except Exception:
                     continue  # Skip if ticker not available
 
+            try:
+                if await self._macro_provider.is_available():
+                    dollar_points = await self._macro_provider.get_time_series(
+                        "DTWEXBGS", start_date, end_date
+                    )
+                    dollar_metrics = _series_metrics(dollar_points)
+                    dollar_metrics["unit"] = "index"
+                    out["series"]["broad_dollar"] = dollar_metrics
+                    if out.get("source") == "yfinance":
+                        out["source"] = "mixed"
+            except Exception as e:
+                logger.warning("FRED DTWEXBGS fetch failed", error=str(e))
+
             # Interpret FX and EM trends
             eur_usd = out["series"].get("eur_usd", {})
             usd_jpy = out["series"].get("usd_jpy", {})
@@ -1091,6 +1117,62 @@ class MacroRegimeIndicatorsTool(Tool):
             logger.warning("Global indicators block failed", error=str(e))
             out = {"available": False, "source": "yfinance", "error": str(e)}
             await self._set_block_cached("global", start_date, end_date, out)
+            return out
+
+    async def _get_volatility_block(
+        self, start_date: datetime, end_date: datetime
+    ) -> dict[str, Any]:
+        """VIX term structure as MacroSeriesData nodes (generic macro subpath, not mri_vix)."""
+        cached = await self._get_block_cached("volatility", start_date, end_date)
+        if cached is not None:
+            return cached
+        tickers = {
+            "vix9d": ("^VIX9D", "index"),
+            "vix3m": ("^VIX3M", "index"),
+            "vvix": ("^VVIX", "index"),
+        }
+        out: dict[str, Any] = {"available": True, "source": "yfinance", "series": {}}
+        try:
+            for key, (ticker, unit) in tickers.items():
+                prices = await self._market_provider.get_historical_data(
+                    ticker, start_date, end_date, interval="1d"
+                )
+                if not prices:
+                    out["series"][key] = {
+                        "available": False,
+                        "latest": None,
+                        "data_points": 0,
+                        "unit": unit,
+                    }
+                    continue
+                vals = [float(d.close_price) for d in prices if d.close_price is not None]
+                if not vals:
+                    out["series"][key] = {
+                        "available": False,
+                        "latest": None,
+                        "data_points": 0,
+                        "unit": unit,
+                    }
+                    continue
+                latest_val = vals[-1]
+                prev_val = vals[-21] if len(vals) >= 21 else vals[0]
+                change_20d = latest_val - prev_val
+                out["series"][key] = {
+                    "available": True,
+                    "latest": {
+                        "timestamp": prices[-1].timestamp.isoformat(),
+                        "value": round(latest_val, 2),
+                    },
+                    "change_20d": round(change_20d, 2),
+                    "data_points": len(vals),
+                    "unit": unit,
+                }
+            await self._set_block_cached("volatility", start_date, end_date, out)
+            return out
+        except Exception as e:
+            logger.warning("VIX term-structure block failed", error=str(e))
+            out = {"available": False, "source": "yfinance", "error": str(e)}
+            await self._set_block_cached("volatility", start_date, end_date, out)
             return out
 
     async def _get_advanced_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:

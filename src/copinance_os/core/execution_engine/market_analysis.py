@@ -48,6 +48,7 @@ from copinance_os.domain.models.regime import (
     MarketRegimeIndicatorsResult,
     MarketTrendData,
     RatesData,
+    VolatilityData,
     VolatilityRegimeData,
 )
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
@@ -96,6 +97,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
         include_consumer = bool(context.get("include_consumer", True))
         include_global = bool(context.get("include_global", True))
         include_advanced = bool(context.get("include_advanced", True))
+        include_volatility = bool(context.get("include_volatility", True))
 
         use_cache = not bool(context.get("no_cache"))
         cache_manager = self._cache_manager if use_cache else None
@@ -330,6 +332,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_consumer=include_consumer,
             include_global=include_global,
             include_advanced=include_advanced,
+            include_volatility=include_volatility,
             financial_literacy=lit.value,
         )
 
@@ -385,6 +388,11 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
                 advanced=(
                     AdvancedData(**macro_result.data.get("advanced", {}), metadata=metadata)
                     if macro_result.data.get("advanced")
+                    else None
+                ),
+                volatility=(
+                    VolatilityData(**macro_result.data.get("volatility", {}), metadata=metadata)
+                    if macro_result.data.get("volatility")
                     else None
                 ),
             )

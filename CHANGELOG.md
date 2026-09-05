@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Macro regime — VIX term structure + extra rate/FX series**: `MacroRegimeIndicatorsTool` gains an `include_volatility` block (default true) with VIX9D, VIX3M, and VVIX as `MacroSeriesData` nodes, plus domain model `VolatilityData` (exported from `domain.models.regime`). `MarketAnalysisExecutor` maps the block onto `MacroRegimeIndicatorsData` and honors `include_volatility` from job context. Rates now include SOFR and 30y nominal (`DGS30`); the global block adds FRED broad-dollar (`DTWEXBGS`).
 - **LLM — Anthropic provider + native function calling**: `AnthropicProvider` (native tool use, prompt caching on system, strict schemas) wired through the factory and env (`COPINANCEOS_ANTHROPIC_API_KEY` / `COPINANCEOS_ANTHROPIC_MODEL`). Gemini, OpenAI, and Ollama now declare tools natively instead of scraping JSON from response text. New `anthropic` dependency.
 - **LLM — ToolSpec / ToolRuntime**: Declarative `ToolSpec` (with `from_legacy` / `to_legacy_tool` adapters) and `ToolRuntime` for parallel-safe batches, per-tool timeouts, and structured results. Job-scope tool gating by tags (unclassified tools stay visible). `ToolRepeatTracker` reuses the second identical `(name, args)` call and stops on the third instead of aborting on the first repeat.
 - **LLM evals (opt-in)**: Tool-selection and TOON-vs-JSON retrieval A/B harnesses. Fake-provider tests run in CI; real-model runs use `pytest -m llm` (API key required; tests skip when no key is set).

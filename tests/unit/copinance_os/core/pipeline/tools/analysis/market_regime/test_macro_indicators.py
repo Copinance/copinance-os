@@ -74,6 +74,8 @@ class _StubMarketProvider:
             return [_mk(Decimal("80.0"))]
         if symbol in {"HYG", "LQD"}:
             return [_mk(Decimal("100.0"))]
+        if symbol in {"^VIX9D", "^VIX3M", "^VVIX"}:
+            return [_mk(Decimal("20.0"))]
         return []
 
 
@@ -89,3 +91,6 @@ class TestMacroRegimeIndicatorsTool:
         assert result.data["rates"]["source"] == "yfinance"
         assert result.data["credit"]["source"] == "yfinance"
         assert result.data["commodities"]["source"] == "yfinance"
+        assert "volatility" in result.data
+        assert result.data["volatility"]["series"]["vix9d"]["available"] is True
+        assert result.data["volatility"]["series"]["vix3m"]["latest"]["value"] == 20.0
