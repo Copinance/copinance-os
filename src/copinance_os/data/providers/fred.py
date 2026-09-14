@@ -36,6 +36,8 @@ class FredMacroeconomicProvider(MacroeconomicDataProvider):
         self._max_retry_attempts = 3
         self._retry_base_delay_seconds = 0.25
         self._retry_max_delay_seconds = 2.0
+        # Set by ``is_available``: ``fred_unavailable`` | ``fred_timeout`` | None if up.
+        self.last_availability_error: str | None = None
 
     @override
     def get_provider_name(self) -> str:
@@ -105,31 +107,41 @@ class FredMacroeconomicProvider(MacroeconomicDataProvider):
     async def is_available(self) -> bool:
         if not self._api_key:
             logger.debug("FRED API key not set", has_api_key=False)
+            self.last_availability_error = "fred_unavailable"
             return False
         try:
-            client = await self._get_client()
-            # Lightweight series metadata call
-            resp = await client.get(
+            # Same timeout as series fetch (client default). A 5s probe was marking
+            # a slow-but-live FRED as down and skipping labor/housing entirely.
+            resp = await self._get_with_retry(
                 "/series",
                 params={"series_id": "DGS10", "api_key": self._api_key, "file_type": "json"},
-                timeout=5.0,
             )
             if resp.status_code == 200:
                 logger.debug("FRED availability check passed", status_code=resp.status_code)
+                self.last_availability_error = None
                 return True
-            else:
-                logger.warning(
-                    "FRED availability check failed",
-                    status_code=resp.status_code,
-                    response_text=resp.text[:200] if resp.text else None,
-                )
-                return False
+            logger.warning(
+                "FRED availability check failed",
+                status_code=resp.status_code,
+                response_text=resp.text[:200] if resp.text else None,
+            )
+            self.last_availability_error = "fred_unavailable"
+            return False
+        except httpx.TimeoutException as e:
+            logger.warning(
+                "FRED availability check timed out",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            self.last_availability_error = "fred_timeout"
+            return False
         except Exception as e:
             logger.warning(
                 "FRED availability check failed with exception",
                 error=str(e),
                 error_type=type(e).__name__,
             )
+            self.last_availability_error = "fred_unavailable"
             return False
 
     @override

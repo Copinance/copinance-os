@@ -116,14 +116,14 @@ def _yahoo_option_implied_volatility_to_sigma(iv: Decimal | None) -> Decimal | N
 
     yfinance usually returns σ as a fraction (e.g. ``0.25`` ≈ 25% vol). Some rows ship
     the same figure in percent points (e.g. ``13.67`` ≈ 13.67% vol). Values strictly
-    greater than ``1`` are treated as percent points and divided by 100.
+    greater than ``3`` cannot be a plausible decimal-fraction σ in this feed and are
+    treated as percent points (divided by 100).
 
-    Genuinely extreme fractional σ above 100% (e.g. ``1.2``) would be mis-scaled; that
-    is uncommon for liquid chains. See developer guide (options chain metadata).
+    A genuine 250% vol as ``2.50`` must stay ``2.50``, not become 2.5%.
     """
     if iv is None or iv <= 0:
         return iv
-    if iv > Decimal("1"):
+    if iv > Decimal("3"):
         return iv / Decimal("100")
     return iv
 

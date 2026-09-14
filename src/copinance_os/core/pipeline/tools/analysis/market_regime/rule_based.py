@@ -287,47 +287,21 @@ class MarketRegimeDetectTrendTool(Tool):
             # Extract closing prices
             prices = [float(data.close_price) for data in historical_data]
 
-            # Adapt parameters based on available data
-            # If we don't have enough data for long MA, adjust to use available data
             if len(prices) < long_ma:
-                if len(prices) < short_ma:
-                    # Not enough data even for short MA - use minimal analysis
-                    if len(prices) < 10:
-                        return ToolResult(
-                            success=False,
-                            data=None,
-                            error=(
-                                f"Insufficient data for trend analysis: need at least 10 data points, "
-                                f"got {len(prices)}. This stock may be newly listed or have limited trading history."
-                            ),
-                            metadata={
-                                "symbol": symbol,
-                                "data_points": len(prices),
-                                "suggestion": "Try a stock with more trading history, or use a shorter lookback period.",
-                            },
-                        )
-                    # Use minimal MAs
-                    adjusted_short_ma = max(5, len(prices) // 3)
-                    adjusted_long_ma = max(adjusted_short_ma + 5, len(prices) - 5)
-                    short_ma = adjusted_short_ma
-                    long_ma = adjusted_long_ma
-                    logger.warning(
-                        "Adjusted MA parameters due to limited data",
-                        symbol=symbol,
-                        data_points=len(prices),
-                        adjusted_short_ma=short_ma,
-                        adjusted_long_ma=long_ma,
-                    )
-                else:
-                    # Have enough for short MA, but not long - use shorter long MA
-                    adjusted_long_ma = max(short_ma + 10, len(prices) - 5)
-                    long_ma = adjusted_long_ma
-                    logger.warning(
-                        "Adjusted long MA parameter due to limited data",
-                        symbol=symbol,
-                        data_points=len(prices),
-                        adjusted_long_ma=long_ma,
-                    )
+                return ToolResult(
+                    success=False,
+                    data=None,
+                    error=(
+                        f"Insufficient data for trend analysis: need at least {long_ma} closes "
+                        f"for the requested long MA, got {len(prices)}."
+                    ),
+                    metadata={
+                        "symbol": symbol,
+                        "data_points": len(prices),
+                        "long_ma_period_requested": long_ma,
+                        "short_ma_period_requested": short_ma,
+                    },
+                )
 
             # Calculate moving averages
             short_ma_values = simple_moving_average(prices, short_ma)

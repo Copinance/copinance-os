@@ -13,6 +13,7 @@ from copinance_os.data.providers.sec.edgartools import (
     _parse_cik_int,
     _resolve_identity,
     _sec_find_funds_sync,
+    _sec_fund_portfolio_sync,
     _serialize_ownership_summary,
 )
 
@@ -267,3 +268,24 @@ class TestEdgarToolsFundamentalProvider:
             assert out["company"]["cik"] == "0000036405"
             assert out["series"]["series_id"] == "S000002839"
             assert out["share_class"]["ticker"] == "VFINX"
+
+
+@pytest.mark.unit
+def test_sec_fund_portfolio_prefers_series_only_filings() -> None:
+    df = pd.DataFrame([{"ticker": "AAPL", "pct_value": 7.5, "value_usd": 1.0}])
+    report = MagicMock()
+    report.investment_data.return_value = df
+    filing = MagicMock()
+    filing.obj.return_value = report
+    filings = [filing]
+    mock_f = MagicMock()
+    mock_f.get_filings.return_value = filings
+
+    with patch("copinance_os.data.providers.sec.edgartools.Fund", return_value=mock_f):
+        out = _sec_fund_portfolio_sync("SPY", 150, "edgartools")
+
+    mock_f.get_filings.assert_called_once_with(form="NPORT-P", series_only=True)
+    mock_f.get_portfolio.assert_not_called()
+    assert out["series_only"] is True
+    assert out["row_count"] == 1
+    assert out["holdings"][0]["ticker"] == "AAPL"

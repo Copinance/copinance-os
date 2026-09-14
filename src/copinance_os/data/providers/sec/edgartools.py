@@ -862,22 +862,62 @@ def _sec_fund_filings_sync(
     }
 
 
-def _sec_fund_portfolio_sync(identifier: str, max_rows: int, provider_name: str) -> dict[str, Any]:
+def _nport_portfolio_dataframe(fund: Any, *, series_only: bool) -> Any:
+    """Load N-PORT holdings, preferring series-scoped filings (edgartools GH #888)."""
+    df = None
+    if series_only:
+        try:
+            series_filings = fund.get_filings(form="NPORT-P", series_only=True)
+        except Exception as e:
+            logger.warning("series_only NPORT-P lookup failed", error=str(e))
+            series_filings = None
+        if series_filings is not None and len(series_filings) > 0:
+            first = series_filings[0]
+            report = first.obj() if hasattr(first, "obj") else None
+            if report is not None and hasattr(report, "investment_data"):
+                try:
+                    df = report.investment_data()
+                except Exception as e:
+                    logger.warning("NPORT investment_data failed", error=str(e))
+        if df is None or getattr(df, "empty", True):
+            try:
+                df = fund.get_portfolio()
+            except Exception as e:
+                logger.warning("Fund.get_portfolio fallback failed", error=str(e))
+                return None
+        return df
+    try:
+        return fund.get_portfolio()
+    except Exception as e:
+        logger.warning("Fund.get_portfolio failed", error=str(e))
+        return None
+
+
+def _sec_fund_portfolio_sync(
+    identifier: str, max_rows: int, provider_name: str, *, series_only: bool = True
+) -> dict[str, Any]:
     fund = Fund(str(identifier).strip())
-    df = fund.get_portfolio()
+    df = _nport_portfolio_dataframe(fund, series_only=series_only)
     cap = max(10, min(max_rows, _MAX_FUND_PORTFOLIO_ROWS))
     rows, truncated, omitted = _df_to_records_capped(df, cap)
     n = 0 if df is None or getattr(df, "empty", True) else len(df)
+    api = (
+        "Fund.get_filings(series_only=True)+investment_data"
+        if series_only
+        else "Fund.get_portfolio"
+    )
     return {
         "identifier": str(identifier).strip(),
         "holdings": rows,
         "row_count": n,
         "truncated": truncated,
         "rows_omitted": omitted,
+        "series_only": bool(series_only),
         "provider": provider_name,
-        "api": "Fund.get_portfolio",
+        "api": api,
         "assumptions": [
-            "Holdings come from the latest NPORT-P disclosure chain via edgartools.",
+            "series_only=True prefers NPORT-P filings that mention this fund's series (GH #888).",
+            "Empty series-scoped extract falls back to Fund.get_portfolio().",
             "value_usd and pct_value are as reported in the filing extract.",
         ],
     }
@@ -1663,7 +1703,7 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
         self,
         identifier: str,
         form: str = "NPORT-P",
-        series_only: bool = False,
+        series_only: bool = True,
         limit: int = 25,
     ) -> dict[str, Any]:
         """Filings for a fund entity (company-level or ``series_only`` EFTS filter)."""
@@ -1699,15 +1739,22 @@ class EdgarToolsFundamentalProvider(FundamentalDataProvider):
         self,
         identifier: str,
         max_rows: int = 150,
+        series_only: bool = True,
     ) -> dict[str, Any]:
-        """Latest portfolio holdings (``Fund.get_portfolio()`` → NPORT chain)."""
+        """Latest portfolio holdings, defaulting to series-scoped NPORT-P."""
 
         def _fetch() -> dict[str, Any]:
             self._ensure_identity()
             mr = max(10, min(int(max_rows), _MAX_FUND_PORTFOLIO_ROWS))
-            return _sec_fund_portfolio_sync(identifier, mr, self._provider_name)
+            return _sec_fund_portfolio_sync(
+                identifier, mr, self._provider_name, series_only=bool(series_only)
+            )
 
-        key_kwargs = {"identifier": str(identifier).strip(), "max_rows": max_rows}
+        key_kwargs = {
+            "identifier": str(identifier).strip(),
+            "max_rows": max_rows,
+            "series_only": bool(series_only),
+        }
         return cast(
             dict[str, Any],
             await self._cached_edgar(

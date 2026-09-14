@@ -49,6 +49,7 @@ def test_yahoo_option_implied_volatility_percent_to_sigma() -> None:
     assert norm(None) is None
     assert norm(Decimal("0.25")) == Decimal("0.25")
     assert norm(Decimal("1")) == Decimal("1")
+    assert norm(Decimal("2.50")) == Decimal("2.50")
     assert norm(Decimal("13.671876455078125")) == Decimal("0.13671876455078125")
     assert norm(Decimal("6.87500140625")) == Decimal("0.0687500140625")
 

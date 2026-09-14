@@ -284,3 +284,45 @@ class TestFredMacroeconomicProvider:
 
         with pytest.raises(httpx.HTTPStatusError):
             await provider.get_release_dates("UNRATE")
+
+    @pytest.mark.asyncio
+    async def test_is_available_uses_client_timeout_not_five_seconds(self) -> None:
+        provider = FredMacroeconomicProvider(api_key="test-key", base_url="https://example.com")
+        seen_timeout: dict[str, float | None] = {}
+
+        class DummyClient:
+            async def get(
+                self, path: str, params: dict, timeout: float | None = None
+            ) -> httpx.Response:
+                seen_timeout["timeout"] = timeout
+                req = httpx.Request("GET", f"https://example.com{path}")
+                return httpx.Response(200, json={"seriess": [{"id": "DGS10"}]}, request=req)
+
+        async def _dummy_get_client() -> DummyClient:  # type: ignore[override]
+            return DummyClient()
+
+        provider._get_client = _dummy_get_client  # type: ignore[method-assign]
+        assert await provider.is_available() is True
+        assert seen_timeout["timeout"] is None
+        assert provider.last_availability_error is None
+
+    @pytest.mark.asyncio
+    async def test_is_available_timeout_sets_fred_timeout(self) -> None:
+        provider = FredMacroeconomicProvider(api_key="test-key", base_url="https://example.com")
+        provider._retry_base_delay_seconds = 0.0
+        provider._retry_max_delay_seconds = 0.0
+        provider._max_retry_attempts = 1
+
+        class DummyClient:
+            async def get(
+                self, path: str, params: dict, timeout: float | None = None
+            ) -> httpx.Response:
+                req = httpx.Request("GET", f"https://example.com{path}")
+                raise httpx.ReadTimeout("slow", request=req)
+
+        async def _dummy_get_client() -> DummyClient:  # type: ignore[override]
+            return DummyClient()
+
+        provider._get_client = _dummy_get_client  # type: ignore[method-assign]
+        assert await provider.is_available() is False
+        assert provider.last_availability_error == "fred_timeout"

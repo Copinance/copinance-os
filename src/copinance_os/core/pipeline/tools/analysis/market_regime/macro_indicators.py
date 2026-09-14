@@ -35,6 +35,60 @@ logger = structlog.get_logger(__name__)
 MACRO_BLOCK_CACHE_TOOL_NAME = "get_macro_regime_indicators_block"
 
 
+def _fred_error_code(provider: Any) -> str:
+    """Map a down FRED provider to a stable block error code."""
+    reason = getattr(provider, "last_availability_error", None)
+    if reason in {"fred_timeout", "fred_unavailable"}:
+        return str(reason)
+    return "fred_unavailable"
+
+
+def _fred_exception_error_code(exc: BaseException) -> str:
+    name = type(exc).__name__.lower()
+    if "timeout" in name:
+        return "fred_timeout"
+    return "fred_unavailable"
+
+
+def _fred_unavailable_block(provider: Any, *, error: str | None = None) -> dict[str, Any]:
+    return {"available": False, "source": "fred", "error": error or _fred_error_code(provider)}
+
+
+def _should_cache_fred_miss(error: str | None) -> bool:
+    # Timeouts are transient; do not cache so the next call can retry FRED.
+    return error != "fred_timeout"
+
+
+def _observation_day(iso_ts: str | None) -> str | None:
+    if not iso_ts:
+        return None
+    return str(iso_ts)[:10]
+
+
+def derived_10y2y_spread(teny: dict[str, Any], twoy: dict[str, Any]) -> dict[str, Any]:
+    """Same-calendar-day DGS10 − DGS2. Withhold if either leg is missing or dates differ."""
+    if not teny.get("available") or not twoy.get("available"):
+        return {"available": False, "error": "missing_leg", "unit": "percent"}
+    t_latest = teny.get("latest") or {}
+    y_latest = twoy.get("latest") or {}
+    t_day = _observation_day(t_latest.get("timestamp") if isinstance(t_latest, dict) else None)
+    y_day = _observation_day(y_latest.get("timestamp") if isinstance(y_latest, dict) else None)
+    if t_day is None or y_day is None or t_day != y_day:
+        return {"available": False, "error": "spread_observation_mismatch", "unit": "percent"}
+    try:
+        spread = float(t_latest["value"]) - float(y_latest["value"])
+    except (KeyError, TypeError, ValueError):
+        return {"available": False, "error": "missing_leg", "unit": "percent"}
+    return {
+        "available": True,
+        "error": None,
+        "latest": {"timestamp": t_latest["timestamp"], "value": spread},
+        "data_points": min(int(teny.get("data_points") or 0), int(twoy.get("data_points") or 0)),
+        "unit": "percent",
+        "derived_from": "DGS10-DGS2",
+    }
+
+
 class MacroRegimeIndicatorsTool(Tool):
     """Tool that returns macro regime indicators (rates, credit, commodities)."""
 
@@ -124,6 +178,13 @@ class MacroRegimeIndicatorsTool(Tool):
                 start_date=start_str,
                 end_date=end_str,
             )
+
+    async def _set_fred_miss_cached(
+        self, block_name: str, start_date: datetime, end_date: datetime, data: dict[str, Any]
+    ) -> None:
+        if not _should_cache_fred_miss(data.get("error") if isinstance(data, dict) else None):
+            return
+        await self._set_block_cached(block_name, start_date, end_date, data)
 
     def get_name(self) -> str:
         return "get_macro_regime_indicators"
@@ -298,32 +359,22 @@ class MacroRegimeIndicatorsTool(Tool):
         cached = await self._get_block_cached("rates", start_date, end_date)
         if cached is not None:
             return cached
-        # Check if FRED is available first
         fred_available = await self._macro_provider.is_available()
         provider_name = self._macro_provider.get_provider_name()
 
-        # Check if API key is configured (even if availability check failed)
-        has_api_key = (
-            hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
-        )
-
         if not fred_available:
-            if not has_api_key:
-                logger.info(
-                    "FRED API key not configured; using yfinance proxies for rates",
-                    provider=provider_name,
-                    hint="Set COPINANCEOS_FRED_API_KEY in your .env file",
-                )
-            else:
-                logger.warning(
-                    "FRED availability check failed (API key configured but check failed); using yfinance proxies for rates",
-                    provider=provider_name,
-                    hint="Check your FRED API key and network connection",
-                )
-        else:
-            logger.info("Using FRED for rates data", provider=provider_name)
+            miss = _fred_unavailable_block(self._macro_provider)
+            logger.warning(
+                "FRED unavailable; withholding rates (no 10Y-only yfinance stand-in)",
+                provider=provider_name,
+                error=miss["error"],
+            )
+            await self._set_fred_miss_cached("rates", start_date, end_date, miss)
+            return miss
 
-        # Preferred FRED series
+        logger.info("Using FRED for rates data", provider=provider_name)
+
+        # T10Y2Y is a FRED-published vintage, not the same-day DGS10−DGS2 spread.
         fred_series = {
             "10y_nominal": ("DGS10", "percent"),
             "2y_nominal": ("DGS2", "percent"),
@@ -332,101 +383,72 @@ class MacroRegimeIndicatorsTool(Tool):
             "30y_nominal": ("DGS30", "percent"),
             "10y_real": ("DFII10", "percent"),
             "10y_breakeven": ("T10YIE", "percent"),
-            "10y2y_spread": (
-                "T10Y2Y",
-                "percent",
-            ),  # Recession indicator - inverted = recession risk
+            "t10y2y_published": ("T10Y2Y", "percent"),
             "10y3m_spread": ("T10Y3M", "percent"),
         }
 
-        # Try FRED if available
-        if fred_available:
-            out: dict[str, Any] = {"available": True, "source": "fred", "series": {}}
-            try:
-                for key, (series_id, unit) in fred_series.items():
-                    points = await self._macro_provider.get_time_series(
-                        series_id, start_date, end_date
-                    )
-                    metrics = _series_metrics(points)
-                    metrics["unit"] = unit
-                    out["series"][key] = metrics
-
-                # Interpret 10Y trend and yield curve inversion
-                teny = out["series"].get("10y_nominal", {})
-                teny2y_spread = out["series"].get("10y2y_spread", {})
-
-                interpretation = {}
-
-                if teny.get("available") and "change_20d" in teny:
-                    change_bps = float(teny["change_20d"]) * 100.0
-                    interpretation.update(
-                        {
-                            "10y_change_20d_bps": round(change_bps, 1),
-                            "10y_trend": (
-                                "steady"
-                                if abs(change_bps) <= 15
-                                else ("rising" if change_bps > 15 else "falling")
-                            ),
-                            "long_duration_pressure": (
-                                "muted" if abs(change_bps) <= 15 else "elevated"
-                            ),
-                        }
-                    )
-
-                # Yield curve inversion analysis (10Y-2Y spread)
-                if teny2y_spread.get("available") and "latest" in teny2y_spread:
-                    spread_value = teny2y_spread["latest"]["value"]
-                    interpretation.update(
-                        {
-                            "10y2y_spread_current": round(spread_value, 2),
-                            "yield_curve_inverted": spread_value < 0,
-                            "recession_risk": "elevated" if spread_value < 0 else "low",
-                            "yield_curve_signal": (
-                                "inverted_recession_warning"
-                                if spread_value < -0.5
-                                else (
-                                    "inverted_mild_warning"
-                                    if spread_value < 0
-                                    else "normal" if spread_value > 1.0 else "flattening"
-                                )
-                            ),
-                        }
-                    )
-
-                if interpretation:
-                    out["_raw_interpretation"] = interpretation
-                logger.info("Successfully fetched rates from FRED", series_count=len(fred_series))
-                await self._set_block_cached("rates", start_date, end_date, out)
-                return out
-            except Exception as e:
-                logger.warning("FRED rates block failed; falling back to proxies", error=str(e))
-
-        # Fallback: yfinance proxies (limited)
-        out = {"available": True, "source": "yfinance", "series": {}}
+        out: dict[str, Any] = {"available": True, "source": "fred", "series": {}}
         try:
-            # ^TNX is 10Y yield * 10. Convert to percent.
-            prices = await self._market_provider.get_historical_data(
-                "^TNX", start_date, end_date, interval="1d"
-            )
-            vals = [float(d.close_price) for d in prices if d.close_price is not None]
-            if len(vals) < 2:
-                return {"available": False, "source": "yfinance", "error": "No ^TNX data"}
+            for key, (series_id, unit) in fred_series.items():
+                points = await self._macro_provider.get_time_series(series_id, start_date, end_date)
+                metrics = _series_metrics(points)
+                metrics["unit"] = unit
+                out["series"][key] = metrics
 
-            teny_pct = vals[-1] / 10.0
-            out["series"]["10y_nominal_proxy"] = {
-                "available": True,
-                "latest": {
-                    "timestamp": prices[-1].timestamp.isoformat(),
-                    "value_percent": round(teny_pct, 3),
-                },
-                "data_points": len(vals),
-            }
+            teny = out["series"].get("10y_nominal", {})
+            twoy = out["series"].get("2y_nominal", {})
+            teny2y_spread = derived_10y2y_spread(teny, twoy)
+            out["series"]["10y2y_spread"] = teny2y_spread
+
+            interpretation: dict[str, Any] = {}
+
+            if teny.get("available") and "change_20d" in teny:
+                change_bps = float(teny["change_20d"]) * 100.0
+                interpretation.update(
+                    {
+                        "10y_change_20d_bps": round(change_bps, 1),
+                        "10y_trend": (
+                            "steady"
+                            if abs(change_bps) <= 15
+                            else ("rising" if change_bps > 15 else "falling")
+                        ),
+                        "long_duration_pressure": (
+                            "muted" if abs(change_bps) <= 15 else "elevated"
+                        ),
+                    }
+                )
+
+            if teny2y_spread.get("available") and isinstance(teny2y_spread.get("latest"), dict):
+                spread_value = teny2y_spread["latest"]["value"]
+                interpretation.update(
+                    {
+                        "10y2y_spread_current": round(spread_value, 2),
+                        "yield_curve_inverted": spread_value < 0,
+                        "recession_risk": "elevated" if spread_value < 0 else "low",
+                        "yield_curve_signal": (
+                            "inverted_recession_warning"
+                            if spread_value < -0.5
+                            else (
+                                "inverted_mild_warning"
+                                if spread_value < 0
+                                else "normal" if spread_value > 1.0 else "flattening"
+                            )
+                        ),
+                    }
+                )
+
+            if interpretation:
+                out["_raw_interpretation"] = interpretation
+            logger.info("Successfully fetched rates from FRED", series_count=len(fred_series))
             await self._set_block_cached("rates", start_date, end_date, out)
             return out
         except Exception as e:
-            out = {"available": False, "source": "yfinance", "error": str(e)}
-            await self._set_block_cached("rates", start_date, end_date, out)
-            return out
+            logger.warning("FRED rates block failed; withholding rates", error=str(e))
+            miss = _fred_unavailable_block(
+                self._macro_provider, error=_fred_exception_error_code(e)
+            )
+            await self._set_fred_miss_cached("rates", start_date, end_date, miss)
+            return miss
 
     async def _get_credit_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         cached = await self._get_block_cached("credit", start_date, end_date)
@@ -660,18 +682,14 @@ class MacroRegimeIndicatorsTool(Tool):
             return cached
         fred_available = await self._macro_provider.is_available()
 
-        has_api_key = (
-            hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
-        )
-
         out: dict[str, Any]
         if not fred_available:
-            if not has_api_key:
-                logger.info("FRED API key not configured; skipping labor market indicators")
-            else:
-                logger.warning("FRED availability check failed; skipping labor market indicators")
-            out = {"available": False, "source": "fred", "error": "FRED not available"}
-            await self._set_block_cached("labor", start_date, end_date, out)
+            out = _fred_unavailable_block(self._macro_provider)
+            logger.warning(
+                "FRED unavailable; skipping labor market indicators",
+                error=out["error"],
+            )
+            await self._set_fred_miss_cached("labor", start_date, end_date, out)
             return out
 
         out = {"available": True, "source": "fred", "series": {}}
@@ -726,9 +744,11 @@ class MacroRegimeIndicatorsTool(Tool):
             return out
         except Exception as e:
             logger.warning("FRED labor block failed", error=str(e))
-            out = {"available": False, "source": "fred", "error": str(e)}
-            await self._set_block_cached("labor", start_date, end_date, out)
-            return out
+            miss = _fred_unavailable_block(
+                self._macro_provider, error=_fred_exception_error_code(e)
+            )
+            await self._set_fred_miss_cached("labor", start_date, end_date, miss)
+            return miss
 
     async def _get_housing_block(self, start_date: datetime, end_date: datetime) -> dict[str, Any]:
         """Housing market indicators: new/existing sales, Case-Shiller."""
@@ -737,18 +757,14 @@ class MacroRegimeIndicatorsTool(Tool):
             return cached
         fred_available = await self._macro_provider.is_available()
 
-        has_api_key = (
-            hasattr(self._macro_provider, "_api_key") and self._macro_provider._api_key is not None
-        )
-
         out: dict[str, Any]
         if not fred_available:
-            if not has_api_key:
-                logger.info("FRED API key not configured; skipping housing indicators")
-            else:
-                logger.warning("FRED availability check failed; skipping housing indicators")
-            out = {"available": False, "source": "fred", "error": "FRED not available"}
-            await self._set_block_cached("housing", start_date, end_date, out)
+            out = _fred_unavailable_block(self._macro_provider)
+            logger.warning(
+                "FRED unavailable; skipping housing indicators",
+                error=out["error"],
+            )
+            await self._set_fred_miss_cached("housing", start_date, end_date, out)
             return out
 
         out = {"available": True, "source": "fred", "series": {}}
@@ -803,9 +819,11 @@ class MacroRegimeIndicatorsTool(Tool):
             return out
         except Exception as e:
             logger.warning("FRED housing block failed", error=str(e))
-            out = {"available": False, "source": "fred", "error": str(e)}
-            await self._set_block_cached("housing", start_date, end_date, out)
-            return out
+            miss = _fred_unavailable_block(
+                self._macro_provider, error=_fred_exception_error_code(e)
+            )
+            await self._set_fred_miss_cached("housing", start_date, end_date, miss)
+            return miss
 
     async def _get_manufacturing_block(
         self, start_date: datetime, end_date: datetime
