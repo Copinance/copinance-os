@@ -1237,7 +1237,7 @@ class FundamentalDataGetSecFundFilingsTool(BaseSecEdgarExtendedFundamentalTool):
     def get_description(self) -> str:
         return (
             "SEC EDGAR — **fund filings** (e.g. NPORT-P portfolio reports) via ``Fund.get_filings``. "
-            "Use **series_only=true** to filter with EFTS to filings mentioning the fund's series id."
+            "Use **series_only=true** (default) to filter with EFTS to filings mentioning the fund's series id."
         )
 
     def get_schema(self) -> ToolSchema:
@@ -1258,7 +1258,7 @@ class FundamentalDataGetSecFundFilingsTool(BaseSecEdgarExtendedFundamentalTool):
                     "series_only": {
                         "type": "boolean",
                         "description": "If true, narrow to filings that mention this fund's series (EFTS)",
-                        "default": False,
+                        "default": True,
                     },
                     "limit": {
                         "type": "integer",
@@ -1292,7 +1292,7 @@ class FundamentalDataGetSecFundFilingsTool(BaseSecEdgarExtendedFundamentalTool):
             data = await provider.get_sec_fund_filings(
                 ident,
                 form=validated.get("form", "NPORT-P"),
-                series_only=validated.get("series_only", False),
+                series_only=validated.get("series_only", True),
                 limit=validated.get("limit", 25),
             )
             return self._create_success_result(data=data, metadata={"identifier": ident})
@@ -1311,7 +1311,8 @@ class FundamentalDataGetSecFundPortfolioTool(BaseSecEdgarExtendedFundamentalTool
 
     def get_description(self) -> str:
         return (
-            "SEC EDGAR — **latest portfolio holdings** for a mutual fund or ETF (``Fund.get_portfolio``). "
+            "SEC EDGAR — **latest portfolio holdings** for a mutual fund or ETF. "
+            "Defaults to **series_only** NPORT-P (avoids umbrella-trust mixups). "
             "Returns name, ticker, value_usd, pct_value, and other columns as in the filing extract."
         )
 
@@ -1329,6 +1330,11 @@ class FundamentalDataGetSecFundPortfolioTool(BaseSecEdgarExtendedFundamentalTool
                         "type": "integer",
                         "description": "Max holdings rows (10–500); top of the table is most material",
                         "default": 150,
+                    },
+                    "series_only": {
+                        "type": "boolean",
+                        "description": "Prefer series-scoped NPORT-P (default true; GH #888)",
+                        "default": True,
                     },
                 },
                 "required": ["identifier"],
@@ -1354,6 +1360,7 @@ class FundamentalDataGetSecFundPortfolioTool(BaseSecEdgarExtendedFundamentalTool
             data = await provider.get_sec_fund_portfolio(
                 ident,
                 max_rows=validated.get("max_rows", 150),
+                series_only=validated.get("series_only", True),
             )
             return self._create_success_result(data=data, metadata={"identifier": ident})
         except Exception as e:

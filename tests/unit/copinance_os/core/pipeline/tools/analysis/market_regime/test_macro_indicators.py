@@ -10,6 +10,7 @@ import pytest
 
 from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators import (
     MacroRegimeIndicatorsTool,
+    derived_10y2y_spread,
 )
 from copinance_os.domain.models.market import MarketDataPoint, OptionsChain
 
@@ -88,9 +89,46 @@ class TestMacroRegimeIndicatorsTool:
 
         assert result.success is True
         assert result.data is not None
-        assert result.data["rates"]["source"] == "yfinance"
+        assert result.data["rates"]["available"] is False
+        assert result.data["rates"]["error"] in {"fred_unavailable", "fred_timeout"}
+        assert result.data["labor"]["available"] is False
+        assert result.data["labor"]["error"] in {"fred_unavailable", "fred_timeout"}
+        assert result.data["housing"]["available"] is False
+        assert result.data["housing"]["error"] in {"fred_unavailable", "fred_timeout"}
         assert result.data["credit"]["source"] == "yfinance"
         assert result.data["commodities"]["source"] == "yfinance"
         assert "volatility" in result.data
         assert result.data["volatility"]["series"]["vix9d"]["available"] is True
         assert result.data["volatility"]["series"]["vix3m"]["latest"]["value"] == 20.0
+
+
+@pytest.mark.unit
+class TestDerived10y2ySpread:
+    def test_same_day_dgs10_minus_dgs2(self) -> None:
+        teny = {
+            "available": True,
+            "latest": {"timestamp": "2026-04-03T00:00:00+00:00", "value": 4.2},
+            "data_points": 10,
+        }
+        twoy = {
+            "available": True,
+            "latest": {"timestamp": "2026-04-03T00:00:00+00:00", "value": 3.8},
+            "data_points": 10,
+        }
+        out = derived_10y2y_spread(teny, twoy)
+        assert out["available"] is True
+        assert out["derived_from"] == "DGS10-DGS2"
+        assert out["latest"]["value"] == pytest.approx(0.4)
+
+    def test_withholds_when_observation_days_differ(self) -> None:
+        teny = {
+            "available": True,
+            "latest": {"timestamp": "2026-04-03T00:00:00+00:00", "value": 4.2},
+        }
+        twoy = {
+            "available": True,
+            "latest": {"timestamp": "2026-04-02T00:00:00+00:00", "value": 3.8},
+        }
+        out = derived_10y2y_spread(teny, twoy)
+        assert out["available"] is False
+        assert out["error"] == "spread_observation_mismatch"

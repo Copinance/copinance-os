@@ -248,10 +248,10 @@ class TestMarketRegimeDetectTrendTool:
         tool = MarketRegimeDetectTrendTool(mock_market_data_provider)
         result = await tool.execute(symbol="TEST", lookback_days=200)
 
-        # Should adapt parameters and still succeed
-        assert result.success is True
-        assert result.data["parameters_adjusted"] is True
-        assert "note" in result.data
+        # Withhold when fewer closes than the requested long MA
+        assert result.success is False
+        assert "Insufficient data" in result.error
+        assert result.metadata["data_points"] == len(sample_stock_data)
 
     @pytest.mark.asyncio
     async def test_execute_no_data(self, mock_market_data_provider: MarketDataProvider) -> None:
@@ -288,6 +288,35 @@ class TestMarketRegimeDetectTrendTool:
 
         assert result.success is False
         assert "Insufficient data" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_withholds_truncated_long_ma(
+        self, mock_market_data_provider: MarketDataProvider
+    ) -> None:
+        """174 closes vs a 200d long MA must not publish a shortened trend."""
+        base_date = datetime(2024, 1, 1)
+        data = [
+            MarketDataPoint(
+                symbol="TEST",
+                timestamp=base_date + timedelta(days=i),
+                open_price=Decimal("100.0"),
+                close_price=Decimal("100.0"),
+                high_price=Decimal("101.0"),
+                low_price=Decimal("99.0"),
+                volume=1000000,
+            )
+            for i in range(174)
+        ]
+        mock_market_data_provider.get_historical_data = AsyncMock(return_value=data)
+
+        tool = MarketRegimeDetectTrendTool(mock_market_data_provider)
+        result = await tool.execute(
+            symbol="TEST", lookback_days=200, short_ma_period=50, long_ma_period=200
+        )
+
+        assert result.success is False
+        assert "200" in result.error
+        assert result.metadata["data_points"] == 174
 
     @pytest.mark.asyncio
     async def test_execute_parameter_validation(

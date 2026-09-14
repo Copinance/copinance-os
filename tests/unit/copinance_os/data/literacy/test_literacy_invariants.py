@@ -131,7 +131,7 @@ def _gc(strike: float, oi: int, vol: int, iv: float, delta: float, gamma: float)
         ask=Decimal("1.1"),
         volume=vol,
         open_interest=oi,
-        implied_volatility=Decimal(str(iv / 100.0 if iv > 2 else iv)),
+        implied_volatility=Decimal(str(iv / 100.0 if iv > 3 else iv)),
         greeks=OptionGreeks(
             delta=Decimal(str(delta)),
             gamma=Decimal(str(gamma)),
@@ -153,7 +153,7 @@ def _gp(strike: float, oi: int, vol: int, iv: float, delta: float, gamma: float)
         ask=Decimal("1.1"),
         volume=vol,
         open_interest=oi,
-        implied_volatility=Decimal(str(iv / 100.0 if iv > 2 else iv)),
+        implied_volatility=Decimal(str(iv / 100.0 if iv > 3 else iv)),
         greeks=OptionGreeks(
             delta=Decimal(str(delta)),
             gamma=Decimal(str(gamma)),

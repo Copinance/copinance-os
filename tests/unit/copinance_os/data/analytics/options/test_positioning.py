@@ -76,7 +76,7 @@ def _gc(strike: float, oi: int, vol: int, iv: float, delta: float, gamma: float)
         ask=Decimal("1.1"),
         volume=vol,
         open_interest=oi,
-        implied_volatility=Decimal(str(iv / 100.0)) if iv > 2 else Decimal(str(iv)),
+        implied_volatility=Decimal(str(iv / 100.0)) if iv > 3 else Decimal(str(iv)),
         greeks=OptionGreeks(
             delta=Decimal(str(delta)),
             gamma=Decimal(str(gamma)),
@@ -98,7 +98,7 @@ def _gp(strike: float, oi: int, vol: int, iv: float, delta: float, gamma: float)
         ask=Decimal("1.1"),
         volume=vol,
         open_interest=oi,
-        implied_volatility=Decimal(str(iv / 100.0)) if iv > 2 else Decimal(str(iv)),
+        implied_volatility=Decimal(str(iv / 100.0)) if iv > 3 else Decimal(str(iv)),
         greeks=OptionGreeks(
             delta=Decimal(str(delta)),
             gamma=Decimal(str(gamma)),
@@ -974,10 +974,7 @@ def test_signal_agreement_tie_is_mixed() -> None:
 def test_contract_iv_pct_preserves_extreme_iv_above_200_percent() -> None:
     """A genuine 250% IV (decimal fraction 2.5) must not be left unscaled as '2.5%'."""
     c = _gc(580, 100, 50, 2.5, 0.5, 0.02)
-    # _gc scales iv/100 only when iv > 2 in the test helper's own convention (18.0 ->
-    # 0.18); pass the raw decimal fraction directly to bypass that and assert the
-    # production code trusts it as-is.
-    c = c.model_copy(update={"implied_volatility": Decimal("2.5")})
+    # 2.5 is already a decimal-fraction σ (250%); the helper does not ÷100 unless iv > 3.
     assert contract_iv_pct(c) == pytest.approx(250.0)
 
 
