@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 from copinance_os.data.analytics.options.positioning.contracts import (
@@ -87,7 +87,16 @@ def compute_implied_move(
     exp_d = parse_expiration_to_date(nearest_exp)
     if exp_d is None:
         return round(pct, 4), round(straddle, 4), None
-    dte = max(1, (exp_d - as_of_date).days)
+    if isinstance(as_of_date, datetime):
+        as_of_utc = (
+            as_of_date.astimezone(UTC) if as_of_date.tzinfo else as_of_date.replace(tzinfo=UTC)
+        )
+        exp_close_utc = datetime(exp_d.year, exp_d.month, exp_d.day, 20, 0, tzinfo=UTC)
+        secs = (exp_close_utc - as_of_utc).total_seconds()
+        dte = max(0.05, secs / 86400.0)
+    else:
+        days_diff = (exp_d - as_of_date).days
+        dte = max(0.05, float(days_diff)) if days_diff > 0 else 0.5
     t_year = dte / 365.0
     fac = config.straddle_ann_factor
     td = config.trading_days_per_year
@@ -102,7 +111,7 @@ def compute_implied_move(
     detail = {
         "raw_straddle_pct": round(pct, 4),
         "raw_straddle_abs": round(straddle, 4),
-        "dte": dte,
+        "dte": round(dte, 4) if isinstance(dte, float) and dte != int(dte) else int(dte),
         "annualized_iv": round(ann, 4),
         "daily_implied_move_pct": round(daily, 4),
         "period_implied_move_pct": round(period, 4),
