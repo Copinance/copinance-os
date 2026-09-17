@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Literal
 
 from copinance_os.data.analytics.options.positioning.contracts import (
@@ -65,6 +66,7 @@ def compute_gex_profile(
     nearest_exp: str | None,
     underlying: float,
     config: GexConfig = DEFAULT_GEX_CONFIG,
+    ref_date: date | None = None,
 ) -> dict[str, Any]:
     if not nearest_exp or underlying <= 0:
         return {
@@ -126,8 +128,19 @@ def compute_gex_profile(
             + contracts_for_expiration(puts, nearest_exp)
             if (iv := contract_iv_pct(c)) is not None and iv > 0
         ]
-        sigma = sum(iv_samples) / len(iv_samples) if iv_samples else 0.25
-        band_pct = max(0.10, 2.0 * sigma)
+        sigma_annualized = sum(iv_samples) / len(iv_samples) if iv_samples else 0.25
+        # The flip band must scale with the *expiry period's* implied move, not the
+        # full annualized IV — an annualized 25% IV band on a 1-DTE expiry claims a
+        # +/-50% swing is plausible before the contract even expires. Calendar-day
+        # fraction of a year (not trading sessions) since nearest_exp/ref_date are
+        # both calendar dates here.
+        try:
+            dte_days = (date.fromisoformat(nearest_exp) - ref_date).days if ref_date else None
+        except ValueError:
+            dte_days = None
+        period_fraction = max(dte_days, 1) / 365.0 if dte_days is not None else 1.0
+        period_sigma = sigma_annualized * (period_fraction**0.5)
+        band_pct = max(0.10, 2.0 * period_sigma)
         valid_crossings = [c for c in crossings if abs(c - underlying) <= band_pct * underlying]
         if valid_crossings:
             gamma_flip = min(valid_crossings, key=lambda c: abs(c - underlying))

@@ -27,6 +27,7 @@ from copinance_os.data.analytics.options.positioning.contracts import contract_i
 from copinance_os.data.analytics.options.positioning.gex import (
     DEFAULT_GEX_CONFIG,
     compute_gamma_regime,
+    compute_gex_profile,
     gex_methodology,
 )
 from copinance_os.data.analytics.options.positioning.math import sigmoid
@@ -390,8 +391,14 @@ def test_gex_per_strike_matches_toy(toy_chain: tuple) -> None:
 
 @pytest.mark.unit
 def test_gamma_flip_interpolated() -> None:
-    """Two-strike front expiry: cumulative GEX crosses zero between strikes."""
-    exp = date(2026, 3, 20)
+    """Two-strike front expiry: cumulative GEX crosses zero between strikes.
+
+    50 DTE and 45% IV so the period-scaled flip band (2 * IV * sqrt(dte/365),
+    floored at 10%) comfortably contains the ~29% strike/spot distance below —
+    see the flip-band period-scaling fix (plan P0-4): a band this wide on a
+    near-dated expiry at low IV would be an unrealistic claim.
+    """
+    exp = date(2026, 4, 20)
     spot = 150.0
     mult = 100.0 * spot
     # Strike 100: net +5000; strike 200: net -12000 -> cumulative crosses between 100 and 200.
@@ -406,7 +413,7 @@ def test_gamma_flip_interpolated() -> None:
             ask=Decimal("1"),
             volume=1,
             open_interest=10,
-            implied_volatility=Decimal("0.2"),
+            implied_volatility=Decimal("0.45"),
             greeks=OptionGreeks(
                 delta=Decimal("0.5"),
                 gamma=Decimal("0.05"),
@@ -427,7 +434,7 @@ def test_gamma_flip_interpolated() -> None:
             ask=Decimal("1"),
             volume=1,
             open_interest=100,
-            implied_volatility=Decimal("0.2"),
+            implied_volatility=Decimal("0.45"),
             greeks=OptionGreeks(
                 delta=Decimal("-0.5"),
                 gamma=Decimal("0.08"),
@@ -466,6 +473,75 @@ def test_gamma_flip_interpolated() -> None:
         if s["name"] == _pt.name_gamma_flip_strike(FinancialLiteracy.INTERMEDIATE)
     )
     assert flip_row["direction"] == "bullish"
+
+
+@pytest.mark.unit
+def test_gamma_flip_band_scales_with_expiry_period_not_annual_iv() -> None:
+    """A crossing ~29% of spot away must be rejected on a 1-DTE, 25% annualized-IV
+    expiry — the old ``band = max(10%, 2 * annual_iv)`` formula sized the band off
+    the annualized IV regardless of how little time the expiry actually has left,
+    so a 1-DTE contract at 25% IV claimed a plausible +/-50% swing before it even
+    expires. The period-scaled band (``2 * annual_iv * sqrt(dte/365)``, floored at
+    10%) correctly narrows to the 10% floor here and rejects the crossing.
+    """
+    spot = 150.0
+    ref_date = date(2026, 3, 1)
+    exp = date(2026, 3, 2)  # 1 DTE
+    mult = 100.0 * spot
+    calls = [
+        OptionContract(
+            underlying_symbol="GF",
+            contract_symbol="GF100C",
+            side=OptionSide.CALL,
+            strike=Decimal("100"),
+            expiration_date=exp,
+            bid=Decimal("1"),
+            ask=Decimal("1"),
+            volume=1,
+            open_interest=10,
+            implied_volatility=Decimal("0.25"),
+            greeks=OptionGreeks(
+                delta=Decimal("0.5"),
+                gamma=Decimal("0.05"),
+                theta=Decimal("0"),
+                vega=Decimal("0"),
+                rho=Decimal("0"),
+            ),
+        ),
+    ]
+    puts = [
+        OptionContract(
+            underlying_symbol="GF",
+            contract_symbol="GF200P",
+            side=OptionSide.PUT,
+            strike=Decimal("200"),
+            expiration_date=exp,
+            bid=Decimal("1"),
+            ask=Decimal("1"),
+            volume=1,
+            open_interest=100,
+            implied_volatility=Decimal("0.25"),
+            greeks=OptionGreeks(
+                delta=Decimal("-0.5"),
+                gamma=Decimal("0.08"),
+                theta=Decimal("0"),
+                vega=Decimal("0"),
+                rho=Decimal("0"),
+            ),
+        ),
+    ]
+    assert 0.05 * 10 * mult > 0 and 0.08 * 100 * mult > 0  # sanity: same crossing as above
+
+    # Without ref_date (an old caller), the fixed function falls back to the
+    # original annual-IV-only band and still finds the crossing.
+    legacy = compute_gex_profile(calls, puts, exp.isoformat(), spot, DEFAULT_GEX_CONFIG)
+    assert legacy["gamma_flip_strike"] is not None
+
+    # With ref_date, the period-scaled band correctly rejects it at 1 DTE.
+    fixed = compute_gex_profile(
+        calls, puts, exp.isoformat(), spot, DEFAULT_GEX_CONFIG, ref_date=ref_date
+    )
+    assert fixed["gamma_flip_strike"] is None
 
 
 @pytest.mark.unit
