@@ -156,7 +156,7 @@ class ImpliedMoveDetailModel(ValueObject):
 
     raw_straddle_pct: float = Field(..., alias="rawStraddlePct")
     raw_straddle_abs: float = Field(..., alias="rawStraddleAbs")
-    dte: int
+    dte: float
     annualized_iv: float = Field(..., alias="annualizedIV")
     daily_implied_move_pct: float = Field(..., alias="dailyImpliedMovePct")
     period_implied_move_pct: float = Field(..., alias="periodImpliedMovePct")

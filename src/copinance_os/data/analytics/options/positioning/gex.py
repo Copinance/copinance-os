@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from copinance_os.data.analytics.options.positioning.contracts import (
+    contract_iv_pct,
     contract_oi,
     contract_strike,
     contracts_for_expiration,
@@ -106,17 +107,30 @@ def compute_gex_profile(
     strikes_sorted = sorted(strike_to_net.keys())
     per_strike = [(k, strike_to_net[k]) for k in strikes_sorted]
 
-    gamma_flip: float | None = None
+    crossings: list[float] = []
     cumulative = 0.0
     for i, (k, gex_k) in enumerate(per_strike):
         next_cum = cumulative + gex_k
-        if i > 0 and cumulative * next_cum < 0.0:
+        if i > 0 and cumulative * next_cum <= 0.0 and cumulative != next_cum:
             k_prev, _ = per_strike[i - 1]
             span = next_cum - cumulative
             t = abs(cumulative) / max(1e-12, abs(span))
-            gamma_flip = k_prev + t * (k - k_prev)
-            break
+            crossings.append(k_prev + t * (k - k_prev))
         cumulative = next_cum
+
+    gamma_flip: float | None = None
+    if crossings:
+        iv_samples: list[float] = [
+            iv / 100.0
+            for c in contracts_for_expiration(calls, nearest_exp)
+            + contracts_for_expiration(puts, nearest_exp)
+            if (iv := contract_iv_pct(c)) is not None and iv > 0
+        ]
+        sigma = sum(iv_samples) / len(iv_samples) if iv_samples else 0.25
+        band_pct = max(0.10, 2.0 * sigma)
+        valid_crossings = [c for c in crossings if abs(c - underlying) <= band_pct * underlying]
+        if valid_crossings:
+            gamma_flip = min(valid_crossings, key=lambda c: abs(c - underlying))
 
     ranked_abs = sorted(per_strike, key=lambda kv: abs(kv[1]), reverse=True)
     profile_cap = ranked_abs[: config.profile_top_k]
