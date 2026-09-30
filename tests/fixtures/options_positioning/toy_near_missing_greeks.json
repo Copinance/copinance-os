@@ -330,9 +330,9 @@
         },
         {
           "name": "Gamma Flip Strike (nearest expiry)",
-          "value": 586.0,
-          "direction": "bullish",
-          "explanation": "Strike where cumulative per-strike GEX (calls \u2212 puts, OI-weighted, \u00d7100\u00d7spot) crosses zero on the front expiry \u2014 a common \u201cflip\u201d narrative (SqueezeMetrics-style dealer gamma; Knuteson 2021, arXiv:2006.00975).  Interpolated flip \u2248 586.00 (spot 595.00).",
+          "value": 621.0841,
+          "direction": "bearish",
+          "explanation": "Strike where cumulative per-strike GEX (calls \u2212 puts, OI-weighted, \u00d7100\u00d7spot) crosses zero on the front expiry \u2014 a common \u201cflip\u201d narrative (SqueezeMetrics-style dealer gamma; Knuteson 2021, arXiv:2006.00975).  Interpolated flip \u2248 621.08 (spot 595.00).",
           "bias_driver_key": null,
           "bias_contribution": null
         },
@@ -367,7 +367,8 @@
           "version": "v1",
           "model_family": "dealer_gamma_exposure",
           "assumptions": [
-            "Nearest listed expiry only; OI-weighted gamma with spot scaling.",
+            "Strike profile, top strikes and `gamma_balance_strike` (the strike where the running per-strike net-gamma sum crosses zero) use the nearest listed expiry only; OI-weighted gamma with spot scaling.",
+            "`gamma_flip_strike` is the zero-gamma level: spot is swept over +/-20% and every contract's Black-Scholes gamma is recomputed at each swept spot from its own IV and time to expiry; the net-gamma root nearest spot is reported. It uses the whole requested expiration window, the same set as the regime.",
             "Scope split: the net-gamma regime score (`compute_gamma_regime`) is computed over the whole book across all expirations, while the gamma-profile / gamma-flip-strike calculation (`compute_gex_profile`) is scoped to the nearest expiration only. These are different scopes computing conceptually related but distinct things."
           ],
           "limitations": [
@@ -576,7 +577,8 @@
     "dollar_put_volume": 141750.0,
     "dollar_call_flow_share": 0.5263
   },
-  "gamma_flip_strike": 586.0,
+  "gamma_flip_strike": 621.0841,
+  "gamma_balance_strike": 586.0,
   "gex_profile": [
     {
       "strike": 590.0,
@@ -656,7 +658,7 @@
   "implied_move_detail": {
     "raw_straddle_pct": 0.3529,
     "raw_straddle_abs": 2.1,
-    "dte": 7,
+    "dte": 7.0,
     "annualized_iv": 3.1937,
     "daily_implied_move_pct": 0.2012,
     "period_implied_move_pct": 0.4423,
@@ -677,7 +679,7 @@
       }
     }
   },
-  "signal_agreement": "moderate_bullish",
+  "signal_agreement": "moderate_bearish",
   "vanna_exposure": {
     "net_vanna": 0.0,
     "call_vanna_exposure": 0.0,
