@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
 
+from copinance_os.data.analytics.options.greeks.config import DEFAULT_RISK_FREE_RATE
 from copinance_os.data.analytics.options.positioning.contracts import (
     contract_iv_pct,
     contract_oi,
@@ -27,6 +30,11 @@ DEFAULT_GEX_TOP_NEGATIVE_K = 5
 DEFAULT_GAMMA_REGIME_THRESHOLD = 0.06
 
 
+# Spot sweep for the zero-gamma level: +/- this fraction of spot, in fixed steps.
+ZERO_GAMMA_SWEEP_BAND = 0.20
+ZERO_GAMMA_SWEEP_STEPS = 160
+
+
 @dataclass(frozen=True, slots=True)
 class GexConfig:
     profile_top_k: int = DEFAULT_GEX_PROFILE_TOP_K
@@ -44,7 +52,14 @@ def gex_methodology(config: GexConfig) -> MethodologySpec:
         version="v1",
         model_family="dealer_gamma_exposure",
         assumptions=(
-            "Nearest listed expiry only; OI-weighted gamma with spot scaling.",
+            "Strike profile, top strikes and `gamma_balance_strike` (the strike where the "
+            "running per-strike net-gamma sum crosses zero) use the nearest listed expiry "
+            "only; OI-weighted gamma with spot scaling.",
+            "`gamma_flip_strike` is the zero-gamma level: spot is swept over +/-"
+            f"{int(ZERO_GAMMA_SWEEP_BAND * 100)}% and every contract's Black-Scholes gamma "
+            "is recomputed at each swept spot from its own IV and time to expiry; the "
+            "net-gamma root nearest spot is reported. It uses the whole requested "
+            "expiration window, the same set as the regime.",
             "Scope split: the net-gamma regime score (`compute_gamma_regime`) is "
             "computed over the whole book across all expirations, while the "
             "gamma-profile / gamma-flip-strike calculation (`compute_gex_profile`) is "
@@ -60,6 +75,70 @@ def gex_methodology(config: GexConfig) -> MethodologySpec:
     )
 
 
+def _bsm_gamma(spot: float, strike: float, sigma: float, t: float, r: float) -> float:
+    sqrt_t = math.sqrt(t)
+    d1 = (math.log(spot / strike) + (r + 0.5 * sigma * sigma) * t) / (sigma * sqrt_t)
+    pdf = math.exp(-0.5 * d1 * d1) / math.sqrt(2.0 * math.pi)
+    return pdf / (spot * sigma * sqrt_t)
+
+
+def compute_zero_gamma_level(
+    calls: list[OptionContract],
+    puts: list[OptionContract],
+    underlying: float,
+    ref_date: date,
+    expirations: Collection[str] | None = None,
+) -> float | None:
+    """Spot level where dealer net gamma changes sign, nearest to ``underlying``.
+
+    Each contract's gamma is recomputed at every swept spot from its own IV and time to
+    expiry (calls add, puts subtract, weighted by OI), so the result reflects how
+    hedging flips as price moves rather than a cumulative sum over strikes at today's
+    spot. Returns ``None`` when no contract has usable IV/OI or the sign never changes
+    within the sweep band.
+    """
+    if underlying <= 0:
+        return None
+    legs: list[tuple[float, float, float, float]] = []  # (sign*oi, strike, sigma, t)
+    for sign, contracts in ((1.0, calls), (-1.0, puts)):
+        for c in contracts:
+            if expirations is not None and c.expiration_date.isoformat() not in expirations:
+                continue
+            oi = contract_oi(c)
+            iv_pct = contract_iv_pct(c)
+            strike = contract_strike(c)
+            if oi is None or oi <= 0 or iv_pct is None or strike <= 0:
+                continue
+            days = (c.expiration_date - ref_date).days
+            if days < 0:
+                continue
+            legs.append((sign * float(oi), strike, iv_pct / 100.0, max(days, 1) / 365.0))
+    if not legs:
+        return None
+    r = float(DEFAULT_RISK_FREE_RATE)
+
+    def net(spot: float) -> float:
+        # Dollar gamma (spot^2 weighting) so the sign matches the dollar GEX shown.
+        return sum(w * _bsm_gamma(spot, k, sig, t, r) for w, k, sig, t in legs) * spot * spot
+
+    step = 2.0 * ZERO_GAMMA_SWEEP_BAND * underlying / ZERO_GAMMA_SWEEP_STEPS
+    spots = [
+        underlying * (1.0 - ZERO_GAMMA_SWEEP_BAND) + i * step
+        for i in range(ZERO_GAMMA_SWEEP_STEPS + 1)
+    ]
+    values = [net(x) for x in spots]
+    roots: list[float] = []
+    for i in range(len(spots) - 1):
+        a, b = values[i], values[i + 1]
+        if a == 0.0:
+            roots.append(spots[i])
+        elif a * b < 0.0:
+            roots.append(spots[i] + step * abs(a) / (abs(a) + abs(b)))
+    if not roots:
+        return None
+    return min(roots, key=lambda x: abs(x - underlying))
+
+
 def compute_gex_profile(
     calls: list[OptionContract],
     puts: list[OptionContract],
@@ -67,10 +146,12 @@ def compute_gex_profile(
     underlying: float,
     config: GexConfig = DEFAULT_GEX_CONFIG,
     ref_date: date | None = None,
+    window_expirations: Collection[str] | None = None,
 ) -> dict[str, Any]:
     if not nearest_exp or underlying <= 0:
         return {
             "gamma_flip_strike": None,
+            "gamma_balance_strike": None,
             "gex_profile": [],
             "top_positive_gex": [],
             "top_negative_gex": [],
@@ -93,6 +174,7 @@ def compute_gex_profile(
     if not strike_to_net:
         return {
             "gamma_flip_strike": None,
+            "gamma_balance_strike": None,
             "gex_profile": [],
             "top_positive_gex": [],
             "top_negative_gex": [],
@@ -101,6 +183,7 @@ def compute_gex_profile(
     if not any(abs(v) > 1e-9 for v in strike_to_net.values()):
         return {
             "gamma_flip_strike": None,
+            "gamma_balance_strike": None,
             "gex_profile": [],
             "top_positive_gex": [],
             "top_negative_gex": [],
@@ -120,7 +203,7 @@ def compute_gex_profile(
             crossings.append(k_prev + t * (k - k_prev))
         cumulative = next_cum
 
-    gamma_flip: float | None = None
+    gamma_balance: float | None = None
     if crossings:
         iv_samples: list[float] = [
             iv / 100.0
@@ -143,7 +226,13 @@ def compute_gex_profile(
         band_pct = max(0.10, 2.0 * period_sigma)
         valid_crossings = [c for c in crossings if abs(c - underlying) <= band_pct * underlying]
         if valid_crossings:
-            gamma_flip = min(valid_crossings, key=lambda c: abs(c - underlying))
+            gamma_balance = min(valid_crossings, key=lambda c: abs(c - underlying))
+
+    gamma_flip = (
+        compute_zero_gamma_level(calls, puts, underlying, ref_date, window_expirations)
+        if ref_date is not None
+        else None
+    )
 
     ranked_abs = sorted(per_strike, key=lambda kv: abs(kv[1]), reverse=True)
     profile_cap = ranked_abs[: config.profile_top_k]
@@ -160,6 +249,7 @@ def compute_gex_profile(
 
     return {
         "gamma_flip_strike": round(gamma_flip, 4) if gamma_flip is not None else None,
+        "gamma_balance_strike": round(gamma_balance, 4) if gamma_balance is not None else None,
         "gex_profile": gex_profile,
         "top_positive_gex": top_pos,
         "top_negative_gex": top_neg,

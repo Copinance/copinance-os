@@ -28,6 +28,7 @@ from copinance_os.data.analytics.options.positioning.gex import (
     DEFAULT_GEX_CONFIG,
     compute_gamma_regime,
     compute_gex_profile,
+    compute_zero_gamma_level,
     gex_methodology,
 )
 from copinance_os.data.analytics.options.positioning.math import sigmoid
@@ -386,7 +387,10 @@ def test_gex_per_strike_matches_toy(toy_chain: tuple) -> None:
     assert by_k[590.0] == pytest.approx(3_451_000.0, rel=1e-6)
     assert by_k[580.0] == pytest.approx(1_190_000.0, rel=1e-6)
     assert by_k[600.0] == pytest.approx(1_309_000.0, rel=1e-6)
-    assert raw["gamma_flip_strike"] is None
+    # Cumulative per-strike sums never cross zero (all strikes are net positive), but the
+    # spot sweep finds the true zero-gamma level above spot.
+    assert raw["gamma_balance_strike"] is None
+    assert raw["gamma_flip_strike"] == pytest.approx(621.0841, rel=1e-4)
 
 
 @pytest.mark.unit
@@ -461,10 +465,12 @@ def test_gamma_flip_interpolated() -> None:
     raw = _build_pos_dict(
         chain, calls, puts, {"current_price": spot}, "GF", "near", as_of_date=date(2026, 3, 1)
     )
+    # The old cumulative-crossing strike is preserved as ``gamma_balance_strike``.
+    assert float(raw["gamma_balance_strike"]) == pytest.approx(106.25, rel=1e-4)
     flip = raw["gamma_flip_strike"]
     assert flip is not None
-    assert float(flip) == pytest.approx(106.25, rel=1e-4)
-    # Spot (150) is above the flip strike (~106.25), so gamma-flip-vs-spot casts a
+    assert float(flip) == pytest.approx(126.4133, rel=1e-4)
+    # Spot (150) is above the flip level (~126.4), so gamma-flip-vs-spot casts a
     # genuine directional vote here -- unlike net-gamma/gamma-regime, which never do.
     gamma_signals = raw["signal_categories"]["gamma"]["signals"]
     flip_row = next(
@@ -535,13 +541,13 @@ def test_gamma_flip_band_scales_with_expiry_period_not_annual_iv() -> None:
     # Without ref_date (an old caller), the fixed function falls back to the
     # original annual-IV-only band and still finds the crossing.
     legacy = compute_gex_profile(calls, puts, exp.isoformat(), spot, DEFAULT_GEX_CONFIG)
-    assert legacy["gamma_flip_strike"] is not None
+    assert legacy["gamma_balance_strike"] is not None
 
     # With ref_date, the period-scaled band correctly rejects it at 1 DTE.
     fixed = compute_gex_profile(
         calls, puts, exp.isoformat(), spot, DEFAULT_GEX_CONFIG, ref_date=ref_date
     )
-    assert fixed["gamma_flip_strike"] is None
+    assert fixed["gamma_balance_strike"] is None
 
 
 @pytest.mark.unit
@@ -1138,7 +1144,9 @@ def test_signal_agreement_strong_bullish_on_toy(toy_chain: tuple) -> None:
     raw = _build_pos_dict(
         chain, calls, puts, {"current_price": 595.0}, "SPY", "near", as_of_date=TOY_AS_OF
     )
-    assert raw["signal_agreement"] == "strong_bullish"
+    # Spot (595) sits below the true zero-gamma level (~621), which casts a bearish
+    # gamma-flip vote and tempers the otherwise strongly bullish agreement.
+    assert raw["signal_agreement"] == "moderate_bullish"
 
 
 @pytest.mark.unit
@@ -1792,3 +1800,50 @@ def test_build_options_positioning_includes_new_sections() -> None:
     assert model.charm_exposure is not None
     assert model.moneyness_summary is not None
     assert model.pin_risk is None
+
+
+def _gamma_leg(side: OptionSide, strike: str, oi: int, iv: str, exp: date) -> OptionContract:
+    return OptionContract(
+        underlying_symbol="ZG",
+        contract_symbol=f"ZG{strike}{side.value}",
+        side=side,
+        strike=Decimal(strike),
+        expiration_date=exp,
+        bid=Decimal("1"),
+        ask=Decimal("1"),
+        volume=1,
+        open_interest=oi,
+        implied_volatility=Decimal(iv),
+    )
+
+
+@pytest.mark.unit
+def test_zero_gamma_level_sits_between_put_wall_and_call_wall() -> None:
+    exp = date(2026, 4, 17)
+    ref = date(2026, 3, 20)
+    calls = [_gamma_leg(OptionSide.CALL, "110", 1000, "0.3", exp)]
+    puts = [_gamma_leg(OptionSide.PUT, "90", 1000, "0.3", exp)]
+    # Symmetric walls: the two gammas cancel at the midpoint.
+    level = compute_zero_gamma_level(calls, puts, 105.0, ref)
+    assert level is not None and 90.0 < level < 110.0
+
+
+@pytest.mark.unit
+def test_zero_gamma_level_respects_expiration_window() -> None:
+    near, far = date(2026, 4, 17), date(2026, 6, 19)
+    ref = date(2026, 3, 20)
+    calls = [_gamma_leg(OptionSide.CALL, "110", 1000, "0.3", near)]
+    puts = [_gamma_leg(OptionSide.PUT, "90", 1000, "0.3", near)]
+    # A far-dated put wall outside the window must not move the level.
+    far_puts = [_gamma_leg(OptionSide.PUT, "95", 50_000, "0.3", far)]
+    base = compute_zero_gamma_level(calls, puts, 105.0, ref, {near.isoformat()})
+    windowed = compute_zero_gamma_level(calls, puts + far_puts, 105.0, ref, {near.isoformat()})
+    assert base == windowed
+
+
+@pytest.mark.unit
+def test_zero_gamma_level_is_none_when_only_one_sign_exists() -> None:
+    exp = date(2026, 4, 17)
+    calls = [_gamma_leg(OptionSide.CALL, "100", 1000, "0.3", exp)]
+    assert compute_zero_gamma_level(calls, [], 100.0, date(2026, 3, 20)) is None
+    assert compute_zero_gamma_level([], [], 100.0, date(2026, 3, 20)) is None

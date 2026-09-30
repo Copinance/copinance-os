@@ -146,6 +146,26 @@ def _safe_int(value: Any) -> int | None:
     return None
 
 
+def _observed_at(info: dict[str, Any], hist: Any) -> str | None:
+    """Time of the price actually returned: last 1-minute bar, else ``regularMarketTime``."""
+    try:
+        if hist is not None and not hist.empty:
+            ts = hist.index[-1]
+            parsed = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            if isinstance(parsed, datetime):
+                return (
+                    (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC))
+                    .astimezone(UTC)
+                    .isoformat()
+                )
+    except Exception:  # noqa: BLE001 - fall through to the info field
+        pass
+    raw = info.get("regularMarketTime")
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return datetime.fromtimestamp(raw, UTC).isoformat()
+    return None
+
+
 class YFinanceMarketProvider(MarketDataProvider):
     """yfinance implementation of MarketDataProvider.
 
@@ -231,7 +251,9 @@ class YFinanceMarketProvider(MarketDataProvider):
                 "market_cap": int(info.get("marketCap", 0)) if info.get("marketCap") else None,
                 "currency": info.get("currency", "USD"),
                 "exchange": info.get("exchange", ""),
-                "timestamp": datetime.now(UTC).isoformat(),
+                # Exchange observation time, never the fetch time: a closed-market quote
+                # carries the last session's price and must not look fresh.
+                "timestamp": _observed_at(info, hist),
                 "beta": Decimal(str(info["beta"])) if info.get("beta") is not None else None,
                 "quoteType": info.get("quoteType"),
             }

@@ -98,7 +98,13 @@ def compose_options_positioning_payload(
     dollar_metrics_dict = compute_dollar_metrics(window_calls, window_puts, mc.dollar)
     delta_exposure_dict = compute_delta_exposure(window_calls, window_puts, underlying, mc.delta)
     gex_bundle = compute_gex_profile(
-        calls, puts, nearest_exp, underlying, mc.gex, ref_date=ref_date
+        calls,
+        puts,
+        nearest_exp,
+        underlying,
+        mc.gex,
+        ref_date=ref_date,
+        window_expirations=window_exp_set,
     )
     oi_enhanced_bundle = oi_clusters_enhanced(calls, puts, nearest_exp, top_n=mc.oi_clusters.top_n)
     vanna_bundle = compute_vanna_exposure(calls, puts, nearest_exp, underlying, mc.vanna)
@@ -609,6 +615,7 @@ def compose_options_positioning_payload(
             "methodology": component_specs["dollar_metrics"],
         },
         "gamma_flip_strike": gf_strike,
+        "gamma_balance_strike": gex_bundle["gamma_balance_strike"],
         "gex_profile": gex_bundle["gex_profile"],
         "top_positive_gex": gex_bundle["top_positive_gex"],
         "top_negative_gex": gex_bundle["top_negative_gex"],

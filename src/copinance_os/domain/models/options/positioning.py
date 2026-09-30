@@ -282,6 +282,7 @@ class OptionsPositioningResult(ValueObject):
     data_quality: float | None = Field(default=None, ge=0, le=1, alias="dataQuality")
     dollar_metrics: DollarMetricsModel | None = Field(default=None, alias="dollarMetrics")
     gamma_flip_strike: float | None = Field(default=None, alias="gammaFlipStrike")
+    gamma_balance_strike: float | None = Field(default=None, alias="gammaBalanceStrike")
     gex_profile: list[GEXStrikeModel] = Field(default_factory=list, alias="gexProfile")
     top_positive_gex: list[GEXStrikeModel] = Field(default_factory=list, alias="topPositiveGex")
     top_negative_gex: list[GEXStrikeModel] = Field(default_factory=list, alias="topNegativeGex")
