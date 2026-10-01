@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
@@ -26,6 +26,7 @@ from copinance_os.data.analytics.options.positioning.compose import _collapse_du
 from copinance_os.data.analytics.options.positioning.contracts import contract_iv_pct
 from copinance_os.data.analytics.options.positioning.gex import (
     DEFAULT_GEX_CONFIG,
+    _years_to_close,
     compute_gamma_regime,
     compute_gex_profile,
     compute_zero_gamma_level,
@@ -1151,15 +1152,15 @@ def test_signal_agreement_strong_bullish_on_toy(toy_chain: tuple) -> None:
 
 @pytest.mark.unit
 def test_gex_methodology_documents_scope_split() -> None:
-    """Regime is scored over the whole book; profile/flip-strike is nearest-expiry
-    only. This scope split is confusing enough (two related-but-different scopes)
-    that the methodology spec must call it out explicitly.
+    """Regime and flip share the requested expiration window; profile/balance strike is
+    nearest-expiry only. This scope split is confusing enough that the methodology spec
+    must call it out explicitly.
     """
     spec = gex_methodology(DEFAULT_GEX_CONFIG)
     assumptions_text = " ".join(spec.assumptions).lower()
-    assert "whole book" in assumptions_text
-    assert "all expirations" in assumptions_text
+    assert "whole requested expiration window" in assumptions_text
     assert "nearest expiration" in assumptions_text
+    assert "whole book" not in assumptions_text
 
 
 @pytest.mark.unit
@@ -1847,3 +1848,37 @@ def test_zero_gamma_level_is_none_when_only_one_sign_exists() -> None:
     calls = [_gamma_leg(OptionSide.CALL, "100", 1000, "0.3", exp)]
     assert compute_zero_gamma_level(calls, [], 100.0, date(2026, 3, 20)) is None
     assert compute_zero_gamma_level([], [], 100.0, date(2026, 3, 20)) is None
+
+
+@pytest.mark.unit
+def test_zero_gamma_level_skips_implausible_iv_placeholders() -> None:
+    exp = date(2026, 4, 17)
+    ref = date(2026, 3, 20)
+    calls = [_gamma_leg(OptionSide.CALL, "110", 1000, "0.3", exp)]
+    puts = [_gamma_leg(OptionSide.PUT, "90", 1000, "0.3", exp)]
+    base = compute_zero_gamma_level(calls, puts, 105.0, ref)
+    # A 3.125% placeholder IV at the money would otherwise dominate the sweep with a
+    # huge false gamma spike.
+    junk = [_gamma_leg(OptionSide.CALL, "105", 500_000, "0.03125", exp)]
+    too_high = [_gamma_leg(OptionSide.PUT, "105", 500_000, "6.0", exp)]
+    assert compute_zero_gamma_level(calls + junk, puts + too_high, 105.0, ref) == base
+
+
+@pytest.mark.unit
+def test_zero_gamma_years_to_close_uses_the_fraction_of_the_day_left() -> None:
+    ref = date(2026, 3, 20)
+    # 15:00 EDT == 19:00 UTC: one hour before the 16:00 ET close.
+    one_hour = _years_to_close(ref, datetime(2026, 3, 20, 19, 0, tzinfo=UTC))
+    assert one_hour == pytest.approx(1.0 / (365.0 * 24.0))
+    # After the close the life is floored, never zero or negative.
+    assert _years_to_close(ref, datetime(2026, 3, 20, 21, 0, tzinfo=UTC)) > 0.0
+
+
+@pytest.mark.unit
+def test_zero_gamma_level_handles_zero_dte_contracts() -> None:
+    ref = date(2026, 3, 20)
+    calls = [_gamma_leg(OptionSide.CALL, "110", 1000, "0.3", ref)]
+    puts = [_gamma_leg(OptionSide.PUT, "90", 1000, "0.3", ref)]
+    now = datetime(2026, 3, 20, 17, 0, tzinfo=UTC)
+    level = compute_zero_gamma_level(calls, puts, 100.0, ref, now=now)
+    assert level is not None and 90.0 < level < 110.0

@@ -416,7 +416,7 @@ def compose_options_positioning_payload(
     )
 
     gamma_sigs, _net_g, regime, regime_explanation = compute_gamma_regime(
-        calls, puts, underlying, lit, mc.gex
+        window_calls, window_puts, underlying, lit, mc.gex
     )
 
     gf_strike = gex_bundle["gamma_flip_strike"]
