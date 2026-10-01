@@ -6,8 +6,9 @@ import math
 from collections import defaultdict
 from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 from copinance_os.data.analytics.options.greeks.config import DEFAULT_RISK_FREE_RATE
 from copinance_os.data.analytics.options.positioning.contracts import (
@@ -33,6 +34,15 @@ DEFAULT_GAMMA_REGIME_THRESHOLD = 0.06
 # Spot sweep for the zero-gamma level: +/- this fraction of spot, in fixed steps.
 ZERO_GAMMA_SWEEP_BAND = 0.20
 ZERO_GAMMA_SWEEP_STEPS = 160
+# Plausible implied-vol band (percent) for the sweep. Placeholder quotes such as 3.125% or
+# 0.01% create false gamma spikes at the strike; an IV above 500% is a data error.
+ZERO_GAMMA_MIN_IV_PCT = 5.0
+ZERO_GAMMA_MAX_IV_PCT = 500.0
+# A 0-DTE contract's remaining life is the time to the 16:00 ET close, floored so a quote
+# read right at the close does not send gamma to infinity.
+_US_CLOSE_ET = time(16, 0)
+_ET = ZoneInfo("America/New_York")
+_MIN_ZERO_DTE_YEARS = 15.0 / (365.0 * 24.0 * 60.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,13 +68,14 @@ def gex_methodology(config: GexConfig) -> MethodologySpec:
             "`gamma_flip_strike` is the zero-gamma level: spot is swept over +/-"
             f"{int(ZERO_GAMMA_SWEEP_BAND * 100)}% and every contract's Black-Scholes gamma "
             "is recomputed at each swept spot from its own IV and time to expiry; the "
-            "net-gamma root nearest spot is reported. It uses the whole requested "
-            "expiration window, the same set as the regime.",
-            "Scope split: the net-gamma regime score (`compute_gamma_regime`) is "
-            "computed over the whole book across all expirations, while the "
-            "gamma-profile / gamma-flip-strike calculation (`compute_gex_profile`) is "
-            "scoped to the nearest expiration only. These are different scopes "
-            "computing conceptually related but distinct things.",
+            "net-gamma root nearest spot is reported. Contracts with IV outside "
+            f"{ZERO_GAMMA_MIN_IV_PCT:g}-{ZERO_GAMMA_MAX_IV_PCT:g}% are skipped, and a "
+            "0-DTE contract's time to expiry is the fraction of a year left until the "
+            "16:00 ET close.",
+            "Scope split: the net-gamma regime score (`compute_gamma_regime`) and the "
+            "gamma-flip strike both use the whole requested expiration window; the "
+            "strike profile, top strikes and `gamma_balance_strike` "
+            "(`compute_gex_profile`) are scoped to the nearest expiration only.",
         ),
         limitations=("Dealer positioning is inferred heuristically from public chain data.",),
         references=(),
@@ -82,12 +93,21 @@ def _bsm_gamma(spot: float, strike: float, sigma: float, t: float, r: float) -> 
     return pdf / (spot * sigma * sqrt_t)
 
 
+def _years_to_close(ref_date: date, now: datetime | None) -> float:
+    """Fraction of a year from ``now`` to the 16:00 ET close on ``ref_date`` (floored)."""
+    at = (now or datetime.now(UTC)).astimezone(_ET)
+    close = datetime.combine(ref_date, _US_CLOSE_ET, _ET)
+    remaining = (close - at) / timedelta(days=365)
+    return max(remaining, _MIN_ZERO_DTE_YEARS)
+
+
 def compute_zero_gamma_level(
     calls: list[OptionContract],
     puts: list[OptionContract],
     underlying: float,
     ref_date: date,
     expirations: Collection[str] | None = None,
+    now: datetime | None = None,
 ) -> float | None:
     """Spot level where dealer net gamma changes sign, nearest to ``underlying``.
 
@@ -95,10 +115,12 @@ def compute_zero_gamma_level(
     expiry (calls add, puts subtract, weighted by OI), so the result reflects how
     hedging flips as price moves rather than a cumulative sum over strikes at today's
     spot. Returns ``None`` when no contract has usable IV/OI or the sign never changes
-    within the sweep band.
+    within the sweep band. ``now`` (default: current time) fixes the remaining life of
+    0-DTE contracts.
     """
     if underlying <= 0:
         return None
+    zero_dte_years = _years_to_close(ref_date, now)
     legs: list[tuple[float, float, float, float]] = []  # (sign*oi, strike, sigma, t)
     for sign, contracts in ((1.0, calls), (-1.0, puts)):
         for c in contracts:
@@ -109,10 +131,13 @@ def compute_zero_gamma_level(
             strike = contract_strike(c)
             if oi is None or oi <= 0 or iv_pct is None or strike <= 0:
                 continue
+            if not ZERO_GAMMA_MIN_IV_PCT <= iv_pct <= ZERO_GAMMA_MAX_IV_PCT:
+                continue
             days = (c.expiration_date - ref_date).days
             if days < 0:
                 continue
-            legs.append((sign * float(oi), strike, iv_pct / 100.0, max(days, 1) / 365.0))
+            years = zero_dte_years if days == 0 else days / 365.0
+            legs.append((sign * float(oi), strike, iv_pct / 100.0, years))
     if not legs:
         return None
     r = float(DEFAULT_RISK_FREE_RATE)

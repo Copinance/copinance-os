@@ -368,8 +368,8 @@
           "model_family": "dealer_gamma_exposure",
           "assumptions": [
             "Strike profile, top strikes and `gamma_balance_strike` (the strike where the running per-strike net-gamma sum crosses zero) use the nearest listed expiry only; OI-weighted gamma with spot scaling.",
-            "`gamma_flip_strike` is the zero-gamma level: spot is swept over +/-20% and every contract's Black-Scholes gamma is recomputed at each swept spot from its own IV and time to expiry; the net-gamma root nearest spot is reported. It uses the whole requested expiration window, the same set as the regime.",
-            "Scope split: the net-gamma regime score (`compute_gamma_regime`) is computed over the whole book across all expirations, while the gamma-profile / gamma-flip-strike calculation (`compute_gex_profile`) is scoped to the nearest expiration only. These are different scopes computing conceptually related but distinct things."
+            "`gamma_flip_strike` is the zero-gamma level: spot is swept over +/-20% and every contract's Black-Scholes gamma is recomputed at each swept spot from its own IV and time to expiry; the net-gamma root nearest spot is reported. Contracts with IV outside 5-500% are skipped, and a 0-DTE contract's time to expiry is the fraction of a year left until the 16:00 ET close.",
+            "Scope split: the net-gamma regime score (`compute_gamma_regime`) and the gamma-flip strike both use the whole requested expiration window; the strike profile, top strikes and `gamma_balance_strike` (`compute_gex_profile`) are scoped to the nearest expiration only."
           ],
           "limitations": [
             "Dealer positioning is inferred heuristically from public chain data."
