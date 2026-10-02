@@ -68,6 +68,18 @@ def resolve_financial_literacy(value: FinancialLiteracy | str | None) -> Financi
         return DEFAULT_LITERACY_FOR_ANALYSIS_OUTPUT
 
 
+def require_financial_literacy(value: FinancialLiteracy | str | None) -> FinancialLiteracy:
+    """Resolve an explicit tier, raising instead of inventing a user literacy level."""
+    if value is None:
+        raise ValueError("financial_literacy is required for literacy-adapted output")
+    if isinstance(value, FinancialLiteracy):
+        return value
+    try:
+        return FinancialLiteracy(str(value).strip().lower())
+    except ValueError as exc:
+        raise ValueError(f"invalid financial_literacy: {value!r}") from exc
+
+
 def financial_literacy_prompt_value(value: FinancialLiteracy | str | None) -> str:
     """Return the stable string token for LLM system/user templates (e.g. ``{financial_literacy}``)."""
     return resolve_financial_literacy(value).value

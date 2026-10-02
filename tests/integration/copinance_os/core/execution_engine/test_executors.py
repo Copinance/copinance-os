@@ -30,7 +30,7 @@ class TestEndToEndExecutors:
             timeframe=JobTimeframe.MID_TERM,
             execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
-        response = await runner.run_job(job, {})
+        response = await runner.run_job(job, {"financial_literacy": "intermediate"})
 
         assert response.success is True
         assert response.results is not None
@@ -51,7 +51,10 @@ class TestEndToEndExecutors:
             execution_type=INSTRUMENT_QUESTION_DRIVEN_TYPE,
         )
         # Pass a question so execution reaches the LLM check; without it we get "Question is required" first
-        context = {"question": "What is the short-term outlook for MSFT?"}
+        context = {
+            "question": "What is the short-term outlook for MSFT?",
+            "financial_literacy": "intermediate",
+        }
         response = await runner.run_job(job, context)
 
         assert response.success is True
@@ -80,7 +83,7 @@ class TestEndToEndExecutors:
             timeframe=JobTimeframe.MID_TERM,
             execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
-        response = await runner.run_job(job, {})
+        response = await runner.run_job(job, {"financial_literacy": "intermediate"})
 
         assert response.success is True
         assert response.results is not None

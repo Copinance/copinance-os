@@ -581,9 +581,11 @@ fund_res = await fundamentals_uc.execute(
 
 ```python
 from copinance_os.research.workflows.analyze import (
+    AnalysisOutputMode,
     AnalyzeInstrumentRequest,
     AnalyzeMarketRequest,
 )
+from copinance_os import FinancialLiteracy
 from copinance_os.domain.models.market import MarketType
 
 # Deterministic equity analysis
@@ -612,7 +614,11 @@ options_res = await instrument_uc.execute(
 # Deterministic macro / market regime analysis
 market_uc = container.analyze_market_use_case()
 macro_res = await market_uc.execute(
-    AnalyzeMarketRequest(market_index="SPY", lookback_days=90)
+    AnalyzeMarketRequest(
+        market_index="SPY",
+        lookback_days=90,
+        output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+    )
 )
 
 # Question-driven market analysis
@@ -620,6 +626,7 @@ market_question_res = await market_uc.execute(
     AnalyzeMarketRequest(
         market_index="SPY",
         question="Is this a risk-on or risk-off regime?",
+        financial_literacy=FinancialLiteracy.INTERMEDIATE,
     )
 )
 ```
@@ -823,7 +830,7 @@ Request and mode types are defined in **`copinance_os.domain.models.analysis`** 
 | Use case | Request | Response | Request fields |
 |----------|---------|----------|----------------|
 | Analyze instrument | `AnalyzeInstrumentRequest` | `RunJobResult` | `symbol` (required), `market_type` (`MarketType.EQUITY` / `OPTIONS`, default `EQUITY`), `timeframe` (optional; defaults by market type), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `expiration_date` (optional YYYY-MM-DD), **`expiration_dates`** (optional list of YYYY-MM-DD; merged with `expiration_date`), `option_side`, **`positioning_window`** (`"near"` \| `"mid"`; options only), `profile_id`, **`financial_literacy`** (`FinancialLiteracy` or `None`; takes precedence over profile), `include_prompt_in_results`, `stream` |
-| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`conversation_history`** (optional; multi-turn question-driven only), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, **`financial_literacy`** (`FinancialLiteracy` or `None`; takes precedence over profile), `include_prompt_in_results`, `stream` |
+| Analyze market | `AnalyzeMarketRequest` | `RunJobResult` | `market_index` (default `"SPY"`), `timeframe` (default `MID_TERM`), `question`, `mode` (`auto` / `deterministic` / `question_driven`), **`output_mode`** (`literacy_adapted` / `canonical_facts`; canonical facts is deterministic and accepts no audience), **`conversation_history`** (optional; multi-turn question-driven only), `lookback_days` (default `252`, 1–2520), `include_vix`, `include_market_breadth`, `include_sector_rotation`, `include_rates`, `include_credit`, `include_commodities`, `include_labor`, `include_housing`, `include_manufacturing`, `include_consumer`, `include_global`, `include_advanced`, `profile_id`, **`financial_literacy`** (`FinancialLiteracy` or `None`; required for literacy-adapted output unless supplied by the profile), `include_prompt_in_results`, `stream` |
 
 **Ports for custom runners:** `AnalyzeInstrumentRunner` and `AnalyzeMarketRunner` in **`copinance_os.domain.ports.analysis_execution`** — each: `async def run(self, request: ...Request) -> RunJobResult`.
 

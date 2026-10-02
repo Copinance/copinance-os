@@ -15,14 +15,14 @@ from copinance_os.research.workflows.profile import (
 )
 
 
-async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID | None:
+async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID:
     """Ensure user has a profile with a literacy level for personalized analysis.
 
     Args:
         profile_id: Optional explicit profile ID. If provided, no prompting occurs.
 
     Returns:
-        A profile ID if available, otherwise None.
+        A profile ID with an explicit financial literacy level.
     """
     console = Console()
     if profile_id is not None:
@@ -50,9 +50,9 @@ async def ensure_profile_with_literacy(profile_id: UUID | None = None) -> UUID |
         "\nWould you like to set your financial literacy level now?", default=True
     ):
         console.print(
-            "\n[yellow]Continuing without profile. Analysis will use default settings.[/yellow]"
+            "\n[yellow]Analysis cancelled: a financial literacy level is required.[/yellow]"
         )
-        return None
+        raise typer.Abort()
 
     # Prompt for literacy level
     console.print("\nSelect your financial literacy level:")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 import typer.testing
@@ -18,7 +19,7 @@ def test_analyze_positioning_json_stdout(
     mock_get_container: MagicMock,
     mock_ensure_profile: MagicMock,
 ) -> None:
-    mock_ensure_profile.return_value = None
+    mock_ensure_profile.return_value = UUID(int=1)
     mock_uc = MagicMock()
     mock_uc.execute = AsyncMock(
         return_value=RunJobResult(

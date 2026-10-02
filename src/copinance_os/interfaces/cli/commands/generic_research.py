@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from copinance_os.domain.models.analysis import AnalyzeMarketRequest, AnalyzeMode
+from copinance_os.domain.models.analysis import (
+    AnalysisOutputMode,
+    AnalyzeMarketRequest,
+    AnalyzeMode,
+)
 from copinance_os.domain.models.job import JobTimeframe
 from copinance_os.interfaces.cli.shared.container_access import get_container
 from copinance_os.interfaces.cli.shared.error_handler import handle_cli_error
@@ -33,6 +37,7 @@ async def run_generic_research(
         timeframe=JobTimeframe.MID_TERM,
         question=question,
         mode=AnalyzeMode.AUTO,
+        output_mode=AnalysisOutputMode.LITERACY_ADAPTED,
         lookback_days=252,
         include_vix=True,
         include_market_breadth=True,

@@ -1,6 +1,6 @@
 # Financial literacy integration guide
 
-Copinance OS adapts every text output — LLM responses, regime labels, report summaries, options narration — to the caller's financial literacy tier. This guide covers the three ways to set literacy, how the precedence chain works, and what each tier actually produces.
+Copinance OS adapts user-facing text — LLM responses, regime labels, report summaries, options narration — to the caller's financial literacy tier. Shared market-data workflows can instead request canonical facts, which contain stable machine-facing values and no literacy-adapted prose. This guide covers both contracts.
 
 ---
 
@@ -12,7 +12,7 @@ Copinance OS adapts every text output — LLM responses, regime labels, report s
 | `"intermediate"` | `FinancialLiteracy.INTERMEDIATE` | Standard market vocabulary; brief glosses for niche concepts; light structure |
 | `"advanced"` | `FinancialLiteracy.ADVANCED` | Institutional vocabulary; second-order effects; options structure; no tutorial copy |
 
-The default when nothing is set is **`intermediate`**.
+User-facing market analysis has no default tier. It requires either an explicit `financial_literacy` value or a profile that supplies one.
 
 ---
 
@@ -22,11 +22,28 @@ The default when nothing is set is **`intermediate`**.
 AnalyzeInstrumentRequest.financial_literacy   ← highest priority
   (also: AnalyzeMarketRequest, MarketNarrativeRequest, GenerateCuratedQuestionsRequest)
   └─ AnalysisProfile.financial_literacy       ← used when request field is None
-       └─ intermediate (DEFAULT)              ← used when no profile is attached
-                                                (logs a WARNING)
+       └─ validation error                     ← market analysis without an audience
 ```
 
 The request field always wins. You do not need a profile to set literacy.
+
+### Shared, non-user market analysis
+
+Background ingestion and other shared-data workflows must not invent a user literacy level. Use canonical-facts mode instead:
+
+```python
+from copinance_os import AnalysisOutputMode, AnalyzeMarketRequest
+
+result = await container.analyze_market_use_case().execute(
+    AnalyzeMarketRequest(
+        market_index="SPY",
+        mode="deterministic",
+        output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+    )
+)
+```
+
+Canonical-facts mode is deterministic, rejects `financial_literacy` and `profile_id`, and does not build an `AnalysisReport`. The result identifies that intentionally with `report_exclusion_reason="canonical_facts"`. Consumers should adapt the canonical values only when presenting them to a known user.
 
 ---
 
@@ -134,7 +151,7 @@ context = {
 result = await container.research_orchestrator().run_job(job, context)
 ```
 
-`DefaultJobRunner` logs a `WARNING` if `financial_literacy` is absent from the context and no profile is attached. In that case the output defaults to `intermediate`.
+For any user-facing job, omitting both `financial_literacy` and a resolvable `profile_id` raises a validation error. For a shared deterministic market job, set `"output_mode": "canonical_facts"` and omit both audience fields.
 
 ---
 

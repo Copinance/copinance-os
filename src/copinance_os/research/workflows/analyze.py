@@ -8,6 +8,7 @@ from copinance_os.domain.models.analysis import (  # noqa: F401
     INSTRUMENT_QUESTION_DRIVEN_TYPE,
     MARKET_DETERMINISTIC_TYPE,
     MARKET_QUESTION_DRIVEN_TYPE,
+    AnalysisOutputMode,
     AnalyzeInstrumentRequest,
     AnalyzeMarketRequest,
     AnalyzeMode,

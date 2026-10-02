@@ -103,6 +103,7 @@ class DefaultAnalyzeMarketRunner(AnalyzeMarketRunner):
             "include_advanced": request.include_advanced,
             "stream": request.stream,
             "no_cache": request.no_cache,
+            "output_mode": request.output_mode.value,
         }
         if request.financial_literacy is not None:
             context["financial_literacy"] = request.financial_literacy.value

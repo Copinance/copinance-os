@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 
 from copinance_os.domain.models.analysis import (
+    AnalysisOutputMode,
     AnalyzeInstrumentRequest,
     AnalyzeMarketRequest,
     AnalyzeMode,
@@ -423,6 +424,7 @@ async def analyze_macro(
         timeframe=timeframe,
         question=question,
         mode=mode,
+        output_mode=AnalysisOutputMode.LITERACY_ADAPTED,
         lookback_days=lookback_days,
         include_vix=include_vix,
         include_market_breadth=include_market_breadth,

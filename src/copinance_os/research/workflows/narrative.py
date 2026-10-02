@@ -12,7 +12,11 @@ from copinance_os.domain.literacy import (
     financial_literacy_prompt_value,
     resolve_financial_literacy,
 )
-from copinance_os.domain.models.analysis import AnalyzeMarketRequest, AnalyzeMode
+from copinance_os.domain.models.analysis import (
+    AnalysisOutputMode,
+    AnalyzeMarketRequest,
+    AnalyzeMode,
+)
 from copinance_os.domain.models.analysis.narrative import MarketNarrativeRequest, NarrativeResult
 from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.job import JobTimeframe
@@ -212,6 +216,7 @@ class GenerateMarketNarrativeUseCase(UseCase[MarketNarrativeRequest, NarrativeRe
             AnalyzeMarketRequest(
                 market_index=market_index,
                 mode=AnalyzeMode.DETERMINISTIC,
+                output_mode=AnalysisOutputMode.LITERACY_ADAPTED,
                 financial_literacy=lit,
                 no_cache=request.no_cache,
                 # Silence mypy pydantic-plugin false positives — all have defaults

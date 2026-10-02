@@ -71,16 +71,34 @@ from copinance_os.domain.indicators import (
     rolling_volatility_annualized_from_prices,
     simple_moving_average,
 )
-from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.literacy import require_financial_literacy
+from copinance_os.domain.models.analysis import AnalysisOutputMode
 from copinance_os.domain.models.common.methodology import (
     MethodologySpec,
     analysis_methodology_single_spec,
 )
+from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MarketDataProvider
 from copinance_os.domain.ports.tools import Tool, ToolSchema
 
 logger = structlog.get_logger(__name__)
+
+
+def _output_literacy(validated: dict[str, Any]) -> FinancialLiteracy | None:
+    output_mode = AnalysisOutputMode(
+        validated.get("output_mode", AnalysisOutputMode.CANONICAL_FACTS.value)
+    )
+    if output_mode == AnalysisOutputMode.CANONICAL_FACTS:
+        return None
+    return require_financial_literacy(validated.get("financial_literacy"))
+
+
+def _cycle_phase_description(key: str, lit: FinancialLiteracy | None) -> str | None:
+    if lit is None:
+        return None
+    return mr_lit.cycle_phase_description(key, lit)
+
 
 # OpenAI function-calling requires JSON Schema arrays to declare ``items``.
 _HISTORICAL_DATA_PARAM = {
@@ -244,6 +262,11 @@ class MarketRegimeDetectTrendTool(Tool):
                         "type": "string",
                         "description": "Literacy tier: beginner|intermediate|advanced",
                     },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["literacy_adapted", "canonical_facts"],
+                        "default": "canonical_facts",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -262,7 +285,7 @@ class MarketRegimeDetectTrendTool(Tool):
             short_ma = validated.get("short_ma_period", 50)
             long_ma = validated.get("long_ma_period", 200)
             historical_data = validated.get("historical_data")
-            financial_literacy = resolve_financial_literacy(validated.get("financial_literacy"))
+            financial_literacy = _output_literacy(validated)
 
             # Use pre-fetched data if provided, otherwise fetch
             if historical_data is None:
@@ -417,7 +440,11 @@ class MarketRegimeDetectTrendTool(Tool):
                 "symbol": symbol,
                 # Canonical codes for structured consumers (e.g. MarketTrendData); see regime_label for tiered copy.
                 "regime": regime,
-                "regime_label": mr_lit.trend_regime_label(regime, financial_literacy),
+                "regime_label": (
+                    regime
+                    if financial_literacy is None
+                    else mr_lit.trend_regime_label(regime, financial_literacy)
+                ),
                 "confidence": confidence,
                 "current_price": current_price,
                 "price_change_pct": round(price_change_pct, 2),  # Log-return as percentage
@@ -547,6 +574,11 @@ class MarketRegimeDetectVolatilityTool(Tool):
                         "type": "string",
                         "description": "Literacy tier: beginner|intermediate|advanced",
                     },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["literacy_adapted", "canonical_facts"],
+                        "default": "canonical_facts",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -564,7 +596,7 @@ class MarketRegimeDetectVolatilityTool(Tool):
             lookback_days = validated.get("lookback_days", 252)
             vol_window = validated.get("volatility_window", 20)
             historical_data = validated.get("historical_data")
-            financial_literacy = resolve_financial_literacy(validated.get("financial_literacy"))
+            financial_literacy = _output_literacy(validated)
 
             # Use pre-fetched data if provided, otherwise fetch
             if historical_data is None:
@@ -648,7 +680,11 @@ class MarketRegimeDetectVolatilityTool(Tool):
             result = {
                 "symbol": symbol,
                 "regime": regime,
-                "regime_label": mr_lit.volatility_regime_label(regime, financial_literacy),
+                "regime_label": (
+                    regime
+                    if financial_literacy is None
+                    else mr_lit.volatility_regime_label(regime, financial_literacy)
+                ),
                 "current_volatility": round(current_vol * 100, 2),  # As percentage
                 "mean_volatility": round(mean_vol * 100, 2),
                 "max_volatility": round(max_vol * 100, 2),
@@ -743,6 +779,11 @@ class MarketRegimeDetectCyclesTool(Tool):
                         "type": "string",
                         "description": "Literacy tier: beginner|intermediate|advanced",
                     },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["literacy_adapted", "canonical_facts"],
+                        "default": "canonical_facts",
+                    },
                 },
                 "required": ["symbol"],
             },
@@ -759,7 +800,7 @@ class MarketRegimeDetectCyclesTool(Tool):
             symbol = validated["symbol"].upper()
             lookback_days = validated.get("lookback_days", 252)
             historical_data = validated.get("historical_data")
-            financial_literacy = resolve_financial_literacy(validated.get("financial_literacy"))
+            financial_literacy = _output_literacy(validated)
 
             # Use pre-fetched data if provided, otherwise fetch
             if historical_data is None:
@@ -851,45 +892,37 @@ class MarketRegimeDetectCyclesTool(Tool):
                 if current_price > current_ma20 > current_ma50 and price_position > 60:
                     if volume_ratio > 1.2:
                         phase = "markup"
-                        phase_description = mr_lit.cycle_phase_description(
+                        phase_description = _cycle_phase_description(
                             "markup_strong", financial_literacy
                         )
                     else:
                         phase = "markup"
-                        phase_description = mr_lit.cycle_phase_description(
+                        phase_description = _cycle_phase_description(
                             "markup_moderate", financial_literacy
                         )
                 elif current_price < current_ma20 < current_ma50 and price_position < 40:
                     if volume_ratio > 1.2:
                         phase = "markdown"
-                        phase_description = mr_lit.cycle_phase_description(
+                        phase_description = _cycle_phase_description(
                             "markdown_strong", financial_literacy
                         )
                     else:
                         phase = "markdown"
-                        phase_description = mr_lit.cycle_phase_description(
+                        phase_description = _cycle_phase_description(
                             "markdown_moderate", financial_literacy
                         )
                 elif price_position > 70 and volume_ratio > 1.1:
                     phase = "distribution"
-                    phase_description = mr_lit.cycle_phase_description(
-                        "distribution", financial_literacy
-                    )
+                    phase_description = _cycle_phase_description("distribution", financial_literacy)
                 elif price_position < 30 and volume_ratio < 0.9:
                     phase = "accumulation"
-                    phase_description = mr_lit.cycle_phase_description(
-                        "accumulation", financial_literacy
-                    )
+                    phase_description = _cycle_phase_description("accumulation", financial_literacy)
                 else:
                     phase = "transition"
-                    phase_description = mr_lit.cycle_phase_description(
-                        "transition", financial_literacy
-                    )
+                    phase_description = _cycle_phase_description("transition", financial_literacy)
             else:
                 phase = "transition"
-                phase_description = mr_lit.cycle_phase_description(
-                    "insufficient", financial_literacy
-                )
+                phase_description = _cycle_phase_description("insufficient", financial_literacy)
 
             # Detect potential regime change (use actual periods)
             recent_period = min(ma_short_period, len(prices) - 1)

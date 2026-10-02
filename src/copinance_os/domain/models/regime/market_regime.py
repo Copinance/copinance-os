@@ -210,7 +210,10 @@ class MarketCyclesData(BaseModel):
             description="Current market cycle phase (transition = unclear or insufficient data)",
         )
     )
-    phase_description: str = Field(..., description="Human-readable phase description")
+    phase_description: str | None = Field(
+        None,
+        description="Literacy-adapted phase description; absent for canonical-facts output",
+    )
     price_position_pct: float = Field(..., description="Price position within cycle (percentage)")
     volume_ratio: float = Field(..., description="Volume ratio vs. moving average")
     current_price: float = Field(..., description="Current price")
