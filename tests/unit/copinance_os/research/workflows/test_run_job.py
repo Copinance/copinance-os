@@ -5,8 +5,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from copinance_os.core.orchestrator.run_job import DefaultJobRunner
-from copinance_os.domain.exceptions import RetryableExecutionError
-from copinance_os.domain.models.job import Job, JobScope, JobTimeframe, RunJobResult
+from copinance_os.domain.exceptions import RetryableExecutionError, ValidationError
+from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE, AnalysisOutputMode
+from copinance_os.domain.models.job import (
+    Job,
+    JobScope,
+    JobTimeframe,
+    ReportExclusionReason,
+    RunJobResult,
+)
 from copinance_os.domain.models.market import MarketType
 from copinance_os.domain.ports.analysis_execution import AnalysisExecutor
 from copinance_os.research.workflows.analyze import INSTRUMENT_DETERMINISTIC_TYPE
@@ -38,7 +45,7 @@ class TestDefaultJobRunner:
             timeframe=JobTimeframe.MID_TERM,
             execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
-        result = await runner.run(job, {})
+        result = await runner.run(job, {"financial_literacy": "intermediate"})
 
         assert isinstance(result, RunJobResult)
         assert result.success is True
@@ -49,6 +56,49 @@ class TestDefaultJobRunner:
         call_job = mock_executor.execute.call_args[0][0]
         assert call_job.instrument_symbol == "AAPL"
         assert call_job.execution_type == INSTRUMENT_DETERMINISTIC_TYPE
+
+    @pytest.mark.asyncio
+    async def test_canonical_market_facts_need_no_literacy_and_build_no_report(self) -> None:
+        mock_executor = AsyncMock(spec=AnalysisExecutor)
+        mock_executor.validate = AsyncMock(return_value=True)
+        mock_executor.execute = AsyncMock(return_value={"market_index": "SPY"})
+        runner = DefaultJobRunner(profile_repository=None, analysis_executors=[mock_executor])
+        job = Job(
+            scope=JobScope.MARKET,
+            market_type=None,
+            instrument_symbol=None,
+            market_index="SPY",
+            timeframe=JobTimeframe.MID_TERM,
+            execution_type=MARKET_DETERMINISTIC_TYPE,
+        )
+
+        result = await runner.run(
+            job,
+            {"output_mode": AnalysisOutputMode.CANONICAL_FACTS.value},
+        )
+
+        assert result.success is True
+        assert result.report is None
+        assert result.report_exclusion_reason == ReportExclusionReason.CANONICAL_FACTS
+
+    @pytest.mark.asyncio
+    async def test_adapted_job_without_literacy_is_rejected(self) -> None:
+        mock_executor = AsyncMock(spec=AnalysisExecutor)
+        mock_executor.validate = AsyncMock(return_value=True)
+        runner = DefaultJobRunner(profile_repository=None, analysis_executors=[mock_executor])
+        job = Job(
+            scope=JobScope.INSTRUMENT,
+            market_type=MarketType.EQUITY,
+            instrument_symbol="AAPL",
+            market_index=None,
+            timeframe=JobTimeframe.MID_TERM,
+            execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
+        )
+
+        with pytest.raises(ValidationError, match="trusted request tier"):
+            await runner.run(job, {})
+
+        mock_executor.execute.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_run_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -89,7 +139,7 @@ class TestDefaultJobRunner:
             timeframe=JobTimeframe.MID_TERM,
             execution_type=INSTRUMENT_DETERMINISTIC_TYPE,
         )
-        result = await runner.run(job, {})
+        result = await runner.run(job, {"financial_literacy": "intermediate"})
 
         assert result.success is True
         assert result.report is not None

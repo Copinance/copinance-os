@@ -18,8 +18,10 @@ from copinance_os.domain.exceptions import (
     DomainError,
     ExecutorNotFoundError,
     RetryableExecutionError,
+    ValidationError,
 )
 from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.models.analysis import AnalysisOutputMode
 from copinance_os.domain.models.job import Job, ReportExclusionReason, RunJobResult
 from copinance_os.domain.ports.analysis_execution import AnalysisExecutor, JobRunner
 from copinance_os.domain.ports.repositories import AnalysisProfileRepository
@@ -70,10 +72,11 @@ class DefaultJobRunner(JobRunner):
                 out["profile_preferences"] = profile.preferences
                 if profile.display_name:
                     out["profile_display_name"] = profile.display_name
-        if "financial_literacy" not in out:
-            logger.warning(
-                "financial_literacy not in context and no profile attached; defaulting to intermediate",
-                execution_type=job.execution_type,
+        canonical_facts = out.get("output_mode") == AnalysisOutputMode.CANONICAL_FACTS.value
+        if "financial_literacy" not in out and not canonical_facts:
+            raise ValidationError(
+                "financial_literacy",
+                "a trusted request tier or attached profile is required for adapted output",
             )
         return out
 
@@ -92,10 +95,19 @@ class DefaultJobRunner(JobRunner):
             for attempt in range(self._max_execute_retries + 1):
                 try:
                     results = await executor.execute(job, ctx)
-                    lit = resolve_financial_literacy(ctx.get("financial_literacy"))
-                    report = build_run_job_analysis_report(results, lit) if results else None
-                    report_exclusion: ReportExclusionReason | None = None
-                    if results and report is None:
+                    canonical_facts = (
+                        ctx.get("output_mode") == AnalysisOutputMode.CANONICAL_FACTS.value
+                    )
+                    report_exclusion: ReportExclusionReason | None = (
+                        ReportExclusionReason.CANONICAL_FACTS
+                        if results and canonical_facts
+                        else None
+                    )
+                    report = None
+                    if results and not canonical_facts:
+                        lit = resolve_financial_literacy(ctx.get("financial_literacy"))
+                        report = build_run_job_analysis_report(results, lit)
+                    if results and report is None and not canonical_facts:
                         et = results.get("execution_type")
                         if et and et not in _REPORT_ENVELOPE_EXECUTION_TYPES:
                             report_exclusion = ReportExclusionReason.UNKNOWN_EXECUTOR_TYPE

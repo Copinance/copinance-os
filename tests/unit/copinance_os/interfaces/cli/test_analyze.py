@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 
@@ -40,7 +41,7 @@ class TestAnalyzeCLI:
         tmp_path: Path,
     ) -> None:
         mock_console = mock_console_class.return_value
-        mock_ensure_profile.return_value = None
+        mock_ensure_profile.return_value = UUID(int=1)
         mock_get_storage_path_safe.return_value = str(tmp_path)
         mock_uc = MagicMock()
         mock_uc.execute = AsyncMock(
@@ -79,7 +80,7 @@ class TestAnalyzeCLI:
         mock_ensure_profile: MagicMock,
     ) -> None:
         mock_console = mock_console_class.return_value
-        mock_ensure_profile.return_value = None
+        mock_ensure_profile.return_value = UUID(int=1)
         mock_uc = MagicMock()
         mock_uc.execute = AsyncMock(
             return_value=RunJobResult(
@@ -125,7 +126,7 @@ class TestAnalyzeCLI:
         tmp_path: Path,
     ) -> None:
         mock_console = mock_console_class.return_value
-        mock_ensure_profile.return_value = None
+        mock_ensure_profile.return_value = UUID(int=1)
         mock_get_storage_path_safe.return_value = str(tmp_path)
         mock_uc = MagicMock()
         mock_uc.execute = AsyncMock(
@@ -165,6 +166,7 @@ class TestAnalyzeCLI:
         request = mock_uc.execute.call_args[0][0]
         assert isinstance(request, AnalyzeMarketRequest)
         assert request.market_index == "SPY"
+        assert request.profile_id == UUID(int=1)
         assert request.lookback_days == 90
         assert request.no_cache is False
         assert mock_console.print.called

@@ -32,6 +32,13 @@ class AnalyzeMode(StrEnum):
     QUESTION_DRIVEN = "question_driven"
 
 
+class AnalysisOutputMode(StrEnum):
+    """Whether an analysis returns canonical facts or user-adapted presentation."""
+
+    LITERACY_ADAPTED = "literacy_adapted"
+    CANONICAL_FACTS = "canonical_facts"
+
+
 def execution_type_from_scope_and_mode(scope: JobScope, mode: AnalyzeMode) -> str:
     """Return the execution type string for the given scope and analysis mode (for Job and executor routing)."""
     if scope == JobScope.INSTRUMENT:
@@ -215,6 +222,13 @@ class AnalyzeMarketRequest(BaseModel):
         AnalyzeMode.AUTO,
         description="Execution mode: auto, deterministic, or question_driven",
     )
+    output_mode: AnalysisOutputMode = Field(
+        AnalysisOutputMode.LITERACY_ADAPTED,
+        description=(
+            "Output contract. literacy_adapted requires a financial literacy tier or profile; "
+            "canonical_facts emits stable codes and measurements for shared persistence."
+        ),
+    )
     lookback_days: int = Field(252, ge=1, le=2520, description="Lookback days (default 252)")
     include_vix: bool = Field(True, description="Include VIX analysis")
     include_market_breadth: bool = Field(True, description="Include market breadth")
@@ -234,7 +248,7 @@ class AnalyzeMarketRequest(BaseModel):
         description=(
             "Literacy tier for output adaptation (beginner/intermediate/advanced). "
             "Takes precedence over the profile's literacy when set. "
-            "Defaults to the attached profile's level, or intermediate when no profile."
+            "Required for literacy_adapted output when no profile is attached."
         ),
     )
     include_prompt_in_results: bool = Field(
@@ -267,6 +281,15 @@ class AnalyzeMarketRequest(BaseModel):
     def _validate_request(self) -> AnalyzeMarketRequest:
         resolved_mode = resolve_analyze_mode(self.mode, self.question)
         normalized_question = (self.question or "").strip()
+        if self.output_mode == AnalysisOutputMode.CANONICAL_FACTS:
+            if resolved_mode != AnalyzeMode.DETERMINISTIC:
+                raise ValueError("canonical_facts is only supported for deterministic analysis")
+            if self.financial_literacy is not None or self.profile_id is not None:
+                raise ValueError(
+                    "canonical_facts cannot be combined with financial_literacy or profile_id"
+                )
+        elif self.financial_literacy is None and self.profile_id is None:
+            raise ValueError("literacy_adapted output requires financial_literacy or profile_id")
         if resolved_mode == AnalyzeMode.QUESTION_DRIVEN and not normalized_question:
             raise ValueError("question is required when mode=question_driven")
         if self.mode == AnalyzeMode.DETERMINISTIC and normalized_question:

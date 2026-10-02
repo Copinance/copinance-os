@@ -89,6 +89,7 @@ from copinance_os.data.analytics.options.positioning.bias import (  # noqa: E402
 )
 from copinance_os.data.analytics.options.positioning.iv_rank import iv_percentile_rank  # noqa: E402
 from copinance_os.domain.models.analysis import (  # noqa: E402
+    AnalysisOutputMode,
     AnalyzeInstrumentRequest,
     AnalyzeMarketRequest,
     AnalyzeMode,
@@ -121,6 +122,7 @@ __all__ = [
     "AnalyzeInstrumentRequest",
     "AnalyzeMarketRequest",
     "AnalyzeMode",
+    "AnalysisOutputMode",
     "RunJobResult",
     "AnalysisReport",
     # Narrative request/response types

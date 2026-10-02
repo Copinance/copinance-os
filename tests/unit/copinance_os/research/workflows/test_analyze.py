@@ -18,6 +18,7 @@ from copinance_os.research.workflows.analyze import (
     INSTRUMENT_QUESTION_DRIVEN_TYPE,
     MARKET_DETERMINISTIC_TYPE,
     MARKET_QUESTION_DRIVEN_TYPE,
+    AnalysisOutputMode,
     AnalyzeInstrumentRequest,
     AnalyzeInstrumentRunner,
     AnalyzeInstrumentUseCase,
@@ -172,12 +173,44 @@ class TestAnalyzeMarketUseCase:
             return_value=RunJobResult(success=True, results={"macro": {}}, error_message=None)
         )
         use_case = AnalyzeMarketUseCase(analyze_market_runner=mock_runner)
-        request = AnalyzeMarketRequest(market_index="QQQ", lookback_days=90, include_vix=False)
+        request = AnalyzeMarketRequest(
+            market_index="QQQ",
+            lookback_days=90,
+            include_vix=False,
+            output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+        )
 
         response = await use_case.execute(request)
 
         assert response.success is True
         mock_runner.run.assert_called_once_with(request)
+
+
+@pytest.mark.unit
+def test_market_request_rejects_adapted_output_without_audience() -> None:
+    with pytest.raises(ValueError, match="requires financial_literacy or profile_id"):
+        AnalyzeMarketRequest(market_index="SPY")
+
+
+@pytest.mark.unit
+def test_market_request_accepts_canonical_facts_without_audience() -> None:
+    request = AnalyzeMarketRequest(
+        market_index="SPY",
+        output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+    )
+
+    assert request.financial_literacy is None
+    assert request.profile_id is None
+
+
+@pytest.mark.unit
+def test_market_request_rejects_audience_for_canonical_facts() -> None:
+    with pytest.raises(ValueError, match="cannot be combined"):
+        AnalyzeMarketRequest(
+            market_index="SPY",
+            output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+            profile_id="00000000-0000-0000-0000-000000000001",
+        )
 
 
 @pytest.mark.unit
@@ -193,7 +226,12 @@ class TestDefaultAnalyzeMarketRunner:
         )
 
         await runner.run(
-            AnalyzeMarketRequest(market_index="QQQ", lookback_days=90, include_vix=False)
+            AnalyzeMarketRequest(
+                market_index="QQQ",
+                lookback_days=90,
+                include_vix=False,
+                output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+            )
         )
 
         job = mock_job_runner.run.call_args[0][0]
@@ -206,6 +244,7 @@ class TestDefaultAnalyzeMarketRunner:
         assert context["include_vix"] is False
         assert context["stream"] is False
         assert context["no_cache"] is False
+        assert context["output_mode"] == "canonical_facts"
 
     @pytest.mark.asyncio
     async def test_run_builds_question_driven_market_job(self) -> None:
@@ -222,6 +261,7 @@ class TestDefaultAnalyzeMarketRunner:
                 market_index="SPY",
                 question="Is this risk on or risk off?",
                 mode=AnalyzeMode.AUTO,
+                profile_id="00000000-0000-0000-0000-000000000001",
             )
         )
 
@@ -242,6 +282,12 @@ class TestDefaultAnalyzeMarketRunner:
         runner = DefaultAnalyzeMarketRunner(
             research_orchestrator=ResearchOrchestrator(mock_job_runner)
         )
-        await runner.run(AnalyzeMarketRequest(market_index="SPY", no_cache=True))
+        await runner.run(
+            AnalyzeMarketRequest(
+                market_index="SPY",
+                no_cache=True,
+                output_mode=AnalysisOutputMode.CANONICAL_FACTS,
+            )
+        )
         context = mock_job_runner.run.call_args[0][1]
         assert context["no_cache"] is True

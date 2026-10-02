@@ -22,6 +22,7 @@ class ReportExclusionReason(StrEnum):
     """When no ``AnalysisReport`` was produced despite having executor results."""
 
     UNKNOWN_EXECUTOR_TYPE = "unknown_executor_type"
+    CANONICAL_FACTS = "canonical_facts"
 
 
 class RunJobResult(BaseModel):

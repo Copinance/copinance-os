@@ -14,7 +14,8 @@ import structlog
 
 from copinance_os.data.cache import CacheManager
 from copinance_os.data.literacy import macro_indicators as macro_lit
-from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.literacy import require_financial_literacy
+from copinance_os.domain.models.analysis import AnalysisOutputMode
 from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.pipeline.tool_results import ToolResult
 from copinance_os.domain.ports.data_providers import MacroeconomicDataProvider, MarketDataProvider
@@ -116,8 +117,10 @@ class MacroRegimeIndicatorsTool(Tool):
         return out
 
     @staticmethod
-    def _resolve_block_literacy(block: dict[str, Any], lit: FinancialLiteracy) -> dict[str, Any]:
-        """Apply literacy to a cached block's raw interpretation codes.
+    def _resolve_block_output(
+        block: dict[str, Any], lit: FinancialLiteracy | None
+    ) -> dict[str, Any]:
+        """Expose canonical interpretation codes or adapt them for a known user tier.
 
         Blocks store raw coded strings under ``_raw_interpretation`` so that
         cached data is literacy-neutral and can be served to any caller tier.
@@ -126,8 +129,10 @@ class MacroRegimeIndicatorsTool(Tool):
         if not raw:
             return block
         result = {k: v for k, v in block.items() if k != "_raw_interpretation"}
-        result["interpretation"] = MacroRegimeIndicatorsTool._apply_literacy_to_interpretation(
-            raw, lit
+        result["interpretation"] = (
+            dict(raw)
+            if lit is None
+            else MacroRegimeIndicatorsTool._apply_literacy_to_interpretation(raw, lit)
         )
         return result
 
@@ -262,6 +267,11 @@ class MacroRegimeIndicatorsTool(Tool):
                         "type": "string",
                         "description": "Literacy tier: beginner|intermediate|advanced",
                     },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["literacy_adapted", "canonical_facts"],
+                        "default": "canonical_facts",
+                    },
                 },
                 "required": [],
             },
@@ -285,7 +295,14 @@ class MacroRegimeIndicatorsTool(Tool):
             include_global = bool(validated.get("include_global", True))
             include_advanced = bool(validated.get("include_advanced", True))
             include_volatility = bool(validated.get("include_volatility", True))
-            lit = resolve_financial_literacy(validated.get("financial_literacy"))
+            output_mode = AnalysisOutputMode(
+                validated.get("output_mode", AnalysisOutputMode.CANONICAL_FACTS.value)
+            )
+            lit = (
+                None
+                if output_mode == AnalysisOutputMode.CANONICAL_FACTS
+                else require_financial_literacy(validated.get("financial_literacy"))
+            )
 
             end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=lookback_days + 30)
@@ -296,52 +313,52 @@ class MacroRegimeIndicatorsTool(Tool):
             }
 
             if include_rates:
-                data["rates"] = self._resolve_block_literacy(
+                data["rates"] = self._resolve_block_output(
                     await self._get_rates_block(start_date, end_date), lit
                 )
 
             if include_credit:
-                data["credit"] = self._resolve_block_literacy(
+                data["credit"] = self._resolve_block_output(
                     await self._get_credit_block(start_date, end_date), lit
                 )
 
             if include_commodities:
-                data["commodities"] = self._resolve_block_literacy(
+                data["commodities"] = self._resolve_block_output(
                     await self._get_commodities_block(start_date, end_date), lit
                 )
 
             if include_labor:
-                data["labor"] = self._resolve_block_literacy(
+                data["labor"] = self._resolve_block_output(
                     await self._get_labor_block(start_date, end_date), lit
                 )
 
             if include_housing:
-                data["housing"] = self._resolve_block_literacy(
+                data["housing"] = self._resolve_block_output(
                     await self._get_housing_block(start_date, end_date), lit
                 )
 
             if include_manufacturing:
-                data["manufacturing"] = self._resolve_block_literacy(
+                data["manufacturing"] = self._resolve_block_output(
                     await self._get_manufacturing_block(start_date, end_date), lit
                 )
 
             if include_consumer:
-                data["consumer"] = self._resolve_block_literacy(
+                data["consumer"] = self._resolve_block_output(
                     await self._get_consumer_block(start_date, end_date), lit
                 )
 
             if include_global:
-                data["global"] = self._resolve_block_literacy(
+                data["global"] = self._resolve_block_output(
                     await self._get_global_block(start_date, end_date), lit
                 )
 
             if include_advanced:
-                data["advanced"] = self._resolve_block_literacy(
+                data["advanced"] = self._resolve_block_output(
                     await self._get_advanced_block(start_date, end_date), lit
                 )
 
             if include_volatility:
-                data["volatility"] = self._resolve_block_literacy(
+                data["volatility"] = self._resolve_block_output(
                     await self._get_volatility_block(start_date, end_date), lit
                 )
 

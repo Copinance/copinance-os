@@ -22,7 +22,8 @@ from copinance_os.domain.indicators import (
     rolling_volatility_annualized_from_prices,
     simple_moving_average,
 )
-from copinance_os.domain.literacy import resolve_financial_literacy
+from copinance_os.domain.literacy import require_financial_literacy
+from copinance_os.domain.models.analysis import AnalysisOutputMode
 from copinance_os.domain.models.entities.profile import FinancialLiteracy
 from copinance_os.domain.models.market import MarketDataPoint
 from copinance_os.domain.models.pipeline.tool_results import ToolResult
@@ -120,6 +121,11 @@ class MarketRegimeIndicatorsTool(Tool):
                     "financial_literacy": {
                         "type": "string",
                         "description": "Literacy tier: beginner|intermediate|advanced",
+                    },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["literacy_adapted", "canonical_facts"],
+                        "default": "canonical_facts",
                     },
                 },
                 "required": [],
@@ -223,7 +229,14 @@ class MarketRegimeIndicatorsTool(Tool):
             include_vix = validated.get("include_vix", True)
             include_market_breadth = validated.get("include_market_breadth", True)
             include_sector_rotation = validated.get("include_sector_rotation", True)
-            financial_literacy = resolve_financial_literacy(validated.get("financial_literacy"))
+            output_mode = AnalysisOutputMode(
+                validated.get("output_mode", AnalysisOutputMode.CANONICAL_FACTS.value)
+            )
+            financial_literacy = (
+                None
+                if output_mode == AnalysisOutputMode.CANONICAL_FACTS
+                else require_financial_literacy(validated.get("financial_literacy"))
+            )
 
             # Calculate date range
             # Add extra buffer to ensure we have enough data for 200-day MA calculation
@@ -343,7 +356,7 @@ class MarketRegimeIndicatorsTool(Tool):
         self,
         start_date: datetime,
         end_date: datetime,
-        financial_literacy: FinancialLiteracy,
+        financial_literacy: FinancialLiteracy | None,
     ) -> dict[str, Any]:
         """Fetch VIX volatility index data.
 
@@ -407,7 +420,11 @@ class MarketRegimeIndicatorsTool(Tool):
                 "recent_max_20d": round(recent_max, 2),
                 "recent_min_20d": round(recent_min, 2),
                 "regime": vix_regime,
-                "sentiment": mr_lit.vix_sentiment_label(vix_sentiment, financial_literacy),
+                "sentiment": (
+                    vix_sentiment
+                    if financial_literacy is None
+                    else mr_lit.vix_sentiment_label(vix_sentiment, financial_literacy)
+                ),
                 "data_points": len(vix_prices),
             }
 

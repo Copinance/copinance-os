@@ -23,7 +23,7 @@ from copinance_os.core.pipeline.tools.analysis.market_regime.macro_indicators im
 )
 from copinance_os.data.cache import CacheManager
 from copinance_os.domain.literacy import resolve_financial_literacy
-from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE
+from copinance_os.domain.models.analysis import MARKET_DETERMINISTIC_TYPE, AnalysisOutputMode
 from copinance_os.domain.models.common.methodology import AnalysisMethodology
 from copinance_os.domain.models.job import Job, JobScope
 from copinance_os.domain.models.market import MarketDataPoint
@@ -101,7 +101,11 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
 
         use_cache = not bool(context.get("no_cache"))
         cache_manager = self._cache_manager if use_cache else None
-        lit = resolve_financial_literacy(context.get("financial_literacy"))
+        output_mode = AnalysisOutputMode(
+            context.get("output_mode", AnalysisOutputMode.LITERACY_ADAPTED.value)
+        )
+        canonical_facts = output_mode == AnalysisOutputMode.CANONICAL_FACTS
+        lit = None if canonical_facts else resolve_financial_literacy(context["financial_literacy"])
 
         # Market regime indicators (VIX, breadth, rotation)
         market_indicators_tool = create_market_regime_indicators_tool(
@@ -114,7 +118,8 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_vix=include_vix,
             include_market_breadth=include_market_breadth,
             include_sector_rotation=include_sector_rotation,
-            financial_literacy=lit.value,
+            output_mode=output_mode.value,
+            financial_literacy=lit.value if lit is not None else None,
         )
 
         # Construct typed market regime indicators result
@@ -217,7 +222,8 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
                     symbol=market_index,
                     lookback_days=lookback_days,
                     historical_data=regime_historical_data,
-                    financial_literacy=lit.value,
+                    output_mode=output_mode.value,
+                    financial_literacy=lit.value if lit is not None else None,
                 )
                 regime_detection_data[tool_name] = ToolResult(
                     success=tool_result.success,
@@ -290,7 +296,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             data = detect_market_cycles_result.data
             detect_market_cycles_data = MarketCyclesData(
                 current_phase=data["current_phase"],
-                phase_description=data["phase_description"],
+                phase_description=data.get("phase_description"),
                 price_position_pct=data["price_position_pct"],
                 volume_ratio=data["volume_ratio"],
                 current_price=data["current_price"],
@@ -333,7 +339,8 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_global=include_global,
             include_advanced=include_advanced,
             include_volatility=include_volatility,
-            financial_literacy=lit.value,
+            output_mode=output_mode.value,
+            financial_literacy=lit.value if lit is not None else None,
         )
 
         # Construct typed macro regime indicators result
