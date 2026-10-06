@@ -120,6 +120,9 @@ class Tool(ABC):
                 continue
 
             param_schema = param_props[param_name]
+            if param_value is None and param_name not in param_required:
+                # An explicit None for an optional parameter means "not provided".
+                continue
             param_type = param_schema.get("type")
 
             # Type validation

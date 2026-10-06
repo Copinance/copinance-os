@@ -113,6 +113,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Canonical-facts market analysis**: `MarketAnalysisExecutor` no longer passes `financial_literacy=None` to the regime, indicator, and macro tools (their parameter validation rejected it, so every canonical-facts run returned empty results). `Tool.validate_parameters` also treats an explicit `None` for an optional parameter as not provided. A new test drives the real executor and tools against synthetic providers.
+- **Yahoo Finance quotes for mutual funds**: `YFinanceMarketProvider.get_quote` skips the 1-minute history call for `MUTUALFUND` and tolerates it failing for any symbol, falling back to `info` fields (previously `KeyError('tradingPeriods')`).
+- **Options chain logging**: "No listed options available" is logged at INFO; the raised `DataProviderError` is unchanged.
 - **Options positioning — zero-gamma level inputs**: `compute_zero_gamma_level` skips implausible IV (outside 5-500%) and uses the fraction of a year to the 16:00 ET close for 0-DTE contracts instead of a full day. `compute_gamma_regime` now scores the requested expiration window (same set as the flip) instead of the whole book; the methodology scope-split text and golden fixtures are updated to match.
 
 - **Options positioning — gamma flip is the zero-gamma spot**: `gamma_flip_strike` is now the spot where dealer net gamma changes sign. Spot is swept ±20% and each contract's Black-Scholes gamma is recomputed from its own IV and time to expiry, over the requested expiration window. The old cumulative per-strike crossing (nearest expiry only) is preserved as `gamma_balance_strike`.

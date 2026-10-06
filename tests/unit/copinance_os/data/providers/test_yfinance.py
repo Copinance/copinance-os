@@ -1244,3 +1244,59 @@ class TestYFinanceFundamentalProvider:
             provider = YFinanceFundamentalProvider()
             with pytest.raises(DataProviderError, match="yfinance is not installed"):
                 await provider.get_detailed_fundamentals("AAPL", periods=1, period_type="annual")
+
+
+class _FakeTicker:
+    """Ticker whose 1-minute history raises like yfinance does for mutual funds."""
+
+    def __init__(self, info: dict, options: tuple = ()) -> None:
+        self.info = info
+        self.options = options
+        self.history_calls = 0
+
+    def history(self, **_kwargs: object) -> None:
+        self.history_calls += 1
+        raise KeyError("tradingPeriods")
+
+
+@pytest.mark.asyncio
+async def test_get_quote_skips_intraday_history_for_mutual_funds() -> None:
+    ticker = _FakeTicker(
+        {
+            "quoteType": "MUTUALFUND",
+            "regularMarketPrice": 512.34,
+            "previousClose": 510.0,
+            "regularMarketTime": 1_791_000_000,
+        }
+    )
+    with patch.object(yfinance_module, "yf", MagicMock(Ticker=lambda _s: ticker)):
+        quote = await YFinanceMarketProvider().get_quote("VFIAX")
+
+    assert ticker.history_calls == 0
+    assert quote["current_price"] == Decimal("512.34")
+    assert quote["previous_close"] == Decimal("510.0")
+    assert quote["timestamp"] is not None
+
+
+@pytest.mark.asyncio
+async def test_get_quote_tolerates_failing_intraday_history() -> None:
+    ticker = _FakeTicker({"quoteType": "EQUITY", "currentPrice": 150.0, "previousClose": 149.0})
+    with patch.object(yfinance_module, "yf", MagicMock(Ticker=lambda _s: ticker)):
+        quote = await YFinanceMarketProvider().get_quote("AAPL")
+
+    assert ticker.history_calls == 1
+    assert quote["current_price"] == Decimal("150.0")
+
+
+@pytest.mark.asyncio
+async def test_options_chain_without_expirations_is_logged_as_info_not_error() -> None:
+    ticker = _FakeTicker({"currency": "USD"}, options=())
+    with (
+        patch.object(yfinance_module, "yf", MagicMock(Ticker=lambda _s: ticker)),
+        patch.object(yfinance_module, "logger") as mock_logger,
+        pytest.raises(DataProviderError, match="No listed options available for VFIAX"),
+    ):
+        await YFinanceMarketProvider().get_options_chain("VFIAX")
+
+    assert any(c.args[0] == "No listed options" for c in mock_logger.info.call_args_list)
+    mock_logger.error.assert_not_called()
