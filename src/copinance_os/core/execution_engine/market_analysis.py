@@ -106,6 +106,9 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
         )
         canonical_facts = output_mode == AnalysisOutputMode.CANONICAL_FACTS
         lit = None if canonical_facts else resolve_financial_literacy(context["financial_literacy"])
+        # Canonical facts are audience-free: omit the argument rather than passing None, which
+        # tool parameter validation rejects for a string-typed parameter.
+        literacy_kwargs: dict[str, str] = {} if lit is None else {"financial_literacy": lit.value}
 
         # Market regime indicators (VIX, breadth, rotation)
         market_indicators_tool = create_market_regime_indicators_tool(
@@ -119,7 +122,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_market_breadth=include_market_breadth,
             include_sector_rotation=include_sector_rotation,
             output_mode=output_mode.value,
-            financial_literacy=lit.value if lit is not None else None,
+            **literacy_kwargs,
         )
 
         # Construct typed market regime indicators result
@@ -223,7 +226,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
                     lookback_days=lookback_days,
                     historical_data=regime_historical_data,
                     output_mode=output_mode.value,
-                    financial_literacy=lit.value if lit is not None else None,
+                    **literacy_kwargs,
                 )
                 regime_detection_data[tool_name] = ToolResult(
                     success=tool_result.success,
@@ -340,7 +343,7 @@ class MarketAnalysisExecutor(BaseAnalysisExecutor):
             include_advanced=include_advanced,
             include_volatility=include_volatility,
             output_mode=output_mode.value,
-            financial_literacy=lit.value if lit is not None else None,
+            **literacy_kwargs,
         )
 
         # Construct typed macro regime indicators result

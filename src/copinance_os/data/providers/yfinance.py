@@ -166,6 +166,10 @@ def _observed_at(info: dict[str, Any], hist: Any) -> str | None:
     return None
 
 
+class _NoListedOptionsError(DataProviderError):
+    """The underlying has no option expirations: a domain answer, not a provider failure."""
+
+
 class YFinanceMarketProvider(MarketDataProvider):
     """yfinance implementation of MarketDataProvider.
 
@@ -223,8 +227,20 @@ class YFinanceMarketProvider(MarketDataProvider):
             ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
             info = await asyncio.to_thread(lambda: ticker.info)
 
-            # Get latest price data
-            hist = await asyncio.to_thread(lambda: ticker.history(period="1d", interval="1m"))
+            # Intraday bars are an enrichment, not a requirement: mutual funds publish a daily
+            # NAV only, and yfinance raises (e.g. KeyError("tradingPeriods")) for them.
+            hist = None
+            if info.get("quoteType") != "MUTUALFUND":
+                try:
+                    hist = await asyncio.to_thread(
+                        lambda: ticker.history(period="1d", interval="1m")
+                    )
+                except Exception as hist_error:  # noqa: BLE001 - fall back to `info` fields
+                    logger.info(
+                        "Intraday history unavailable; using quote info",
+                        symbol=symbol,
+                        error=repr(hist_error),
+                    )
 
             info_volume = (
                 _safe_int(
@@ -259,7 +275,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             }
 
             # Add latest price from history if available
-            if not hist.empty:
+            if hist is not None and not hist.empty:
                 latest = hist.iloc[-1]
                 quote["current_price"] = Decimal(str(float(latest["Close"])))
                 # `latest["Volume"]` is per-bar volume, often 0 for the latest minute.
@@ -510,7 +526,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             available_expirations = await asyncio.to_thread(lambda: list(ticker.options))
 
             if not available_expirations:
-                raise DataProviderError(
+                raise _NoListedOptionsError(
                     self._provider_name,
                     "get_options_chain",
                     f"No listed options available for {underlying_symbol}",
@@ -597,11 +613,14 @@ class YFinanceMarketProvider(MarketDataProvider):
             )
             return result
         except Exception as e:
-            logger.error(
-                "Failed to fetch options chain",
-                underlying_symbol=underlying_symbol,
-                error=str(e),
-            )
+            if isinstance(e, _NoListedOptionsError):
+                logger.info("No listed options", underlying_symbol=underlying_symbol, error=str(e))
+            else:
+                logger.error(
+                    "Failed to fetch options chain",
+                    underlying_symbol=underlying_symbol,
+                    error=str(e),
+                )
             raise DataProviderError(
                 self._provider_name,
                 "get_options_chain",

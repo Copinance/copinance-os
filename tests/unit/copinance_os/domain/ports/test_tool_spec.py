@@ -206,3 +206,14 @@ def test_tool_spec_policy_fields_are_settable() -> None:
     assert tuned.cache_ttl_s == 10.0
     assert tuned.parallel_safe is False
     assert "market" in tuned.tags
+
+
+def test_validate_parameters_treats_none_for_optional_parameter_as_not_provided() -> None:
+    validated = _EchoTool().validate_parameters(symbol="AAPL", side=None)
+
+    assert validated == {"symbol": "AAPL", "limit": 5}
+
+
+def test_validate_parameters_still_rejects_none_for_required_parameter() -> None:
+    with pytest.raises(ValueError, match="must be a string"):
+        _EchoTool().validate_parameters(symbol=None)
