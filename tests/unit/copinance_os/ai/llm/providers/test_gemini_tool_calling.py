@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from google import genai
 
 from copinance_os.ai.llm.providers.gemini import GeminiProvider
 from copinance_os.core.pipeline.tools.tool_runtime import ToolRuntime
@@ -314,3 +315,20 @@ async def test_validation_error_text_still_matches_the_tool_schema_hint_conditio
         or "Missing required parameter" in error_msg
         or "validation error" in error_msg
     )
+
+
+def test_thought_signature_is_extracted_and_replayed_on_the_function_call_part() -> None:
+    """Gemini 3 rejects the follow-up request (400 INVALID_ARGUMENT) when a replayed
+    function_call part lacks the thought_signature it was issued with."""
+    provider = _provider()
+    part = SimpleNamespace(
+        text=None,
+        function_call=SimpleNamespace(name="get_a", args={"symbol": "AAPL"}),
+        thought_signature=b"sig-1",
+    )
+    calls = provider._extract_function_calls_from_response(_fake_response(text=None, parts=[part]))
+
+    assert calls[0]["thought_signature"] == b"sig-1"
+    replayed = genai.types.Part.from_function_call(name="get_a", args={"symbol": "AAPL"})
+    replayed.thought_signature = calls[0]["thought_signature"]
+    assert replayed.thought_signature == b"sig-1"
