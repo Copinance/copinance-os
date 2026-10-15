@@ -625,7 +625,13 @@ class GeminiProvider(LLMProvider):
             for part in getattr(content, "parts", None) or []:
                 fc = getattr(part, "function_call", None)
                 if fc is not None and getattr(fc, "name", None):
-                    calls.append({"name": fc.name, "args": dict(fc.args or {})})
+                    call: dict[str, Any] = {"name": fc.name, "args": dict(fc.args or {})}
+                    # Gemini 3 requires the part's thought_signature to be echoed back
+                    # on replay, or the next request fails with a 400.
+                    signature = getattr(part, "thought_signature", None)
+                    if signature:
+                        call["thought_signature"] = signature
+                    calls.append(call)
         return self._dedupe_function_calls(calls)
 
     def _get_tool_schema_info(self, tool_name: str, runtime: ToolRuntime) -> dict[str, Any] | None:
@@ -1036,12 +1042,13 @@ class GeminiProvider(LLMProvider):
                     model_parts: list[Any] = []
                     if response_text:
                         model_parts.append(genai.types.Part.from_text(text=response_text))
-                    model_parts.extend(
-                        genai.types.Part.from_function_call(
+                    for func_call in function_calls:
+                        fc_part = genai.types.Part.from_function_call(
                             name=func_call["name"], args=func_call.get("args", {})
                         )
-                        for func_call in function_calls
-                    )
+                        if func_call.get("thought_signature"):
+                            fc_part.thought_signature = func_call["thought_signature"]
+                        model_parts.append(fc_part)
                     contents.append(genai.types.Content(role="model", parts=model_parts))
                     # Function responses are their own turn — one Content per
                     # Gemini's expected function-calling contract, not mixed

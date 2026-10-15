@@ -113,6 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Gemini tool loop — thought signatures**: replayed `function_call` parts now carry the `thought_signature` the model issued them with; Gemini 3 otherwise rejects the follow-up request with `400 INVALID_ARGUMENT` after the first tool round.
+
 - **Canonical-facts market analysis**: `MarketAnalysisExecutor` no longer passes `financial_literacy=None` to the regime, indicator, and macro tools (their parameter validation rejected it, so every canonical-facts run returned empty results). `Tool.validate_parameters` also treats an explicit `None` for an optional parameter as not provided. A new test drives the real executor and tools against synthetic providers.
 - **Yahoo Finance quotes for mutual funds**: `YFinanceMarketProvider.get_quote` skips the 1-minute history call for `MUTUALFUND` and tolerates it failing for any symbol, falling back to `info` fields (previously `KeyError('tradingPeriods')`).
 - **Options chain logging**: "No listed options available" is logged at INFO; the raised `DataProviderError` is unchanged.
