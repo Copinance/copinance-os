@@ -313,6 +313,41 @@ class TestYFinanceMarketProvider:
             assert result[0].close_price == Decimal("101.0")
 
     @pytest.mark.asyncio
+    async def test_get_historical_data_skips_non_finite_bars(self) -> None:
+        """An all-NaN placeholder bar is dropped instead of failing the whole series."""
+        mock_ticker = MagicMock()
+        mock_df = MagicMock()
+        mock_df.empty = False
+
+        def _bar(day: int, price: float) -> tuple[MagicMock, MagicMock]:
+            ts = MagicMock()
+            ts.to_pydatetime.return_value = datetime(2024, 1, day, tzinfo=UTC)
+            row = MagicMock()
+            row.__getitem__ = MagicMock(
+                side_effect=lambda key: {
+                    "Open": price,
+                    "Close": price,
+                    "High": price,
+                    "Low": price,
+                    "Volume": float("nan") if price != price else 10,
+                }[key]
+            )
+            return ts, row
+
+        mock_df.iterrows.return_value = [_bar(1, 100.0), _bar(2, float("nan")), _bar(3, 101.0)]
+
+        with (
+            patch("copinance_os.data.providers.yfinance.YFINANCE_AVAILABLE", True),
+            patch("asyncio.to_thread", new=AsyncMock(side_effect=[mock_ticker, mock_df])),
+        ):
+            provider = YFinanceMarketProvider()
+            result = await provider.get_historical_data(
+                "SPWI.L", datetime(2024, 1, 1), datetime(2024, 1, 31)
+            )
+
+        assert [p.close_price for p in result] == [Decimal("100.0"), Decimal("101.0")]
+
+    @pytest.mark.asyncio
     async def test_get_historical_data_empty(self) -> None:
         """Test getting historical data when empty."""
         mock_ticker = MagicMock()
