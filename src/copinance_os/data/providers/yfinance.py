@@ -24,6 +24,7 @@ To use a custom provider, simply implement the MarketDataProvider interface:
 """
 
 import asyncio
+import math
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -144,6 +145,26 @@ def _safe_int(value: Any) -> int | None:
     except (ValueError, TypeError, OverflowError):
         return None
     return None
+
+
+def _finite_ohlc(row: Any) -> tuple[float, float, float, float] | None:
+    """(open, high, low, close) of a history row, or None when any price is NaN.
+
+    yfinance emits all-NaN placeholder bars (no-trade days on thin listings such as
+    ``.L`` ETFs); one of them must not fail the whole series.
+    """
+    prices = (
+        float(row["Open"]),
+        float(row["High"]),
+        float(row["Low"]),
+        float(row["Close"]),
+    )
+    return prices if all(math.isfinite(p) for p in prices) else None
+
+
+def _finite_volume(row: Any) -> int:
+    volume = float(row["Volume"])
+    return int(volume) if math.isfinite(volume) else 0
 
 
 def _observed_at(info: dict[str, Any], hist: Any) -> str | None:
@@ -337,6 +358,11 @@ class YFinanceMarketProvider(MarketDataProvider):
 
             stock_data_list: list[MarketDataPoint] = []
             for timestamp, row in hist.iterrows():
+                ohlc = _finite_ohlc(row)
+                if ohlc is None:
+                    logger.debug("Skipping non-finite bar", symbol=symbol, timestamp=str(timestamp))
+                    continue
+                open_, high, low, close = ohlc
                 ts = (
                     timestamp.to_pydatetime()
                     if hasattr(timestamp, "to_pydatetime")
@@ -345,11 +371,11 @@ class YFinanceMarketProvider(MarketDataProvider):
                 stock_data = MarketDataPoint(
                     symbol=symbol.upper(),
                     timestamp=cast(datetime, ts),
-                    open_price=Decimal(str(float(row["Open"]))),
-                    close_price=Decimal(str(float(row["Close"]))),
-                    high_price=Decimal(str(float(row["High"]))),
-                    low_price=Decimal(str(float(row["Low"]))),
-                    volume=int(row["Volume"]),
+                    open_price=Decimal(str(open_)),
+                    close_price=Decimal(str(close)),
+                    high_price=Decimal(str(high)),
+                    low_price=Decimal(str(low)),
+                    volume=_finite_volume(row),
                     metadata={
                         "interval": interval,
                         "provider": self._provider_name,
@@ -409,6 +435,11 @@ class YFinanceMarketProvider(MarketDataProvider):
 
             stock_data_list: list[MarketDataPoint] = []
             for timestamp, row in hist.iterrows():
+                ohlc = _finite_ohlc(row)
+                if ohlc is None:
+                    logger.debug("Skipping non-finite bar", symbol=symbol, timestamp=str(timestamp))
+                    continue
+                open_, high, low, close = ohlc
                 ts = (
                     timestamp.to_pydatetime()
                     if hasattr(timestamp, "to_pydatetime")
@@ -417,11 +448,11 @@ class YFinanceMarketProvider(MarketDataProvider):
                 stock_data = MarketDataPoint(
                     symbol=symbol.upper(),
                     timestamp=cast(datetime, ts),
-                    open_price=Decimal(str(float(row["Open"]))),
-                    close_price=Decimal(str(float(row["Close"]))),
-                    high_price=Decimal(str(float(row["High"]))),
-                    low_price=Decimal(str(float(row["Low"]))),
-                    volume=int(row["Volume"]),
+                    open_price=Decimal(str(open_)),
+                    close_price=Decimal(str(close)),
+                    high_price=Decimal(str(high)),
+                    low_price=Decimal(str(low)),
+                    volume=_finite_volume(row),
                     metadata={
                         "interval": interval,
                         "provider": self._provider_name,
