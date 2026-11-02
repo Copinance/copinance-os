@@ -20,11 +20,13 @@ if TYPE_CHECKING:
     from copinance_os.infra.di.container import (
         Container,
         create_container,
+        create_engine_container,
     )
 
 __all__ = [
     "Container",
     "create_container",
+    "create_engine_container",
 ]
 
 _EXPORTS = frozenset(__all__)
@@ -35,11 +37,13 @@ def __getattr__(name: str) -> Any:
         from copinance_os.infra.di.container import (  # noqa: PLC0415
             Container,
             create_container,
+            create_engine_container,
         )
 
         # Cache in globals so subsequent accesses are O(1) attribute lookups
         g = globals()
         g["Container"] = Container
         g["create_container"] = create_container
+        g["create_engine_container"] = create_engine_container
         return g[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

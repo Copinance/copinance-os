@@ -13,6 +13,7 @@ adding startup latency.
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 from dependency_injector import containers, providers
@@ -124,6 +125,7 @@ class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
     llm_config = providers.Configuration()
     fred_api_key_config = providers.Configuration()
+    standalone_config = providers.Configuration()
 
     # Prompt templates: default manager (package prompts). Override via create_container().
     # Uses _make_prompt_manager so PromptManager is only imported when first resolved.
@@ -154,6 +156,10 @@ class Container(containers.DeclarativeContainer):
         configure_data_providers,
         llm_config=llm_config,
         cache_manager=cache_manager,
+        standalone=providers.Callable(
+            lambda s: bool(s),
+            s=standalone_config.provided,
+        ),
         fred_api_key=providers.Callable(
             lambda key: key if key else None,
             key=fred_api_key_config.provided,
@@ -305,12 +311,14 @@ def create_container(
     fundamental_data_provider: Any | None = None,
     sec_filings_provider: Any | None = None,
     macro_data_provider: Any | None = None,
+    standalone: bool = False,
+    facts: Any | None = None,
 ) -> Container:
     """Create an independent, library-safe dependency injection container.
 
     Defaults are deliberately side-effect free: memory repositories, memory
-    profile state, a no-op cache, and no environment-based LLM configuration.
-    File persistence and caching require explicit backends/paths.
+    profile state, a no-op cache, and pure computational engine providers (no network
+    scraping). Standalone CLI commands pass ``standalone=True`` to wire vendor adapters.
 
     Args:
         llm_config: Optional LLM configuration. If None and load_from_env is True,
@@ -330,23 +338,48 @@ def create_container(
         cache_manager: Explicit cache manager. Omit for a no-op cache.
         storage_type: ``"memory"`` (default) or ``"file"``.
         storage_path: Required when ``storage_type="file"``.
-        storage_backend: Optional pre-built ``Storage`` instance. When provided,
-            takes precedence over ``storage_type`` and ``storage_path``. Use this
-            when you have a custom ``Storage`` implementation (e.g. SQLite, S3) and
-            want to inject it directly. For Postgres, prefer overriding individual
-            repository providers via ``container.stock_repository.override()`` after
-            this container, since the ``Storage`` ABC is oriented toward collection-based
-            backends (file/memory); a Postgres backend is better expressed as async
-            repository implementations.
+        storage_backend: Optional pre-built ``Storage`` instance.
+        current_profile_path: Path to profile storage.
         market_data_provider: Optional host-owned market-data provider.
         fundamental_data_provider: Optional host-owned fundamentals provider.
         sec_filings_provider: Optional host-owned SEC filings provider.
         macro_data_provider: Optional host-owned macro-data provider.
+        standalone: True to enable vendor scrapers (YFinance, FRED) for standalone CLI use.
+            Also enabled by setting ``COPINANCE_STANDALONE=1`` in the environment; this is
+            the single place that combines the two, so ``configure_data_providers`` never
+            re-reads the environment itself.
+        facts: Optional ``MarketFacts`` or mapping of facts to inject directly in-memory.
 
     Returns:
         Container instance
+
+    Raises:
+        ValueError: If ``fred_api_key`` is given without either ``standalone=True`` or an
+            explicit ``macro_data_provider``. Engine mode is fail-closed by default, so a
+            bare ``fred_api_key`` would otherwise be silently ignored and macro calls would
+            quietly degrade to ``NullMacroDataProvider`` instead of using FRED.
     """
+    resolved_standalone = standalone or os.environ.get(
+        "COPINANCE_STANDALONE", ""
+    ).strip().lower() in {"1", "true", "yes"}
+
+    if fred_api_key is not None and macro_data_provider is None and not resolved_standalone:
+        raise ValueError(
+            "fred_api_key was provided but no macro provider will be wired: "
+            "create_container() defaults to a fail-closed, no-network engine mode, "
+            "so fred_api_key is otherwise silently ignored. Pass standalone=True to "
+            "enable copinance-os's own FredMacroeconomicProvider, or pass an explicit "
+            "macro_data_provider (e.g. your own FredMacroeconomicProvider instance) "
+            "to make the choice unambiguous."
+        )
+
     container_instance = Container()
+    container_instance.standalone_config.override(resolved_standalone)
+
+    if facts is not None and market_data_provider is None:
+        from copinance_os.data.providers.facts import FactBasedMarketProvider  # noqa: PLC0415
+
+        market_data_provider = FactBasedMarketProvider(facts)
 
     if llm_config is None and load_from_env:
         from copinance_os.ai.llm.config_loader import load_llm_config_from_env  # noqa: PLC0415
@@ -395,3 +428,31 @@ def create_container(
             provider.override(providers.Object(override))
 
     return container_instance
+
+
+def create_engine_container(
+    facts: Any | None = None,
+    *,
+    market_data_provider: Any | None = None,
+    fundamental_data_provider: Any | None = None,
+    macro_data_provider: Any | None = None,
+    llm_config: LLMConfig | None = None,
+    prompt_manager: PromptManager | None = None,
+    cache_manager: CacheManager | None = None,
+) -> Container:
+    """Create a container configured strictly as an in-process computational engine.
+
+    Zero outbound network I/O, no vendor scrapers. Market facts must be injected
+    via ``facts`` or ``market_data_provider``.
+    """
+    return create_container(
+        standalone=False,
+        facts=facts,
+        market_data_provider=market_data_provider,
+        fundamental_data_provider=fundamental_data_provider,
+        macro_data_provider=macro_data_provider,
+        llm_config=llm_config,
+        prompt_manager=prompt_manager,
+        cache_manager=cache_manager,
+        storage_type="memory",
+    )

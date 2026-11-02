@@ -88,6 +88,16 @@ from copinance_os.data.analytics.options.positioning.bias import (  # noqa: E402
     signal_agreement_direction,
 )
 from copinance_os.data.analytics.options.positioning.iv_rank import iv_percentile_rank  # noqa: E402
+from copinance_os.data.providers.facts import (  # noqa: E402
+    FactBasedMacroProvider,
+    FactBasedMarketProvider,
+    FactNotFound,
+    FactProviderNotConfigured,
+    MarketFacts,
+    NullFundamentalDataProvider,
+    NullMacroDataProvider,
+    NullMarketDataProvider,
+)
 from copinance_os.domain.models.analysis import (  # noqa: E402
     AnalysisOutputMode,
     AnalyzeInstrumentRequest,
@@ -148,4 +158,13 @@ __all__ = [
     "CacheBackend",
     "StockRepository",
     "AnalysisProfileRepository",
+    # Computational engine and fact injection
+    "MarketFacts",
+    "FactBasedMarketProvider",
+    "FactBasedMacroProvider",
+    "FactNotFound",
+    "FactProviderNotConfigured",
+    "NullMarketDataProvider",
+    "NullFundamentalDataProvider",
+    "NullMacroDataProvider",
 ]
