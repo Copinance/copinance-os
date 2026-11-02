@@ -43,6 +43,7 @@ def get_container() -> Container:
         str(get_state_dir(storage_path) / "app.json") if settings.storage_type == "file" else None
     )
     _cli_container = create_container(
+        standalone=True,
         load_from_env=True,
         cache_manager=cache_manager,
         storage_type=settings.storage_type,

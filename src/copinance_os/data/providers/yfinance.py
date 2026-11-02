@@ -45,6 +45,7 @@ except ImportError:
     DataFrame = None  # type: ignore[misc, assignment]
     pd = None  # type: ignore[assignment]
 
+from copinance_os.data.providers.market_facts import refuse_covered_fetch
 from copinance_os.domain.exceptions import DataProviderError, ValidationError
 from copinance_os.domain.models.market import (
     MarketDataPoint,
@@ -244,6 +245,7 @@ class YFinanceMarketProvider(MarketDataProvider):
             - currency: Currency code
             - exchange: Exchange name
         """
+        refuse_covered_fetch("quote")
         try:
             ticker = await asyncio.to_thread(lambda: yf.Ticker(symbol))
             info = await asyncio.to_thread(lambda: ticker.info)
@@ -338,6 +340,7 @@ class YFinanceMarketProvider(MarketDataProvider):
         Returns:
             List of MarketDataPoint objects with OHLCV data
         """
+        refuse_covered_fetch("historical")
         try:
             if not YFINANCE_AVAILABLE:
                 raise ImportError(
@@ -547,6 +550,7 @@ class YFinanceMarketProvider(MarketDataProvider):
         expiration_date: str | None = None,
     ) -> OptionsChain:
         """Get the options chain for an underlying instrument."""
+        refuse_covered_fetch("option_chain")
         try:
             if not YFINANCE_AVAILABLE:
                 raise ImportError(

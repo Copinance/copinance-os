@@ -20,7 +20,10 @@ class TestContainerCacheConfig:
 
     def test_custom_cache_manager_is_shared_with_edgar_provider_graph(self) -> None:
         custom = CacheManager(InMemoryCacheBackend())
-        container = create_container(cache_manager=custom)
+        # Vendor adapters (including the real EdgarToolsFundamentalProvider this test
+        # checks) are only wired in standalone mode; the default engine mode wires
+        # fail-closed null providers that have nothing to share a cache manager with.
+        container = create_container(cache_manager=custom, standalone=True)
 
         assert container.cache_manager() is custom
         assert container.sec_filings_provider()._cache_manager is custom
